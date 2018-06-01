@@ -17,46 +17,16 @@ limitations under the License.
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"time"
-
-	"cloud.google.com/go/compute/metadata"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
 	"github.com/golang/glog"
 )
-
-func isK8sMaster() bool {
-	if !metadata.OnGCE() {
-		log.Fatal("not running on GCE")
-	}
-
-	yKubeEnv, err := metadata.InstanceAttributeValue("kube-env")
-	if err != nil {
-		log.Fatal("failed to fetch kube-env: %v", err)
-	}
-
-	jKubeEnv, err := utilyaml.ToJSON([]byte(yKubeEnv))
-	if err != nil {
-		log.Fatal("failed to convert kube-env to JSON: %v", err)
-	}
-
-	var data map[string]interface{}
-	if err := json.Unmarshal(jKubeEnv, &data); err != nil {
-		log.Fatal("failed to parse kube-env: %v", err)
-	}
-
-	return data["KUBERNETES_MASTER"].(string) == "true"
-}
 
 func main() {
 	nodeName, err := os.Hostname()
@@ -106,10 +76,6 @@ func k8sClient() (*kubernetes.Clientset, error) {
 	if err != nil {
 		glog.Errorf("failed to create in-cluster config: %v", err)
 		return nil, err
-	}
-
-	if isK8sMaster() {
-		config.Host = "http://localhost:8080"
 	}
 
 	client, err := kubernetes.NewForConfig(config)

@@ -113,7 +113,7 @@ spec:
       terminationGracePeriodSeconds: 0
       hostNetwork: true
       containers:
-      - image: gcr.io/koonwah-k8s/netd-amd64:f907d3f-dirty
+      - image: gcr.io/google-containers/netd-amd64:0.1
         name: netd
         securityContext:
           privileged: true

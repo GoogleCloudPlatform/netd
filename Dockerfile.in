@@ -16,6 +16,10 @@ FROM ARG_FROM
 
 MAINTAINER Jing Ai <jinga@google.com>
 
+RUN apk add --no-cache curl
+RUN apk update && apk add jq
+
+ADD cni/install-cni.sh /install-cni.sh
 ADD bin/ARG_ARCH/ARG_BIN /ARG_BIN
 
 ENTRYPOINT ["/ARG_BIN"]

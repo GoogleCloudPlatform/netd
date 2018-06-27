@@ -59,12 +59,12 @@ subjects:
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: netd-cni-config
+  name: netd-config
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: EnsureExists
 data:
-  cni_network_config: |-
+  cni_spec_template: |-
     {
       "name": "k8s-pod-network",
       "cniVersion": "0.3.1",
@@ -74,7 +74,11 @@ data:
           "mtu": 1460,
           "ipam": {
               "type": "host-local",
-              "subnet": "%s",
+              "ranges": [
+                [
+                  {"subnet": podCidr}
+                ]
+              ],
               "routes": [
                 {"dst": "0.0.0.0/0"}
               ]
@@ -89,6 +93,8 @@ data:
         }
       ]
     }
+  cni_spec_name: "10-k8s-ptp.conflist"
+  
 ---
 
 kind: DaemonSet
@@ -112,24 +118,31 @@ spec:
       serviceAccountName: netd
       terminationGracePeriodSeconds: 0
       hostNetwork: true
-      containers:
-      - image: gcr.io/google-containers/netd-amd64:0.1
-        name: netd
-        securityContext:
-          privileged: true
+      initContainers:
+      - image: gcr.io/google-containers/netd-amd64:latest
+        name: install-cni
+        command: ['./install-cni.sh']
         env:
-          - name: NETD_CNI_CONFIG_PATH
-            value: "/host/etc/cni/net.d/10-k8s-ptp.conflist"
-          - name: NETD_CNI_NETWORK_CONFIG_TEMPLATE
+          - name: CNI_SPEC_TEMPLATE
             valueFrom:
               configMapKeyRef:
-                name: netd-cni-config
-                key: cni_network_config
-        args:
-        - -logtostderr
+                name: netd-config
+                key: cni_spec_template
+          - name: CNI_SPEC_NAME
+            valueFrom:
+              configMapKeyRef:
+                name: netd-config
+                key: cni_spec_name
         volumeMounts:
         - mountPath: /host/etc/cni/net.d
           name: cni-net-dir
+      containers:
+      - image: gcr.io/google-containers/netd-amd64:latest
+        name: netd
+        securityContext:
+          privileged: true
+          capabilities:
+            add: ["NET_ADMIN"]
       volumes:
       - name: cni-net-dir
         hostPath:

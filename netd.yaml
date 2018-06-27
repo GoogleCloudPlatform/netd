@@ -119,7 +119,7 @@ spec:
       terminationGracePeriodSeconds: 0
       hostNetwork: true
       initContainers:
-      - image: us.gcr.io/jinga-prod/netd-amd64:latest
+      - image: gcr.io/google-containers/netd-amd64:latest
         name: install-cni
         command: ['./install-cni.sh']
         env:
@@ -137,7 +137,7 @@ spec:
         - mountPath: /host/etc/cni/net.d
           name: cni-net-dir
       containers:
-      - image: us.gcr.io/jinga-prod/netd-amd64:latest
+      - image: gcr.io/google-containers/netd-amd64:latest
         name: netd
         securityContext:
           privileged: true

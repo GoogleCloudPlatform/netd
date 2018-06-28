@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  branch = "master"
+  name = "github.com/GoogleCloudPlatform/netd"
+  packages = ["pkg/config"]
+  revision = "3d8c61b051a6b62f5187324a29b27c878f99054b"
+
+[[projects]]
   name = "github.com/containernetworking/plugins"
   packages = ["pkg/utils/sysctl"]
   revision = "72b62babeeb3d7b25c9809ea9eb9fc9c02cc0f71"
@@ -37,6 +43,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "65b00b713aaa78d420a62a717ce5da0762acfe9931ba2166d66a968705a5eca6"
+  inputs-digest = "fff09a7f207efec2c9df8e2d82fba60885b42fdca61f9440d89352f95eb11eb7"
   solver-name = "gps-cdcl"
   solver-version = 1

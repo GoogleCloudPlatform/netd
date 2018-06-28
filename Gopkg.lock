@@ -5,7 +5,7 @@
   branch = "master"
   name = "github.com/GoogleCloudPlatform/netd"
   packages = ["pkg/config"]
-  revision = "3d8c61b051a6b62f5187324a29b27c878f99054b"
+  revision = "ba0282813cd9d43108e1dca1edfa7794234a8e9c"
 
 [[projects]]
   name = "github.com/containernetworking/plugins"
@@ -18,6 +18,12 @@
   packages = ["iptables"]
   revision = "b5b1876b170881a8259f036445ee89c8669db386"
   version = "v0.3.0"
+
+[[projects]]
+  name = "github.com/spf13/pflag"
+  packages = ["."]
+  revision = "583c0c0531f06d5278b7d917446061adc344b5cd"
+  version = "v1.0.1"
 
 [[projects]]
   name = "github.com/vishvananda/netlink"
@@ -43,6 +49,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "fff09a7f207efec2c9df8e2d82fba60885b42fdca61f9440d89352f95eb11eb7"
+  inputs-digest = "efcb75857a1dc8e13600f381bf0f8bf10341e7f3094e98f77222e601c3ada432"
   solver-name = "gps-cdcl"
   solver-version = 1

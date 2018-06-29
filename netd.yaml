@@ -117,11 +117,13 @@ spec:
       priorityClassName: system-node-critical
       serviceAccountName: netd
       terminationGracePeriodSeconds: 0
+      nodeSelector:
+        beta.kubernetes.io/kube-netd-ready: "true"
       hostNetwork: true
       initContainers:
       - image: gcr.io/google-containers/netd-amd64:latest
         name: install-cni
-        command: ['./install-cni.sh']
+        command: ["sh", "/install-cni.sh"]
         env:
           - name: CNI_SPEC_TEMPLATE
             valueFrom:

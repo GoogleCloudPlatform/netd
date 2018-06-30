@@ -23,36 +23,36 @@ const (
 
 func MasqueradeConfig() []Config {
 	return []Config{
-		&IPTablesChainConfig{
+		IPTablesChainConfig{
 			TableName: natTable,
 			ChainName: ipMasqChain,
 		},
-		&IPTablesRuleConfig{
+		IPTablesRuleConfig{
 			TableName: natTable,
 			ChainName: postRoutingChain,
 			RuleSpec:  []string{"-m", "addrtype", "!", "--dst-type", "LOCAL", "-j", "IP-MASQ"},
 		},
-		&IPTablesRuleConfig{
+		IPTablesRuleConfig{
 			TableName: natTable,
 			ChainName: ipMasqChain,
 			RuleSpec:  []string{"-d", "169.254.0.0/16", "-j", "RETURN"},
 		},
-		&IPTablesRuleConfig{
+		IPTablesRuleConfig{
 			TableName: natTable,
 			ChainName: ipMasqChain,
 			RuleSpec:  []string{"-d", "10.0.0.0/8", "-j", "RETURN"},
 		},
-		&IPTablesRuleConfig{
+		IPTablesRuleConfig{
 			TableName: natTable,
 			ChainName: ipMasqChain,
 			RuleSpec:  []string{"-d", "172.16.0.0/12", "-j", "RETURN"},
 		},
-		&IPTablesRuleConfig{
+		IPTablesRuleConfig{
 			TableName: natTable,
 			ChainName: ipMasqChain,
 			RuleSpec:  []string{"-d", "192.168.0.0/16", "-j", "RETURN"},
 		},
-		&IPTablesRuleConfig{
+		IPTablesRuleConfig{
 			TableName: natTable,
 			ChainName: ipMasqChain,
 			RuleSpec:  []string{"-j", "MASQUERADE"},

@@ -59,26 +59,26 @@ func init() {
 	}
 }
 
-func (s *SysctlConfig) Ensure() error {
+func (s SysctlConfig) Ensure() error {
 	_, err := sysctl.Sysctl(s.Key, s.Value)
 	return err
 }
 
-func (r *IPRouteConfig) Ensure() error {
+func (r IPRouteConfig) Ensure() error {
 	return netlink.RouteAdd(&r.Route)
 }
 
-func (r *IPRuleConfig) Ensure() error {
+func (r IPRuleConfig) Ensure() error {
 	return netlink.RuleAdd(&r.Rule)
 }
 
-func (c *IPTablesChainConfig) Ensure() error {
+func (c IPTablesChainConfig) Ensure() error {
 	if err := ipt.NewChain(c.TableName, c.ChainName); err != nil && err != os.ErrExist {
 		return err
 	}
 	return nil
 }
 
-func (r *IPTablesRuleConfig) Ensure() error {
+func (r IPTablesRuleConfig) Ensure() error {
 	return ipt.AppendUnique(r.TableName, r.ChainName, r.RuleSpec...)
 }

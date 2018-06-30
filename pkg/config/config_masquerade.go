@@ -21,8 +21,10 @@ const (
 	ipMasqChain = "IP-MASQ"
 )
 
-func MasqueradeConfig() []Config {
-	return []Config{
+var MasqueradeConfig []Config
+
+func init() {
+	MasqueradeConfig = []Config{
 		IPTablesChainConfig{
 			TableName: natTable,
 			ChainName: ipMasqChain,

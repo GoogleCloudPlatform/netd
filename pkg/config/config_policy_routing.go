@@ -55,6 +55,8 @@ var (
 	localNetdev      string
 )
 
+var PolicyRoutingConfig []Config
+
 func init() {
 	f := func(ip net.IP) (linkIndex int, netdev string, gw net.IP) {
 		routes, err := netlink.RouteGet(ip)
@@ -74,10 +76,8 @@ func init() {
 	}
 	defaultLinkIndex, defaultNetdev, defaultGateway = f(net.IPv4(8, 8, 8, 8))
 	localLinkIndex, localNetdev, _ = f(net.IPv4(127, 0, 0, 1))
-}
 
-func PolicyRoutingConfig() []Config {
-	return []Config{
+	PolicyRoutingConfig = []Config{
 		SysctlConfig{
 			Key:   sysctlReversePathFilter,
 			Value: "2",

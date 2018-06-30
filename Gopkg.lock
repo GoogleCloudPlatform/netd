@@ -5,7 +5,7 @@
   branch = "master"
   name = "github.com/GoogleCloudPlatform/netd"
   packages = ["pkg/config"]
-  revision = "ba0282813cd9d43108e1dca1edfa7794234a8e9c"
+  revision = "9283c289548a315fcef01107a5633b3b0de3563c"
 
 [[projects]]
   name = "github.com/containernetworking/plugins"
@@ -18,6 +18,12 @@
   packages = ["iptables"]
   revision = "b5b1876b170881a8259f036445ee89c8669db386"
   version = "v0.3.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/golang/glog"
+  packages = ["."]
+  revision = "23def4e6c14b4da8ac2ed8007337bc5eb5007998"
 
 [[projects]]
   name = "github.com/spf13/pflag"
@@ -49,6 +55,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "efcb75857a1dc8e13600f381bf0f8bf10341e7f3094e98f77222e601c3ada432"
+  inputs-digest = "79a1c5c380cbb283bed4ed1c4df3225f58b2cc9a8843d2a87f341d219271c17a"
   solver-name = "gps-cdcl"
   solver-version = 1

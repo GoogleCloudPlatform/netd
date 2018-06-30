@@ -5,7 +5,7 @@
   branch = "master"
   name = "github.com/GoogleCloudPlatform/netd"
   packages = ["pkg/config"]
-  revision = "9283c289548a315fcef01107a5633b3b0de3563c"
+  revision = "cf01423837d3c3e449d768bdd256457a9f578f0b"
 
 [[projects]]
   name = "github.com/containernetworking/plugins"

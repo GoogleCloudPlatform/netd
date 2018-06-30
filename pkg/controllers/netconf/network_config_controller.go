@@ -33,11 +33,11 @@ func NewNetworkConfigController(enablePolicyRouting, enableMasquerade bool) *Net
 	var configs []config.Config
 
 	if enablePolicyRouting {
-		configs = append(configs, config.PolicyRoutingConfig()...)
+		configs = append(configs, config.PolicyRoutingConfig...)
 	}
 
 	if enableMasquerade {
-		configs = append(configs, config.MasqueradeConfig()...)
+		configs = append(configs, config.MasqueradeConfig...)
 	}
 
 	return &NetworkConfigController{

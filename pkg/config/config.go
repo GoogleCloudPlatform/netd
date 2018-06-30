@@ -17,8 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"os"
-
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/golang/glog"
@@ -73,8 +71,10 @@ func (r IPRuleConfig) Ensure() error {
 }
 
 func (c IPTablesChainConfig) Ensure() error {
-	if err := ipt.NewChain(c.TableName, c.ChainName); err != nil && err != os.ErrExist {
-		return err
+	if err := ipt.NewChain(c.TableName, c.ChainName); err != nil {
+		if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 1 {
+			return err
+		}
 	}
 	return nil
 }

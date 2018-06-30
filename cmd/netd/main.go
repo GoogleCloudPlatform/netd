@@ -17,11 +17,40 @@ limitations under the License.
 package main
 
 import (
-	"time"
+	"flag"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+
+	"github.com/GoogleCloudPlatform/netd/pkg/controllers/netconf"
+	"github.com/GoogleCloudPlatform/netd/pkg/options"
+	"github.com/golang/glog"
+	"github.com/spf13/pflag"
 )
 
 func main() {
-	for {
-		time.Sleep(10 * time.Second)
-	}
+	config := options.NewNetdConfig()
+	config.AddFlags(pflag.CommandLine)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
+
+	glog.Infof("Starting netd ...")
+
+	nc := netconf.NewNetworkConfigController(config.EnablePolicyRouting, config.EnableMasquerade)
+
+	var wg sync.WaitGroup
+	stopCh := make(chan struct{})
+
+	wg.Add(1)
+	go nc.Run(stopCh, &wg)
+
+	ch := make(chan os.Signal)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+	<-ch
+
+	glog.Infof("Shutting down netd ...")
+	close(stopCh)
+
+	wg.Wait()
 }

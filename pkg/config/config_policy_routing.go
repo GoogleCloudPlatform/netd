@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 )
@@ -47,36 +48,30 @@ const (
 var (
 	defaultGateway   net.IP
 	defaultLinkIndex int
+	defaultNetdev    string
 	localLinkIndex   int
-	defaultNetDev    string
-	localNetDev      string
+	localNetdev      string
 )
 
 func init() {
-	routes, err := netlink.RouteGet(net.IPv4(8, 8, 8, 8))
-	if err != nil {
+	f := func(ip net.IP) (linkIndex int, netdev string, gw net.IP) {
+		routes, err := netlink.RouteGet(ip)
+		if err != nil {
+			glog.Errorf("failed to get route for IP: %v (%v)", ip, err)
+			return
+		}
+		gw = routes[0].Gw
+		linkIndex = routes[0].LinkIndex
+
+		l, err := netlink.LinkByIndex(linkIndex)
+		if err != nil {
+			glog.Errorf("failed to get the link by index: %v (%v)", linkIndex, err)
+		}
+		netdev = l.Attrs().Name
 		return
 	}
-
-	for _, r := range routes {
-		if r.Dst == nil {
-			defaultLinkIndex = r.LinkIndex
-			defaultGateway = r.Gw
-			l, err := netlink.LinkByIndex(defaultLinkIndex)
-			if err != nil {
-				return
-			}
-			defaultNetDev = l.Attrs().Name
-		}
-		if r.Src.IsLoopback() {
-			localLinkIndex = r.LinkIndex
-			l, err := netlink.LinkByIndex(localLinkIndex)
-			if err != nil {
-				return
-			}
-			localNetDev = l.Attrs().Name
-		}
-	}
+	defaultLinkIndex, defaultNetdev, defaultGateway = f(net.IPv4(8, 8, 8, 8))
+	localLinkIndex, localNetdev, _ = f(net.IPv4(127, 0, 0, 1))
 }
 
 func PolicyRoutingConfig() []Config {
@@ -127,7 +122,7 @@ func PolicyRoutingConfig() []Config {
 		},
 		IPRuleConfig{
 			Rule: netlink.Rule{
-				IifName:  defaultNetDev,
+				IifName:  defaultNetdev,
 				Invert:   true,
 				Table:    customRouteTable,
 				Priority: maxRulePriority,
@@ -135,7 +130,7 @@ func PolicyRoutingConfig() []Config {
 		},
 		IPRuleConfig{
 			Rule: netlink.Rule{
-				IifName:  localNetDev,
+				IifName:  localNetdev,
 				Table:    unix.RT_TABLE_MAIN,
 				Priority: maxRulePriority - 1,
 			},

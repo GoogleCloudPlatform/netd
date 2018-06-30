@@ -41,8 +41,10 @@ const (
 )
 
 const (
-	customRouteTable = 1
-	maxRulePriority  = 30000
+	customRouteTable    = 2
+	hairpinRulePriority = 30000 + iota
+	localRulePriority
+	policyRoutingRulePriority
 )
 
 var (
@@ -122,25 +124,25 @@ func PolicyRoutingConfig() []Config {
 		},
 		IPRuleConfig{
 			Rule: netlink.Rule{
-				IifName:  defaultNetdev,
-				Invert:   true,
-				Table:    customRouteTable,
-				Priority: maxRulePriority,
+				Mark:     hairpinMark,
+				Mask:     hairpinMask,
+				Table:    unix.RT_TABLE_MAIN,
+				Priority: hairpinRulePriority,
 			},
 		},
 		IPRuleConfig{
 			Rule: netlink.Rule{
 				IifName:  localNetdev,
 				Table:    unix.RT_TABLE_MAIN,
-				Priority: maxRulePriority - 1,
+				Priority: localRulePriority,
 			},
 		},
 		IPRuleConfig{
 			Rule: netlink.Rule{
-				Mark:     hairpinMark,
-				Mask:     hairpinMask,
-				Table:    unix.RT_TABLE_MAIN,
-				Priority: maxRulePriority - 2,
+				IifName:  defaultNetdev,
+				Invert:   true,
+				Table:    customRouteTable,
+				Priority: policyRoutingRulePriority,
 			},
 		},
 	}

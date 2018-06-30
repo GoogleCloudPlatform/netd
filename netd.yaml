@@ -94,6 +94,8 @@ data:
       ]
     }
   cni_spec_name: "10-k8s-ptp.conflist"
+  enable_policy_routing: "true"
+  enable_masquerade: "true"
   
 ---
 
@@ -141,10 +143,26 @@ spec:
       containers:
       - image: gcr.io/google-containers/netd-amd64:latest
         name: netd
+        imagePullPolicy: Always
         securityContext:
           privileged: true
           capabilities:
             add: ["NET_ADMIN"]
+        args:
+        - --enable-policy-routing=$(ENABLE_POLICY_ROUTING)
+        - --enable-masquerade=$(ENABLE_MASQUERADE)
+        - --logtostderr
+        env:
+          - name: ENABLE_POLICY_ROUTING
+            valueFrom:
+              configMapKeyRef:
+                name: netd-config
+                key: enable_policy_routing
+          - name: ENABLE_MASQUERADE
+            valueFrom:
+              configMapKeyRef:
+                name: netd-config
+                key: enable_masquerade
       volumes:
       - name: cni-net-dir
         hostPath:

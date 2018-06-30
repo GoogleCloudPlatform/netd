@@ -21,10 +21,9 @@ import (
 
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/coreos/go-iptables/iptables"
+	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 )
-
-var ipt *iptables.IPTables
 
 type Config interface {
 	Ensure() error
@@ -51,9 +50,12 @@ type IPTablesRuleConfig struct {
 	RuleSpec             []string
 }
 
+var ipt *iptables.IPTables
+
 func init() {
 	var err error
 	if ipt, err = iptables.NewWithProtocol(iptables.ProtocolIPv4); err != nil {
+		glog.Errorf("failed to initialize iptables")
 	}
 }
 

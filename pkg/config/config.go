@@ -1,9 +1,12 @@
 /*
 Copyright 2018 Google Inc.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,10 +21,9 @@ import (
 
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/coreos/go-iptables/iptables"
+	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 )
-
-var ipt *iptables.IPTables
 
 type Config interface {
 	Ensure() error
@@ -48,32 +50,35 @@ type IPTablesRuleConfig struct {
 	RuleSpec             []string
 }
 
+var ipt *iptables.IPTables
+
 func init() {
 	var err error
 	if ipt, err = iptables.NewWithProtocol(iptables.ProtocolIPv4); err != nil {
+		glog.Errorf("failed to initialize iptables")
 	}
 }
 
-func (s *SysctlConfig) Ensure() error {
+func (s SysctlConfig) Ensure() error {
 	_, err := sysctl.Sysctl(s.Key, s.Value)
 	return err
 }
 
-func (r *IPRouteConfig) Ensure() error {
+func (r IPRouteConfig) Ensure() error {
 	return netlink.RouteAdd(&r.Route)
 }
 
-func (r *IPRuleConfig) Ensure() error {
+func (r IPRuleConfig) Ensure() error {
 	return netlink.RuleAdd(&r.Rule)
 }
 
-func (c *IPTablesChainConfig) Ensure() error {
+func (c IPTablesChainConfig) Ensure() error {
 	if err := ipt.NewChain(c.TableName, c.ChainName); err != nil && err != os.ErrExist {
 		return err
 	}
 	return nil
 }
 
-func (r *IPTablesRuleConfig) Ensure() error {
+func (r IPTablesRuleConfig) Ensure() error {
 	return ipt.AppendUnique(r.TableName, r.ChainName, r.RuleSpec...)
 }

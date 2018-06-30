@@ -1,9 +1,12 @@
 /*
 Copyright 2018 Google Inc.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,6 +20,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 )
@@ -37,84 +41,80 @@ const (
 )
 
 const (
-	customRouteTable = 1
-	maxRulePriority  = 30000
+	customRouteTable    = 2
+	hairpinRulePriority = 30000 + iota
+	localRulePriority
+	policyRoutingRulePriority
 )
 
 var (
 	defaultGateway   net.IP
 	defaultLinkIndex int
+	defaultNetdev    string
 	localLinkIndex   int
-	defaultNetDev    string
-	localNetDev      string
+	localNetdev      string
 )
 
+var PolicyRoutingConfig []Config
+
 func init() {
-	routes, err := netlink.RouteGet(net.IPv4(8, 8, 8, 8))
-	if err != nil {
+	f := func(ip net.IP) (linkIndex int, netdev string, gw net.IP) {
+		routes, err := netlink.RouteGet(ip)
+		if err != nil {
+			glog.Errorf("failed to get route for IP: %v (%v)", ip, err)
+			return
+		}
+		gw = routes[0].Gw
+		linkIndex = routes[0].LinkIndex
+
+		l, err := netlink.LinkByIndex(linkIndex)
+		if err != nil {
+			glog.Errorf("failed to get the link by index: %v (%v)", linkIndex, err)
+		}
+		netdev = l.Attrs().Name
 		return
 	}
+	defaultLinkIndex, defaultNetdev, defaultGateway = f(net.IPv4(8, 8, 8, 8))
+	localLinkIndex, localNetdev, _ = f(net.IPv4(127, 0, 0, 1))
 
-	for _, r := range routes {
-		if r.Dst == nil {
-			defaultLinkIndex = r.LinkIndex
-			defaultGateway = r.Gw
-			l, err := netlink.LinkByIndex(defaultLinkIndex)
-			if err != nil {
-				return
-			}
-			defaultNetDev = l.Attrs().Name
-		}
-		if r.Src.IsLoopback() {
-			localLinkIndex = r.LinkIndex
-			l, err := netlink.LinkByIndex(localLinkIndex)
-			if err != nil {
-				return
-			}
-			localNetDev = l.Attrs().Name
-		}
-	}
-}
-
-func PolicyRoutingConfig() []Config {
-	return []Config{
-		&SysctlConfig{
+	PolicyRoutingConfig = []Config{
+		SysctlConfig{
 			Key:   sysctlReversePathFilter,
 			Value: "2",
 		},
-		&SysctlConfig{
+		SysctlConfig{
 			Key:   sysctlSrcValidMark,
 			Value: "1",
 		},
-		&IPTablesChainConfig{
+		IPTablesChainConfig{
 			TableName: tableMangle,
 			ChainName: gcpPreRoutingChain,
 		},
-		&IPTablesRuleConfig{
+		IPTablesRuleConfig{
 			TableName: tableMangle,
 			ChainName: preRoutingChain,
 			RuleSpec:  []string{"-j", gcpPreRoutingChain},
 		},
-		&IPTablesRuleConfig{
+		IPTablesRuleConfig{
 			TableName: tableMangle,
 			ChainName: gcpPreRoutingChain,
 			RuleSpec:  []string{"-j", "CONNMARK", "--restore-mark"},
 		},
-		&IPTablesChainConfig{
+		IPTablesChainConfig{
 			TableName: tableMangle,
 			ChainName: gcpPostRoutingChain,
 		},
-		&IPTablesRuleConfig{
+		IPTablesRuleConfig{
 			TableName: tableMangle,
 			ChainName: postRoutingChain,
 			RuleSpec:  []string{"-j", gcpPostRoutingChain},
 		},
-		&IPTablesRuleConfig{
+		IPTablesRuleConfig{
 			TableName: tableMangle,
 			ChainName: gcpPostRoutingChain,
 			RuleSpec:  []string{"-m", "mark", "--mark", fmt.Sprintf("0x%x/0x%x", hairpinMark, hairpinMask), "-j", "CONNMARK", "--save-mark"},
 		},
-		&IPRouteConfig{
+		IPRouteConfig{
 			Route: netlink.Route{
 				Table:     customRouteTable,
 				LinkIndex: defaultLinkIndex,
@@ -122,27 +122,27 @@ func PolicyRoutingConfig() []Config {
 				Dst:       nil,
 			},
 		},
-		&IPRuleConfig{
-			Rule: netlink.Rule{
-				IifName:  defaultNetDev,
-				Invert:   true,
-				Table:    customRouteTable,
-				Priority: maxRulePriority,
-			},
-		},
-		&IPRuleConfig{
-			Rule: netlink.Rule{
-				IifName:  localNetDev,
-				Table:    unix.RT_TABLE_MAIN,
-				Priority: maxRulePriority - 1,
-			},
-		},
-		&IPRuleConfig{
+		IPRuleConfig{
 			Rule: netlink.Rule{
 				Mark:     hairpinMark,
 				Mask:     hairpinMask,
 				Table:    unix.RT_TABLE_MAIN,
-				Priority: maxRulePriority - 2,
+				Priority: hairpinRulePriority,
+			},
+		},
+		IPRuleConfig{
+			Rule: netlink.Rule{
+				IifName:  localNetdev,
+				Table:    unix.RT_TABLE_MAIN,
+				Priority: localRulePriority,
+			},
+		},
+		IPRuleConfig{
+			Rule: netlink.Rule{
+				IifName:  defaultNetdev,
+				Invert:   true,
+				Table:    customRouteTable,
+				Priority: policyRoutingRulePriority,
 			},
 		},
 	}

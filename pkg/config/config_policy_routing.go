@@ -22,7 +22,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
-	"golang.org/x/sys/unix"
 )
 
 const (
@@ -112,7 +111,8 @@ func init() {
 		IPTablesRuleConfig{
 			TableName: tableMangle,
 			ChainName: gcpPostRoutingChain,
-			RuleSpec:  []string{"-m", "mark", "--mark", fmt.Sprintf("0x%x/0x%x", hairpinMark, hairpinMask), "-j", "CONNMARK", "--save-mark"},
+			RuleSpec: []string{"-m", "mark", "--mark", fmt.Sprintf("0x%x/0x%x", hairpinMark, hairpinMask),
+				"-j", "CONNMARK", "--save-mark"},
 		},
 		IPRouteConfig{
 			Route: netlink.Route{
@@ -123,27 +123,14 @@ func init() {
 			},
 		},
 		IPRuleConfig{
-			Rule: netlink.Rule{
-				Mark:     hairpinMark,
-				Mask:     hairpinMask,
-				Table:    unix.RT_TABLE_MAIN,
-				Priority: hairpinRulePriority,
-			},
+			RuleSpec: []string{"add", "fwmark", fmt.Sprintf("0x%x/0x%x", hairpinMark, hairpinMask),
+				"table", "main", "pref", fmt.Sprintf("%d", hairpinRulePriority)},
 		},
 		IPRuleConfig{
-			Rule: netlink.Rule{
-				IifName:  localNetdev,
-				Table:    unix.RT_TABLE_MAIN,
-				Priority: localRulePriority,
-			},
-		},
+			RuleSpec: []string{"add", "iif", localNetdev,
+				"table", "main", "pref", fmt.Sprintf("%d", localRulePriority)}},
 		IPRuleConfig{
-			Rule: netlink.Rule{
-				IifName:  defaultNetdev,
-				Invert:   true,
-				Table:    customRouteTable,
-				Priority: policyRoutingRulePriority,
-			},
-		},
+			RuleSpec: []string{"add", "not", "iif", defaultNetdev,
+				"table", fmt.Sprintf("%d", customRouteTable), "pref", fmt.Sprintf("%d", policyRoutingRulePriority)}},
 	}
 }

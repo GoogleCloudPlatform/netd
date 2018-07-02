@@ -17,7 +17,7 @@ limitations under the License.
 package config
 
 import (
-	"os/exec"
+	"os"
 
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/coreos/go-iptables/iptables"
@@ -38,7 +38,7 @@ type IPRouteConfig struct {
 }
 
 type IPRuleConfig struct {
-	RuleSpec []string
+	Rule netlink.Rule
 }
 
 type IPTablesChainConfig struct {
@@ -65,12 +65,19 @@ func (s SysctlConfig) Ensure() error {
 }
 
 func (r IPRouteConfig) Ensure() error {
-	return netlink.RouteAdd(&r.Route)
+	err := netlink.RouteAdd(&r.Route)
+	if err != nil && !os.IsExist(err) {
+		return err
+	}
+	return nil
 }
 
 func (r IPRuleConfig) Ensure() error {
-	cmd := exec.Command("ip", append([]string{"rule"}, r.RuleSpec...)...)
-	return cmd.Run()
+	err := netlink.RuleAdd(&r.Rule)
+	if err != nil && !os.IsExist(err) {
+		return err
+	}
+	return nil
 }
 
 func (c IPTablesChainConfig) Ensure() error {

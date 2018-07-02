@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -123,14 +124,43 @@ func init() {
 			},
 		},
 		IPRuleConfig{
-			RuleSpec: []string{"add", "fwmark", fmt.Sprintf("0x%x/0x%x", hairpinMark, hairpinMask),
-				"table", "main", "pref", fmt.Sprintf("%d", hairpinRulePriority)},
+			Rule: netlink.Rule{
+				Mark:              hairpinMark,
+				Mask:              hairpinMask,
+				Table:             unix.RT_TABLE_MAIN,
+				Priority:          hairpinRulePriority,
+				SuppressIfgroup:   -1,
+				SuppressPrefixlen: -1,
+				Goto:              -1,
+				Flow:              -1,
+			},
 		},
 		IPRuleConfig{
-			RuleSpec: []string{"add", "iif", localNetdev,
-				"table", "main", "pref", fmt.Sprintf("%d", localRulePriority)}},
+			Rule: netlink.Rule{
+				IifName:           localNetdev,
+				Table:             unix.RT_TABLE_MAIN,
+				Priority:          localRulePriority,
+				SuppressIfgroup:   -1,
+				SuppressPrefixlen: -1,
+				Mark:              -1,
+				Mask:              -1,
+				Goto:              -1,
+				Flow:              -1,
+			},
+		},
 		IPRuleConfig{
-			RuleSpec: []string{"add", "not", "iif", defaultNetdev,
-				"table", fmt.Sprintf("%d", customRouteTable), "pref", fmt.Sprintf("%d", policyRoutingRulePriority)}},
+			Rule: netlink.Rule{
+				IifName:           defaultNetdev,
+				Invert:            true,
+				Table:             customRouteTable,
+				Priority:          policyRoutingRulePriority,
+				SuppressIfgroup:   -1,
+				SuppressPrefixlen: -1,
+				Mark:              -1,
+				Mask:              -1,
+				Goto:              -1,
+				Flow:              -1,
+			},
+		},
 	}
 }

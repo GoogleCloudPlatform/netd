@@ -17,10 +17,12 @@ limitations under the License.
 package netconf
 
 import (
+	"reflect"
 	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/netd/pkg/config"
+	"github.com/golang/glog"
 )
 
 type NetworkConfigController struct {
@@ -62,6 +64,8 @@ func (n *NetworkConfigController) Run(stopCh <-chan struct{}, wg *sync.WaitGroup
 
 func (n *NetworkConfigController) ensure() {
 	for _, c := range n.configs {
-		c.Ensure()
+		if err := c.Ensure(); err != nil {
+			glog.Errorf("found an error: %v when ensuring %v", err, reflect.ValueOf(c))
+		}
 	}
 }

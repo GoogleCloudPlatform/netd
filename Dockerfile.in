@@ -16,7 +16,7 @@ FROM ARG_FROM
 
 MAINTAINER Jing Ai <jinga@google.com>
 
-RUN apk add --no-cache curl iptables iproute2
+RUN apk add --no-cache curl iptables
 RUN apk update && apk add jq && rm -rf /var/cache/apk/*
 
 ADD scripts/install-cni.sh /install-cni.sh

@@ -28,44 +28,61 @@ import (
 type NetworkConfigController struct {
 	enablePolicyRouting bool
 	enableMasquerade    bool
-	configs             []config.Config
+	onConfigs           []config.Config
+	offConfigs          []config.Config
 }
 
+const reconcileInterval = 10 * time.Second
+
 func NewNetworkConfigController(enablePolicyRouting, enableMasquerade bool) *NetworkConfigController {
-	var configs []config.Config
+	var onConfigs, offConfigs []config.Config
 
 	if enablePolicyRouting {
-		configs = append(configs, config.PolicyRoutingConfig...)
+		onConfigs = append(onConfigs, config.PolicyRoutingConfig...)
+	} else {
+		offConfigs = append(offConfigs, config.PolicyRoutingConfig...)
 	}
 
 	if enableMasquerade {
-		configs = append(configs, config.MasqueradeConfig...)
+		onConfigs = append(onConfigs, config.MasqueradeConfig...)
+	} else {
+		offConfigs = append(offConfigs, config.MasqueradeConfig...)
 	}
 
 	return &NetworkConfigController{
 		enablePolicyRouting: enablePolicyRouting,
 		enableMasquerade:    enableMasquerade,
-		configs:             configs,
+		onConfigs:           onConfigs,
+		offConfigs:          offConfigs,
 	}
 }
 
-func (n *NetworkConfigController) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
+func (nc *NetworkConfigController) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
+
+	ticker := time.NewTicker(reconcileInterval)
+	defer ticker.Stop()
 
 	for {
 		select {
 		case <-stopCh:
 			return
-		case <-time.After(10 * time.Second):
-			n.ensure()
+		case <-ticker.C:
+			nc.ensure()
 		}
 	}
 }
 
-func (n *NetworkConfigController) ensure() {
-	for _, c := range n.configs {
-		if err := c.Ensure(); err != nil {
-			glog.Errorf("found an error: %v when ensuring %v", err, reflect.ValueOf(c))
+func (nc *NetworkConfigController) ensure() {
+	for on, configs := range map[bool]*[]config.Config{
+		true:  &nc.onConfigs,
+		false: &nc.offConfigs} {
+		for _, c := range *configs {
+			glog.V(4).Infof("Ensure %v as %v", reflect.ValueOf(c), on)
+			if err := c.Ensure(on); err != nil {
+				glog.Errorf("failed to ensure %v as %v: %v", reflect.ValueOf(c), on, err)
+			}
 		}
+
 	}
 }

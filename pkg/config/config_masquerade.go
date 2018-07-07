@@ -21,43 +21,35 @@ const (
 	ipMasqChain = "IP-MASQ"
 )
 
+const (
+	ipMasqNatPostRoutingComment = "ip-masq: ensure nat POSTROUTING directs all non-LOCAL destination traffic to our custom IP-MASQ chain"
+	ipMasqLocalTrafficComment   = "ip-masq: local traffic is not subject to MASQUERADE"
+	ipMasqRemoteTrafficComment  = "ip-masq: outbound traffic is subject to MASQUERADE (must be last in chain)"
+)
+
 var MasqueradeConfig []Config
 
 func init() {
 	MasqueradeConfig = []Config{
 		IPTablesChainConfig{
-			TableName: natTable,
-			ChainName: ipMasqChain,
+			IPTablesChainSpec: IPTablesChainSpec{
+				TableName: natTable,
+				ChainName: ipMasqChain,
+			},
+			RuleSpecs: []IPTablesRuleSpec{
+				[]string{"-d", "169.254.0.0/16", "-m", "comment", "--comment", ipMasqLocalTrafficComment, "-j", "RETURN"},
+				[]string{"-d", "10.0.0.0/8", "-m", "comment", "--comment", ipMasqLocalTrafficComment, "-j", "RETURN"},
+				[]string{"-d", "172.16.0.0/12", "-m", "comment", "--comment", ipMasqLocalTrafficComment, "-j", "RETURN"},
+				[]string{"-d", "192.168.0.0/16", "-m", "comment", "--comment", ipMasqLocalTrafficComment, "-j", "RETURN"},
+				[]string{"-m", "comment", "--comment", ipMasqRemoteTrafficComment, "-j", "MASQUERADE"},
+			},
 		},
 		IPTablesRuleConfig{
-			TableName: natTable,
-			ChainName: postRoutingChain,
-			RuleSpec:  []string{"-m", "addrtype", "!", "--dst-type", "LOCAL", "-j", "IP-MASQ"},
-		},
-		IPTablesRuleConfig{
-			TableName: natTable,
-			ChainName: ipMasqChain,
-			RuleSpec:  []string{"-d", "169.254.0.0/16", "-j", "RETURN"},
-		},
-		IPTablesRuleConfig{
-			TableName: natTable,
-			ChainName: ipMasqChain,
-			RuleSpec:  []string{"-d", "10.0.0.0/8", "-j", "RETURN"},
-		},
-		IPTablesRuleConfig{
-			TableName: natTable,
-			ChainName: ipMasqChain,
-			RuleSpec:  []string{"-d", "172.16.0.0/12", "-j", "RETURN"},
-		},
-		IPTablesRuleConfig{
-			TableName: natTable,
-			ChainName: ipMasqChain,
-			RuleSpec:  []string{"-d", "192.168.0.0/16", "-j", "RETURN"},
-		},
-		IPTablesRuleConfig{
-			TableName: natTable,
-			ChainName: ipMasqChain,
-			RuleSpec:  []string{"-j", "MASQUERADE"},
+			IPTablesChainSpec: IPTablesChainSpec{
+				TableName: natTable,
+				ChainName: postRoutingChain,
+			},
+			RuleSpec: []string{"-m", "comment", "--comment", ipMasqNatPostRoutingComment, "-m", "addrtype", "!", "--dst-type", "LOCAL", "-j", "IP-MASQ"},
 		},
 	}
 }

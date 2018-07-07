@@ -123,7 +123,7 @@ spec:
         beta.kubernetes.io/kube-netd-ready: "true"
       hostNetwork: true
       initContainers:
-      - image: gcr.io/google-containers/netd-amd64:latest
+      - image: gcr.io/google-containers/netd-amd64:0.1.1
         name: install-cni
         command: ["sh", "/install-cni.sh"]
         env:
@@ -141,7 +141,7 @@ spec:
         - mountPath: /host/etc/cni/net.d
           name: cni-net-dir
       containers:
-      - image: gcr.io/google-containers/netd-amd64:latest
+      - image: gcr.io/google-containers/netd-amd64:0.1.1
         name: netd
         imagePullPolicy: Always
         securityContext:

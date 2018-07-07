@@ -36,6 +36,7 @@ func main() {
 	pflag.Parse()
 
 	glog.Infof("Starting netd ...")
+	defer glog.Infof("Shutting down netd ...")
 
 	nc := netconf.NewNetworkConfigController(config.EnablePolicyRouting, config.EnableMasquerade)
 
@@ -49,7 +50,6 @@ func main() {
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	<-ch
 
-	glog.Infof("Shutting down netd ...")
 	close(stopCh)
 
 	wg.Wait()

@@ -26,26 +26,25 @@ import (
 )
 
 type NetworkConfigController struct {
-	enablePolicyRouting bool
-	enableMasquerade    bool
-	configs             []config.Config
+	configSets []*config.ConfigSet
 }
 
 func NewNetworkConfigController(enablePolicyRouting, enableMasquerade bool) *NetworkConfigController {
-	var configs []config.Config
+	var configSets []*config.ConfigSet
+
+	configSets = append(configSets, &config.PolicyRoutingConfigSet)
+	configSets = append(configSets, &config.MasqueradeConfigSet)
 
 	if enablePolicyRouting {
-		configs = append(configs, config.PolicyRoutingConfig...)
+		config.PolicyRoutingConfigSet.Enabled = true
 	}
 
 	if enableMasquerade {
-		configs = append(configs, config.MasqueradeConfig...)
+		config.MasqueradeConfigSet.Enabled = true
 	}
 
 	return &NetworkConfigController{
-		enablePolicyRouting: enablePolicyRouting,
-		enableMasquerade:    enableMasquerade,
-		configs:             configs,
+		configSets: configSets,
 	}
 }
 
@@ -63,9 +62,11 @@ func (n *NetworkConfigController) Run(stopCh <-chan struct{}, wg *sync.WaitGroup
 }
 
 func (n *NetworkConfigController) ensure() {
-	for _, c := range n.configs {
-		if err := c.Ensure(); err != nil {
-			glog.Errorf("found an error: %v when ensuring %v", err, reflect.ValueOf(c))
+	for _, cs := range n.configSets {
+		for _, c := range cs.Configs {
+			if err := c.Ensure(cs.Enabled); err != nil {
+				glog.Errorf("found an error: %v when ensuring %v", err, reflect.ValueOf(c))
+			}
 		}
 	}
 }

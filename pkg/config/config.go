@@ -26,7 +26,13 @@ import (
 )
 
 type Config interface {
-	Ensure() error
+	Ensure(Enabled bool) error
+}
+
+type ConfigSet struct {
+	Enabled     bool
+	FeatureName string
+	Configs     []Config
 }
 
 type SysctlConfig struct {
@@ -59,12 +65,12 @@ func init() {
 	}
 }
 
-func (s SysctlConfig) Ensure() error {
+func (s SysctlConfig) Ensure(Enabled bool) error {
 	_, err := sysctl.Sysctl(s.Key, s.Value)
 	return err
 }
 
-func (r IPRouteConfig) Ensure() error {
+func (r IPRouteConfig) Ensure(Enabled bool) error {
 	err := netlink.RouteAdd(&r.Route)
 	if err != nil && !os.IsExist(err) {
 		return err
@@ -72,7 +78,7 @@ func (r IPRouteConfig) Ensure() error {
 	return nil
 }
 
-func (r IPRuleConfig) Ensure() error {
+func (r IPRuleConfig) Ensure(Enabled bool) error {
 	err := netlink.RuleAdd(&r.Rule)
 	if err != nil && !os.IsExist(err) {
 		return err
@@ -80,7 +86,7 @@ func (r IPRuleConfig) Ensure() error {
 	return nil
 }
 
-func (c IPTablesChainConfig) Ensure() error {
+func (c IPTablesChainConfig) Ensure(Enabled bool) error {
 	if err := ipt.NewChain(c.TableName, c.ChainName); err != nil {
 		if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 1 {
 			return err
@@ -89,6 +95,6 @@ func (c IPTablesChainConfig) Ensure() error {
 	return nil
 }
 
-func (r IPTablesRuleConfig) Ensure() error {
+func (r IPTablesRuleConfig) Ensure(Enabled bool) error {
 	return ipt.AppendUnique(r.TableName, r.ChainName, r.RuleSpec...)
 }

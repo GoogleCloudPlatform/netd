@@ -21,10 +21,14 @@ const (
 	ipMasqChain = "IP-MASQ"
 )
 
-var MasqueradeConfig []Config
+var MasqueradeConfigSet = ConfigSet{
+	false,
+	"Masquerade",
+	nil,
+}
 
 func init() {
-	MasqueradeConfig = []Config{
+	MasqueradeConfigSet.Configs = []Config{
 		IPTablesChainConfig{
 			TableName: natTable,
 			ChainName: ipMasqChain,

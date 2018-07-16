@@ -83,12 +83,14 @@ func init() {
 
 	PolicyRoutingConfigSet.Configs = []Config{
 		SysctlConfig{
-			Key:   sysctlReversePathFilter,
-			Value: "2",
+			Key:          sysctlReversePathFilter,
+			Value:        "2",
+			DefaultValue: "2",
 		},
 		SysctlConfig{
-			Key:   sysctlSrcValidMark,
-			Value: "1",
+			Key:          sysctlSrcValidMark,
+			Value:        "1",
+			DefaultValue: "0",
 		},
 		IPTablesChainConfig{
 			TableName: tableMangle,

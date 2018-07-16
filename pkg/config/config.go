@@ -18,6 +18,7 @@ package config
 
 import (
 	"os"
+	"syscall"
 
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/coreos/go-iptables/iptables"
@@ -26,7 +27,7 @@ import (
 )
 
 type Config interface {
-	Ensure(Enabled bool) error
+	Ensure(enabled bool) error
 }
 
 type ConfigSet struct {
@@ -36,7 +37,7 @@ type ConfigSet struct {
 }
 
 type SysctlConfig struct {
-	Key, Value string
+	Key, Value, DefaultValue string
 }
 
 type IPRouteConfig struct {
@@ -65,28 +66,50 @@ func init() {
 	}
 }
 
-func (s SysctlConfig) Ensure(Enabled bool) error {
-	_, err := sysctl.Sysctl(s.Key, s.Value)
+func (s SysctlConfig) Ensure(enabled bool) error {
+	var value string
+	if enabled {
+		value = s.Value
+	} else {
+		value = s.DefaultValue
+	}
+	_, err := sysctl.Sysctl(s.Key, value)
 	return err
 }
 
-func (r IPRouteConfig) Ensure(Enabled bool) error {
-	err := netlink.RouteAdd(&r.Route)
-	if err != nil && !os.IsExist(err) {
-		return err
+func (r IPRouteConfig) Ensure(enabled bool) error {
+	var err error
+	if enabled {
+		err = netlink.RouteAdd(&r.Route)
+		if os.IsExist(err) {
+			err = nil
+		}
+	} else {
+		if err = netlink.RouteDel(&r.Route); err != nil && err.(syscall.Errno) == syscall.ESRCH {
+			err = nil
+		}
 	}
-	return nil
+
+	return err
 }
 
-func (r IPRuleConfig) Ensure(Enabled bool) error {
-	err := netlink.RuleAdd(&r.Rule)
-	if err != nil && !os.IsExist(err) {
-		return err
+func (r IPRuleConfig) Ensure(enabled bool) error {
+	var err error
+	if enabled {
+		err = netlink.RuleAdd(&r.Rule)
+		if os.IsExist(err) {
+			err = nil
+		}
+	} else {
+		if err = netlink.RuleDel(&r.Rule); err != nil && err.(syscall.Errno) == syscall.ENOENT {
+			err = nil
+		}
 	}
-	return nil
+
+	return err
 }
 
-func (c IPTablesChainConfig) Ensure(Enabled bool) error {
+func (c IPTablesChainConfig) Ensure(enabled bool) error {
 	if err := ipt.NewChain(c.TableName, c.ChainName); err != nil {
 		if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 1 {
 			return err
@@ -95,6 +118,6 @@ func (c IPTablesChainConfig) Ensure(Enabled bool) error {
 	return nil
 }
 
-func (r IPTablesRuleConfig) Ensure(Enabled bool) error {
+func (r IPTablesRuleConfig) Ensure(enabled bool) error {
 	return ipt.AppendUnique(r.TableName, r.ChainName, r.RuleSpec...)
 }

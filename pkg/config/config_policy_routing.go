@@ -47,7 +47,7 @@ const (
 )
 
 const (
-	customRouteTable    = 2
+	customRouteTable    = 1
 	hairpinRulePriority = 30000 + iota
 	localRulePriority
 	policyRoutingRulePriority
@@ -91,7 +91,7 @@ func init() {
 		SysctlConfig{
 			Key:          sysctlReversePathFilter,
 			Value:        "2",
-			DefaultValue: "2",
+			DefaultValue: "1",
 		},
 		SysctlConfig{
 			Key:          sysctlSrcValidMark,

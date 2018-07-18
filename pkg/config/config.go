@@ -25,6 +25,7 @@ import (
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 )
 
 type Config interface {
@@ -100,9 +101,15 @@ func (r IPRouteConfig) Ensure(enabled bool) error {
 func (r IPRuleConfig) Ensure(enabled bool) error {
 	var err error
 	if enabled {
-		err = netlink.RuleAdd(&r.Rule)
-		if os.IsExist(err) {
-			err = nil
+		exist, e := r.exist()
+		if e != nil {
+			return err
+		}
+		if !exist {
+			err = netlink.RuleAdd(&r.Rule)
+			if os.IsExist(err) {
+				err = nil
+			}
 		}
 	} else {
 		if err = netlink.RuleDel(&r.Rule); err != nil && err.(syscall.Errno) == syscall.ENOENT {
@@ -111,6 +118,19 @@ func (r IPRuleConfig) Ensure(enabled bool) error {
 	}
 
 	return err
+}
+
+func (r IPRuleConfig) exist() (bool, error) {
+	rules, err := netlink.RuleList(unix.AF_INET)
+	if err != nil {
+		return false, err
+	}
+	for _, rule := range rules {
+		if rule == r.Rule {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (c IPTablesChainSpec) ensure(enabled bool) error {
@@ -158,7 +178,7 @@ func (r IPTablesRuleConfig) Ensure(enabled bool) error {
 				if err := ipt.Delete(r.Spec.TableName, r.Spec.ChainName, rs...); err != nil {
 					if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 2 {
 						// TODO: better handling the error
-						if !strings.Contains(eerr.Error(), "No chain/target/match"){
+						if !strings.Contains(eerr.Error(), "No chain/target/match") {
 							return err
 						}
 					}

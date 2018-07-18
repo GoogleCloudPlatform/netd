@@ -21,7 +21,7 @@ const (
 	ipMasqChain = "IP-MASQ"
 )
 
-var MasqueradeConfigSet = ConfigSet{
+var MasqueradeConfigSet = Set{
 	false,
 	"Masquerade",
 	nil,
@@ -29,39 +29,30 @@ var MasqueradeConfigSet = ConfigSet{
 
 func init() {
 	MasqueradeConfigSet.Configs = []Config{
-		IPTablesChainConfig{
-			TableName: natTable,
-			ChainName: ipMasqChain,
+
+		IPTablesRuleConfig{
+			IPTablesChainSpec{
+				TableName:      natTable,
+				ChainName:      postRoutingChain,
+				IsDefaultChain: true,
+			},
+			[]IPTablesRuleSpec{
+				[]string{"-m", "addrtype", "!", "--dst-type", "LOCAL", "-j", "IP-MASQ"},
+			},
 		},
 		IPTablesRuleConfig{
-			TableName: natTable,
-			ChainName: postRoutingChain,
-			RuleSpec:  []string{"-m", "addrtype", "!", "--dst-type", "LOCAL", "-j", "IP-MASQ"},
-		},
-		IPTablesRuleConfig{
-			TableName: natTable,
-			ChainName: ipMasqChain,
-			RuleSpec:  []string{"-d", "169.254.0.0/16", "-j", "RETURN"},
-		},
-		IPTablesRuleConfig{
-			TableName: natTable,
-			ChainName: ipMasqChain,
-			RuleSpec:  []string{"-d", "10.0.0.0/8", "-j", "RETURN"},
-		},
-		IPTablesRuleConfig{
-			TableName: natTable,
-			ChainName: ipMasqChain,
-			RuleSpec:  []string{"-d", "172.16.0.0/12", "-j", "RETURN"},
-		},
-		IPTablesRuleConfig{
-			TableName: natTable,
-			ChainName: ipMasqChain,
-			RuleSpec:  []string{"-d", "192.168.0.0/16", "-j", "RETURN"},
-		},
-		IPTablesRuleConfig{
-			TableName: natTable,
-			ChainName: ipMasqChain,
-			RuleSpec:  []string{"-j", "MASQUERADE"},
+			IPTablesChainSpec{
+				TableName:      natTable,
+				ChainName:      ipMasqChain,
+				IsDefaultChain: false,
+			},
+			[]IPTablesRuleSpec{
+				[]string{"-d", "169.254.0.0/16", "-j", "RETURN"},
+				[]string{"-d", "10.0.0.0/8", "-j", "RETURN"},
+				[]string{"-d", "172.16.0.0/12", "-j", "RETURN"},
+				[]string{"-d", "192.168.0.0/16", "-j", "RETURN"},
+				[]string{"-j", "MASQUERADE"},
+			},
 		},
 	}
 }

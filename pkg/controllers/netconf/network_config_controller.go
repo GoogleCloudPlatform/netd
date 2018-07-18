@@ -26,11 +26,11 @@ import (
 )
 
 type NetworkConfigController struct {
-	configSets []*config.ConfigSet
+	configSets []*config.Set
 }
 
 func NewNetworkConfigController(enablePolicyRouting, enableMasquerade bool) *NetworkConfigController {
-	var configSets []*config.ConfigSet
+	var configSets []*config.Set
 
 	configSets = append(configSets, &config.PolicyRoutingConfigSet)
 	configSets = append(configSets, &config.MasqueradeConfigSet)

@@ -65,7 +65,7 @@ func (n *NetworkConfigController) ensure() {
 	for _, cs := range n.configSets {
 		for _, c := range cs.Configs {
 			if err := c.Ensure(cs.Enabled); err != nil {
-				glog.Errorf("found an error: %v when ensuring %v", err, reflect.ValueOf(c))
+				glog.Errorf("found an error for %v: %v when ensuring %v", cs.FeatureName, err, reflect.ValueOf(c))
 			}
 		}
 	}

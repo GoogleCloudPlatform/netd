@@ -39,9 +39,15 @@ const (
 	hairpinMark         = 0x4000
 	hairpinMask         = 0x4000
 )
+const (
+	policyRoutingGcpPreRoutingComment  = "restore the conn mark if applicable"
+	policyRoutingPreRoutingComment     = "redirect all traffic to GCP-PREROUTING chain"
+	policyRoutingGcpPostRoutingComment = "save the conn mark only if hairpin bit (0x4000/0x4000) is set"
+	policyRoutingPostRoutingComment    = "redirect all traffic to GCP-POSTROUTING chain"
+)
 
 const (
-	customRouteTable    = 2
+	customRouteTable    = 1
 	hairpinRulePriority = 30000 + iota
 	localRulePriority
 	policyRoutingRulePriority
@@ -55,7 +61,11 @@ var (
 	localNetdev      string
 )
 
-var PolicyRoutingConfig []Config
+var PolicyRoutingConfigSet = Set{
+	false,
+	"PolicyRouting",
+	nil,
+}
 
 func init() {
 	f := func(ip net.IP) (linkIndex int, netdev string, gw net.IP) {
@@ -77,43 +87,56 @@ func init() {
 	defaultLinkIndex, defaultNetdev, defaultGateway = f(net.IPv4(8, 8, 8, 8))
 	localLinkIndex, localNetdev, _ = f(net.IPv4(127, 0, 0, 1))
 
-	PolicyRoutingConfig = []Config{
+	PolicyRoutingConfigSet.Configs = []Config{
 		SysctlConfig{
-			Key:   sysctlReversePathFilter,
-			Value: "2",
+			Key:          sysctlReversePathFilter,
+			Value:        "2",
+			DefaultValue: "1",
 		},
 		SysctlConfig{
-			Key:   sysctlSrcValidMark,
-			Value: "1",
-		},
-		IPTablesChainConfig{
-			TableName: tableMangle,
-			ChainName: gcpPreRoutingChain,
+			Key:          sysctlSrcValidMark,
+			Value:        "1",
+			DefaultValue: "0",
 		},
 		IPTablesRuleConfig{
-			TableName: tableMangle,
-			ChainName: preRoutingChain,
-			RuleSpec:  []string{"-j", gcpPreRoutingChain},
+			IPTablesChainSpec{
+				TableName:      tableMangle,
+				ChainName:      gcpPreRoutingChain,
+				IsDefaultChain: false,
+			},
+			[]IPTablesRuleSpec{
+				[]string{"-j", "CONNMARK", "--restore-mark", "-m", "comment", "--comment", policyRoutingGcpPreRoutingComment},
+			},
 		},
 		IPTablesRuleConfig{
-			TableName: tableMangle,
-			ChainName: gcpPreRoutingChain,
-			RuleSpec:  []string{"-j", "CONNMARK", "--restore-mark"},
-		},
-		IPTablesChainConfig{
-			TableName: tableMangle,
-			ChainName: gcpPostRoutingChain,
-		},
-		IPTablesRuleConfig{
-			TableName: tableMangle,
-			ChainName: postRoutingChain,
-			RuleSpec:  []string{"-j", gcpPostRoutingChain},
+			IPTablesChainSpec{
+				TableName:      tableMangle,
+				ChainName:      preRoutingChain,
+				IsDefaultChain: true,
+			},
+			[]IPTablesRuleSpec{
+				[]string{"-j", gcpPreRoutingChain, "-m", "comment", "--comment", policyRoutingPreRoutingComment},
+			},
 		},
 		IPTablesRuleConfig{
-			TableName: tableMangle,
-			ChainName: gcpPostRoutingChain,
-			RuleSpec: []string{"-m", "mark", "--mark", fmt.Sprintf("0x%x/0x%x", hairpinMark, hairpinMask),
-				"-j", "CONNMARK", "--save-mark"},
+			IPTablesChainSpec{
+				TableName:      tableMangle,
+				ChainName:      gcpPostRoutingChain,
+				IsDefaultChain: false,
+			},
+			[]IPTablesRuleSpec{
+				[]string{"-m", "mark", "--mark", fmt.Sprintf("0x%x/0x%x", hairpinMark, hairpinMask), "-j", "CONNMARK", "--save-mark", "-m", "comment", "--comment", policyRoutingGcpPostRoutingComment},
+			},
+		},
+		IPTablesRuleConfig{
+			IPTablesChainSpec{
+				TableName:      tableMangle,
+				ChainName:      postRoutingChain,
+				IsDefaultChain: true,
+			},
+			[]IPTablesRuleSpec{
+				[]string{"-j", gcpPostRoutingChain, "-m", "comment", "--comment", policyRoutingPostRoutingComment},
+			},
 		},
 		IPRouteConfig{
 			Route: netlink.Route{

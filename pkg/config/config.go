@@ -18,6 +18,8 @@ package config
 
 import (
 	"os"
+	"strings"
+	"syscall"
 
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/coreos/go-iptables/iptables"
@@ -26,11 +28,17 @@ import (
 )
 
 type Config interface {
-	Ensure() error
+	Ensure(enabled bool) error
+}
+
+type Set struct {
+	Enabled     bool
+	FeatureName string
+	Configs     []Config
 }
 
 type SysctlConfig struct {
-	Key, Value string
+	Key, Value, DefaultValue string
 }
 
 type IPRouteConfig struct {
@@ -41,13 +49,16 @@ type IPRuleConfig struct {
 	Rule netlink.Rule
 }
 
-type IPTablesChainConfig struct {
-	ChainName, TableName string
+type IPTablesRuleSpec []string
+
+type IPTablesChainSpec struct {
+	TableName, ChainName string
+	IsDefaultChain       bool // Is a System default chain, if yes, we won't delete it.
 }
 
 type IPTablesRuleConfig struct {
-	ChainName, TableName string
-	RuleSpec             []string
+	Spec      IPTablesChainSpec
+	RuleSpecs []IPTablesRuleSpec
 }
 
 var ipt *iptables.IPTables
@@ -59,36 +70,101 @@ func init() {
 	}
 }
 
-func (s SysctlConfig) Ensure() error {
-	_, err := sysctl.Sysctl(s.Key, s.Value)
+func (s SysctlConfig) Ensure(enabled bool) error {
+	var value string
+	if enabled {
+		value = s.Value
+	} else {
+		value = s.DefaultValue
+	}
+	_, err := sysctl.Sysctl(s.Key, value)
 	return err
 }
 
-func (r IPRouteConfig) Ensure() error {
-	err := netlink.RouteAdd(&r.Route)
-	if err != nil && !os.IsExist(err) {
-		return err
+func (r IPRouteConfig) Ensure(enabled bool) error {
+	var err error
+	if enabled {
+		err = netlink.RouteAdd(&r.Route)
+		if os.IsExist(err) {
+			err = nil
+		}
+	} else {
+		if err = netlink.RouteDel(&r.Route); err != nil && err.(syscall.Errno) == syscall.ESRCH {
+			err = nil
+		}
 	}
-	return nil
+
+	return err
 }
 
-func (r IPRuleConfig) Ensure() error {
-	err := netlink.RuleAdd(&r.Rule)
-	if err != nil && !os.IsExist(err) {
-		return err
+func (r IPRuleConfig) Ensure(enabled bool) error {
+	var err error
+	if enabled {
+		err = netlink.RuleAdd(&r.Rule)
+		if os.IsExist(err) {
+			err = nil
+		}
+	} else {
+		if err = netlink.RuleDel(&r.Rule); err != nil && err.(syscall.Errno) == syscall.ENOENT {
+			err = nil
+		}
 	}
-	return nil
+
+	return err
 }
 
-func (c IPTablesChainConfig) Ensure() error {
-	if err := ipt.NewChain(c.TableName, c.ChainName); err != nil {
-		if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 1 {
-			return err
+func (c IPTablesChainSpec) ensure(enabled bool) error {
+	var err error
+	if enabled {
+		if err = ipt.NewChain(c.TableName, c.ChainName); err != nil {
+			if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 1 {
+				return err
+			}
+		}
+	} else {
+		if !c.IsDefaultChain {
+			err = ipt.ClearChain(c.TableName, c.ChainName)
+			if err != nil {
+				glog.Errorf("failed to clean chain %s in table %s: %v", c.TableName, c.ChainName, err)
+				return err
+			}
+			if err = ipt.DeleteChain(c.TableName, c.ChainName); err != nil {
+				if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 1 {
+					glog.Errorf("failed to delete chain %s in table %s: %v", c.TableName, c.ChainName, err)
+					return err
+				}
+			}
 		}
 	}
 	return nil
 }
 
-func (r IPTablesRuleConfig) Ensure() error {
-	return ipt.AppendUnique(r.TableName, r.ChainName, r.RuleSpec...)
+func (r IPTablesRuleConfig) Ensure(enabled bool) error {
+	var err error
+	if err = r.Spec.ensure(enabled); err != nil {
+		return err
+	}
+	if enabled {
+		for _, rs := range r.RuleSpecs {
+			err = ipt.AppendUnique(r.Spec.TableName, r.Spec.ChainName, rs...)
+			if err != nil {
+				glog.Errorf("failed to append rule %v in table %s chain %s: %v", rs, r.Spec.TableName, r.Spec.ChainName, err)
+				return err
+			}
+		}
+	} else {
+		if r.Spec.IsDefaultChain {
+			for _, rs := range r.RuleSpecs {
+				if err := ipt.Delete(r.Spec.TableName, r.Spec.ChainName, rs...); err != nil {
+					if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 2 {
+						// TODO: better handling the error
+						if !strings.Contains(eerr.Error(), "No chain/target/match"){
+							return err
+						}
+					}
+				}
+			}
+		}
+	}
+	return nil
 }

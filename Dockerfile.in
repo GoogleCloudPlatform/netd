@@ -16,8 +16,8 @@ FROM ARG_FROM
 
 MAINTAINER Jing Ai <jinga@google.com>
 
-RUN apk add --no-cache curl iptables
-RUN apk update && apk add jq && rm -rf /var/cache/apk/*
+RUN apk --update add --no-cache curl iptables jq \
+    && rm -rf /var/cache/apk/*
 
 ADD scripts/install-cni.sh /install-cni.sh
 ADD bin/ARG_ARCH/ARG_BIN /ARG_BIN

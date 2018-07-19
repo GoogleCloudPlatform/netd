@@ -27,38 +27,40 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+// Config can ensure kernel settings
 type Config interface {
 	Ensure(enabled bool) error
 }
 
+// Set holds Configs for a feature
 type Set struct {
 	Enabled     bool
 	FeatureName string
 	Configs     []Config
 }
 
-type SysctlConfig struct {
-	Key, Value, DefaultValue string
+type sysctlConfig struct {
+	key, value, defaultValue string
 }
 
-type IPRouteConfig struct {
-	Route netlink.Route
+type ipRouteConfig struct {
+	route netlink.Route
 }
 
-type IPRuleConfig struct {
-	Rule netlink.Rule
+type ipRuleConfig struct {
+	rule netlink.Rule
 }
 
-type IPTablesRuleSpec []string
+type ipTablesRuleSpec []string
 
-type IPTablesChainSpec struct {
-	TableName, ChainName string
-	IsDefaultChain       bool // Is a System default chain, if yes, we won't delete it.
+type ipTablesChainSpec struct {
+	tableName, chainName string
+	isDefaultChain       bool // Is a System default chain, if yes, we won't delete it.
 }
 
-type IPTablesRuleConfig struct {
-	Spec      IPTablesChainSpec
-	RuleSpecs []IPTablesRuleSpec
+type ipTablesRuleConfig struct {
+	spec      ipTablesChainSpec
+	ruleSpecs []ipTablesRuleSpec
 }
 
 var ipt *iptables.IPTables
@@ -70,26 +72,26 @@ func init() {
 	}
 }
 
-func (s SysctlConfig) Ensure(enabled bool) error {
+func (s sysctlConfig) Ensure(enabled bool) error {
 	var value string
 	if enabled {
-		value = s.Value
+		value = s.value
 	} else {
-		value = s.DefaultValue
+		value = s.defaultValue
 	}
-	_, err := sysctl.Sysctl(s.Key, value)
+	_, err := sysctl.Sysctl(s.key, value)
 	return err
 }
 
-func (r IPRouteConfig) Ensure(enabled bool) error {
+func (r ipRouteConfig) Ensure(enabled bool) error {
 	var err error
 	if enabled {
-		err = netlink.RouteAdd(&r.Route)
+		err = netlink.RouteAdd(&r.route)
 		if os.IsExist(err) {
 			err = nil
 		}
 	} else {
-		if err = netlink.RouteDel(&r.Route); err != nil && err.(syscall.Errno) == syscall.ESRCH {
+		if err = netlink.RouteDel(&r.route); err != nil && err.(syscall.Errno) == syscall.ESRCH {
 			err = nil
 		}
 	}
@@ -97,15 +99,15 @@ func (r IPRouteConfig) Ensure(enabled bool) error {
 	return err
 }
 
-func (r IPRuleConfig) Ensure(enabled bool) error {
+func (r ipRuleConfig) Ensure(enabled bool) error {
 	var err error
 	if enabled {
-		err = netlink.RuleAdd(&r.Rule)
+		err = netlink.RuleAdd(&r.rule)
 		if os.IsExist(err) {
 			err = nil
 		}
 	} else {
-		if err = netlink.RuleDel(&r.Rule); err != nil && err.(syscall.Errno) == syscall.ENOENT {
+		if err = netlink.RuleDel(&r.rule); err != nil && err.(syscall.Errno) == syscall.ENOENT {
 			err = nil
 		}
 	}
@@ -113,24 +115,24 @@ func (r IPRuleConfig) Ensure(enabled bool) error {
 	return err
 }
 
-func (c IPTablesChainSpec) ensure(enabled bool) error {
+func (c ipTablesChainSpec) ensure(enabled bool) error {
 	var err error
 	if enabled {
-		if err = ipt.NewChain(c.TableName, c.ChainName); err != nil {
+		if err = ipt.NewChain(c.tableName, c.chainName); err != nil {
 			if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 1 {
 				return err
 			}
 		}
 	} else {
-		if !c.IsDefaultChain {
-			err = ipt.ClearChain(c.TableName, c.ChainName)
+		if !c.isDefaultChain {
+			err = ipt.ClearChain(c.tableName, c.chainName)
 			if err != nil {
-				glog.Errorf("failed to clean chain %s in table %s: %v", c.TableName, c.ChainName, err)
+				glog.Errorf("failed to clean chain %s in table %s: %v", c.tableName, c.chainName, err)
 				return err
 			}
-			if err = ipt.DeleteChain(c.TableName, c.ChainName); err != nil {
+			if err = ipt.DeleteChain(c.tableName, c.chainName); err != nil {
 				if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 1 {
-					glog.Errorf("failed to delete chain %s in table %s: %v", c.TableName, c.ChainName, err)
+					glog.Errorf("failed to delete chain %s in table %s: %v", c.tableName, c.chainName, err)
 					return err
 				}
 			}
@@ -139,26 +141,26 @@ func (c IPTablesChainSpec) ensure(enabled bool) error {
 	return nil
 }
 
-func (r IPTablesRuleConfig) Ensure(enabled bool) error {
+func (r ipTablesRuleConfig) Ensure(enabled bool) error {
 	var err error
-	if err = r.Spec.ensure(enabled); err != nil {
+	if err = r.spec.ensure(enabled); err != nil {
 		return err
 	}
 	if enabled {
-		for _, rs := range r.RuleSpecs {
-			err = ipt.AppendUnique(r.Spec.TableName, r.Spec.ChainName, rs...)
+		for _, rs := range r.ruleSpecs {
+			err = ipt.AppendUnique(r.spec.tableName, r.spec.chainName, rs...)
 			if err != nil {
-				glog.Errorf("failed to append rule %v in table %s chain %s: %v", rs, r.Spec.TableName, r.Spec.ChainName, err)
+				glog.Errorf("failed to append rule %v in table %s chain %s: %v", rs, r.spec.tableName, r.spec.chainName, err)
 				return err
 			}
 		}
 	} else {
-		if r.Spec.IsDefaultChain {
-			for _, rs := range r.RuleSpecs {
-				if err := ipt.Delete(r.Spec.TableName, r.Spec.ChainName, rs...); err != nil {
+		if r.spec.isDefaultChain {
+			for _, rs := range r.ruleSpecs {
+				if err := ipt.Delete(r.spec.tableName, r.spec.chainName, rs...); err != nil {
 					if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 2 {
 						// TODO: better handling the error
-						if !strings.Contains(eerr.Error(), "No chain/target/match"){
+						if !strings.Contains(eerr.Error(), "No chain/target/match") {
 							return err
 						}
 					}

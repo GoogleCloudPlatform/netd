@@ -77,10 +77,10 @@ data:
               "ranges": [
                 [
                   {"subnet": podCidr}
-                ]
+                ]ipv6RangeOptional
               ],
               "routes": [
-                {"dst": "0.0.0.0/0"}
+                {"dst": "0.0.0.0/0"}ipv6RouteOptional
               ]
           }
         },
@@ -96,7 +96,9 @@ data:
   cni_spec_name: "10-k8s-ptp.conflist"
   enable_policy_routing: "true"
   enable_masquerade: "true"
-  
+  enable_calico_network_policy: "false"
+  enable_private_ipv6_access: "false"
+
 ---
 
 kind: DaemonSet
@@ -137,6 +139,16 @@ spec:
               configMapKeyRef:
                 name: netd-config
                 key: cni_spec_name
+          - name: ENABLE_CALICO_NETWORK_POLICY
+            valueFrom:
+              configMapKeyRef:
+                name: netd-config
+                key: enable_calico_network_policy
+          - name: ENABLE_PRIVATE_IPV6_ACCESS
+            valueFrom:
+              configMapKeyRef:
+                name: netd-config
+                key: enable_private_ipv6_access
         volumeMounts:
         - mountPath: /host/etc/cni/net.d
           name: cni-net-dir

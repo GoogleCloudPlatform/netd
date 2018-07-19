@@ -25,10 +25,12 @@ import (
 	"github.com/golang/glog"
 )
 
+// NetworkConfigController manages kernel settings
 type NetworkConfigController struct {
 	configSets []*config.Set
 }
 
+// NewNetworkConfigController creates a new NetworkConfigController
 func NewNetworkConfigController(enablePolicyRouting, enableMasquerade bool) *NetworkConfigController {
 	var configSets []*config.Set
 
@@ -48,6 +50,7 @@ func NewNetworkConfigController(enablePolicyRouting, enableMasquerade bool) *Net
 	}
 }
 
+// Run executes main loop of NetworkConfigController
 func (n *NetworkConfigController) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 

@@ -61,6 +61,7 @@ var (
 	localNetdev      string
 )
 
+// PolicyRoutingConfigSet contains confgiurations for Policy Routing
 var PolicyRoutingConfigSet = Set{
 	false,
 	"PolicyRouting",
@@ -88,66 +89,66 @@ func init() {
 	localLinkIndex, localNetdev, _ = f(net.IPv4(127, 0, 0, 1))
 
 	PolicyRoutingConfigSet.Configs = []Config{
-		SysctlConfig{
-			Key:          sysctlReversePathFilter,
-			Value:        "2",
-			DefaultValue: "1",
+		sysctlConfig{
+			key:          sysctlReversePathFilter,
+			value:        "2",
+			defaultValue: "1",
 		},
-		SysctlConfig{
-			Key:          sysctlSrcValidMark,
-			Value:        "1",
-			DefaultValue: "0",
+		sysctlConfig{
+			key:          sysctlSrcValidMark,
+			value:        "1",
+			defaultValue: "0",
 		},
-		IPTablesRuleConfig{
-			IPTablesChainSpec{
-				TableName:      tableMangle,
-				ChainName:      gcpPreRoutingChain,
-				IsDefaultChain: false,
+		ipTablesRuleConfig{
+			ipTablesChainSpec{
+				tableName:      tableMangle,
+				chainName:      gcpPreRoutingChain,
+				isDefaultChain: false,
 			},
-			[]IPTablesRuleSpec{
+			[]ipTablesRuleSpec{
 				[]string{"-j", "CONNMARK", "--restore-mark", "-m", "comment", "--comment", policyRoutingGcpPreRoutingComment},
 			},
 		},
-		IPTablesRuleConfig{
-			IPTablesChainSpec{
-				TableName:      tableMangle,
-				ChainName:      preRoutingChain,
-				IsDefaultChain: true,
+		ipTablesRuleConfig{
+			ipTablesChainSpec{
+				tableName:      tableMangle,
+				chainName:      preRoutingChain,
+				isDefaultChain: true,
 			},
-			[]IPTablesRuleSpec{
+			[]ipTablesRuleSpec{
 				[]string{"-j", gcpPreRoutingChain, "-m", "comment", "--comment", policyRoutingPreRoutingComment},
 			},
 		},
-		IPTablesRuleConfig{
-			IPTablesChainSpec{
-				TableName:      tableMangle,
-				ChainName:      gcpPostRoutingChain,
-				IsDefaultChain: false,
+		ipTablesRuleConfig{
+			ipTablesChainSpec{
+				tableName:      tableMangle,
+				chainName:      gcpPostRoutingChain,
+				isDefaultChain: false,
 			},
-			[]IPTablesRuleSpec{
+			[]ipTablesRuleSpec{
 				[]string{"-m", "mark", "--mark", fmt.Sprintf("0x%x/0x%x", hairpinMark, hairpinMask), "-j", "CONNMARK", "--save-mark", "-m", "comment", "--comment", policyRoutingGcpPostRoutingComment},
 			},
 		},
-		IPTablesRuleConfig{
-			IPTablesChainSpec{
-				TableName:      tableMangle,
-				ChainName:      postRoutingChain,
-				IsDefaultChain: true,
+		ipTablesRuleConfig{
+			ipTablesChainSpec{
+				tableName:      tableMangle,
+				chainName:      postRoutingChain,
+				isDefaultChain: true,
 			},
-			[]IPTablesRuleSpec{
+			[]ipTablesRuleSpec{
 				[]string{"-j", gcpPostRoutingChain, "-m", "comment", "--comment", policyRoutingPostRoutingComment},
 			},
 		},
-		IPRouteConfig{
-			Route: netlink.Route{
+		ipRouteConfig{
+			route: netlink.Route{
 				Table:     customRouteTable,
 				LinkIndex: defaultLinkIndex,
 				Gw:        defaultGateway,
 				Dst:       nil,
 			},
 		},
-		IPRuleConfig{
-			Rule: netlink.Rule{
+		ipRuleConfig{
+			rule: netlink.Rule{
 				Mark:              hairpinMark,
 				Mask:              hairpinMask,
 				Table:             unix.RT_TABLE_MAIN,
@@ -158,8 +159,8 @@ func init() {
 				Flow:              -1,
 			},
 		},
-		IPRuleConfig{
-			Rule: netlink.Rule{
+		ipRuleConfig{
+			rule: netlink.Rule{
 				IifName:           localNetdev,
 				Table:             unix.RT_TABLE_MAIN,
 				Priority:          localRulePriority,
@@ -171,8 +172,8 @@ func init() {
 				Flow:              -1,
 			},
 		},
-		IPRuleConfig{
-			Rule: netlink.Rule{
+		ipRuleConfig{
+			rule: netlink.Rule{
 				IifName:           defaultNetdev,
 				Invert:            true,
 				Table:             customRouteTable,

@@ -21,6 +21,7 @@ const (
 	ipMasqChain = "IP-MASQ"
 )
 
+// MasqueradeConfigSet contains configurations for Masquerade
 var MasqueradeConfigSet = Set{
 	false,
 	"Masquerade",
@@ -30,23 +31,23 @@ var MasqueradeConfigSet = Set{
 func init() {
 	MasqueradeConfigSet.Configs = []Config{
 
-		IPTablesRuleConfig{
-			IPTablesChainSpec{
-				TableName:      natTable,
-				ChainName:      postRoutingChain,
-				IsDefaultChain: true,
+		ipTablesRuleConfig{
+			ipTablesChainSpec{
+				tableName:      natTable,
+				chainName:      postRoutingChain,
+				isDefaultChain: true,
 			},
-			[]IPTablesRuleSpec{
+			[]ipTablesRuleSpec{
 				[]string{"-m", "addrtype", "!", "--dst-type", "LOCAL", "-j", "IP-MASQ"},
 			},
 		},
-		IPTablesRuleConfig{
-			IPTablesChainSpec{
-				TableName:      natTable,
-				ChainName:      ipMasqChain,
-				IsDefaultChain: false,
+		ipTablesRuleConfig{
+			ipTablesChainSpec{
+				tableName:      natTable,
+				chainName:      ipMasqChain,
+				isDefaultChain: false,
 			},
-			[]IPTablesRuleSpec{
+			[]ipTablesRuleSpec{
 				[]string{"-d", "169.254.0.0/16", "-j", "RETURN", "-m", "comment", "--comment", "ip-masq: local traffic is not subject to MASQUERADE"},
 				[]string{"-d", "10.0.0.0/8", "-j", "RETURN", "-m", "comment", "--comment", "ip-masq: local traffic is not subject to MASQUERADE"},
 				[]string{"-d", "172.16.0.0/12", "-j", "RETURN", "-m", "comment", "--comment", "ip-masq: local traffic is not subject to MASQUERADE"},

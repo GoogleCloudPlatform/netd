@@ -101,36 +101,51 @@ func (r IPRouteConfig) Ensure(enabled bool) error {
 func (r IPRuleConfig) Ensure(enabled bool) error {
 	var err error
 	if enabled {
-		exist, e := r.exist()
+		ruleCount, e := r.exist()
 		if e != nil {
 			return err
 		}
-		if !exist {
+		if ruleCount > 0 {
+			for ruleCount > 1 {
+				if err = netlink.RuleDel(&r.Rule); err != nil {
+					glog.Errorf("failed to delete duplicated ip rule: %v, error: %v", r.Rule, err)
+				}
+				ruleCount--
+			}
+		} else {
 			err = netlink.RuleAdd(&r.Rule)
 			if os.IsExist(err) {
 				err = nil
 			}
 		}
 	} else {
-		if err = netlink.RuleDel(&r.Rule); err != nil && err.(syscall.Errno) == syscall.ENOENT {
-			err = nil
+		ruleCount, e := r.exist()
+		if e != nil {
+			return err
+		}
+		for ruleCount > 0 {
+			if err = netlink.RuleDel(&r.Rule); err != nil {
+				glog.Errorf("failed to delete duplicated ip rule: $v, error: %v", r.Rule, err)
+			}
+			ruleCount--
 		}
 	}
 
 	return err
 }
 
-func (r IPRuleConfig) exist() (bool, error) {
+func (r IPRuleConfig) exist() (int, error) {
 	rules, err := netlink.RuleList(unix.AF_INET)
 	if err != nil {
-		return false, err
+		return 0, err
 	}
+	var count int
 	for _, rule := range rules {
 		if rule == r.Rule {
-			return true, nil
+			count++
 		}
 	}
-	return false, nil
+	return count, nil
 }
 
 func (c IPTablesChainSpec) ensure(enabled bool) error {

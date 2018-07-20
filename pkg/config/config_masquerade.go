@@ -21,43 +21,38 @@ const (
 	ipMasqChain = "IP-MASQ"
 )
 
-var MasqueradeConfig []Config
+var MasqueradeConfigSet = Set{
+	false,
+	"Masquerade",
+	nil,
+}
 
 func init() {
-	MasqueradeConfig = []Config{
-		IPTablesChainConfig{
-			TableName: natTable,
-			ChainName: ipMasqChain,
+	MasqueradeConfigSet.Configs = []Config{
+
+		IPTablesRuleConfig{
+			IPTablesChainSpec{
+				TableName:      natTable,
+				ChainName:      postRoutingChain,
+				IsDefaultChain: true,
+			},
+			[]IPTablesRuleSpec{
+				[]string{"-m", "addrtype", "!", "--dst-type", "LOCAL", "-j", "IP-MASQ"},
+			},
 		},
 		IPTablesRuleConfig{
-			TableName: natTable,
-			ChainName: postRoutingChain,
-			RuleSpec:  []string{"-m", "addrtype", "!", "--dst-type", "LOCAL", "-j", "IP-MASQ"},
-		},
-		IPTablesRuleConfig{
-			TableName: natTable,
-			ChainName: ipMasqChain,
-			RuleSpec:  []string{"-d", "169.254.0.0/16", "-j", "RETURN"},
-		},
-		IPTablesRuleConfig{
-			TableName: natTable,
-			ChainName: ipMasqChain,
-			RuleSpec:  []string{"-d", "10.0.0.0/8", "-j", "RETURN"},
-		},
-		IPTablesRuleConfig{
-			TableName: natTable,
-			ChainName: ipMasqChain,
-			RuleSpec:  []string{"-d", "172.16.0.0/12", "-j", "RETURN"},
-		},
-		IPTablesRuleConfig{
-			TableName: natTable,
-			ChainName: ipMasqChain,
-			RuleSpec:  []string{"-d", "192.168.0.0/16", "-j", "RETURN"},
-		},
-		IPTablesRuleConfig{
-			TableName: natTable,
-			ChainName: ipMasqChain,
-			RuleSpec:  []string{"-j", "MASQUERADE"},
+			IPTablesChainSpec{
+				TableName:      natTable,
+				ChainName:      ipMasqChain,
+				IsDefaultChain: false,
+			},
+			[]IPTablesRuleSpec{
+				[]string{"-d", "169.254.0.0/16", "-j", "RETURN", "-m", "comment", "--comment", "ip-masq: local traffic is not subject to MASQUERADE"},
+				[]string{"-d", "10.0.0.0/8", "-j", "RETURN", "-m", "comment", "--comment", "ip-masq: local traffic is not subject to MASQUERADE"},
+				[]string{"-d", "172.16.0.0/12", "-j", "RETURN", "-m", "comment", "--comment", "ip-masq: local traffic is not subject to MASQUERADE"},
+				[]string{"-d", "192.168.0.0/16", "-j", "RETURN", "-m", "comment", "--comment", "ip-masq: local traffic is not subject to MASQUERADE"},
+				[]string{"-j", "MASQUERADE", "-m", "comment", "--comment", "ip-masq: outbound traffic is subject to MASQUERADE (must be last in chain)"},
+			},
 		},
 	}
 }

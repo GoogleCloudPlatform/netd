@@ -27,16 +27,18 @@ fi
 if [ -w /host/etc/cni/net.d ]; then
   cni_spec=$(echo ${CNI_SPEC_TEMPLATE:-} | sed -e "s#@podCidr#${pod_cidr:-}#g")
 
-  node_ipv6_addr=$(curl -s -k --fail "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ipv6s" -H "Metadata-Flavor: Google" | jq '.[0]') ||:
+  if [ "$ENABLE_PRIVATE_IPV6_ACCESS" = true ]; then
+    node_ipv6_addr=$(curl -s -k --fail "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ipv6s" -H "Metadata-Flavor: Google" | jq '.[0]') ||:
 
-  if [ -n "${node_ipv6_addr:-}" ]; then
-    cni_spec=$(echo ${cni_spec:-} | \
-      sed -e "s#@ipv6RangeOptional#, [{\"subnet\": \"${node_ipv6_addr:-}/112\"}]#g"| \
-      sed -e "s#@ipv6RouteOptional#, {\"dst\": \"::/0\"}]#g")
-  else
-    cni_spec=$(echo ${cni_spec:-} | \
-      sed -e "s#@ipv6RangeOptional##g" | \
-      sed -e "s#@ipv6RouteOptional##g")
+    if [ -n "${node_ipv6_addr:-}" ]; then
+      cni_spec=$(echo ${cni_spec:-} | \
+        sed -e "s#@ipv6RangeOptional#, [{\"subnet\": \"${node_ipv6_addr:-}/112\"}]#g"| \
+        sed -e "s#@ipv6RouteOptional#, {\"dst\": \"::/0\"}]#g")
+    else
+      cni_spec=$(echo ${cni_spec:-} | \
+        sed -e "s#@ipv6RangeOptional##g" | \
+        sed -e "s#@ipv6RouteOptional##g")
+    fi
   fi
 
 cat >/host/etc/cni/net.d/$CNI_SPEC_NAME <<EOF

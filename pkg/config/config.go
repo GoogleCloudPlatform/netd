@@ -99,47 +99,41 @@ func (r IPRouteConfig) Ensure(enabled bool) error {
 }
 
 func (r IPRuleConfig) Ensure(enabled bool) error {
-	var err error
 	if enabled {
-		ruleCount, e := r.exist()
-		if e != nil {
-			return err
+		return r.ensureHelper(1)
+	}
+	return r.ensureHelper(0)
+}
+
+func (r IPRuleConfig) ensureHelper(ensureCount int) error {
+	ruleCount, e := r.count()
+	if e != nil {
+		return e
+	}
+	var err error
+	for ruleCount > ensureCount {
+		if err = netlink.RuleDel(&r.Rule); err != nil {
+			glog.Errorf("failed to delete duplicated ip rule: $v, error: %v", r.Rule, err)
 		}
-		if ruleCount > 0 {
-			for ruleCount > 1 {
-				if err = netlink.RuleDel(&r.Rule); err != nil {
-					glog.Errorf("failed to delete duplicated ip rule: %v, error: %v", r.Rule, err)
-				}
-				ruleCount--
-			}
-		} else {
-			err = netlink.RuleAdd(&r.Rule)
-			if os.IsExist(err) {
-				err = nil
-			}
-		}
-	} else {
-		ruleCount, e := r.exist()
-		if e != nil {
-			return err
-		}
-		for ruleCount > 0 {
-			if err = netlink.RuleDel(&r.Rule); err != nil {
-				glog.Errorf("failed to delete duplicated ip rule: $v, error: %v", r.Rule, err)
-			}
-			ruleCount--
-		}
+		ruleCount--
 	}
 
+	for ruleCount < ensureCount{
+		err = netlink.RuleAdd(&r.Rule)
+		if os.IsExist(err) {
+			err = nil
+		}
+		ruleCount++
+	}
 	return err
 }
 
-func (r IPRuleConfig) exist() (int, error) {
+func (r IPRuleConfig) count() (int, error) {
 	rules, err := netlink.RuleList(unix.AF_INET)
 	if err != nil {
 		return 0, err
 	}
-	var count int
+	count :=0 
 	for _, rule := range rules {
 		if rule == r.Rule {
 			count++

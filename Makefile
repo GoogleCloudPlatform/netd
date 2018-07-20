@@ -19,7 +19,7 @@ BIN := netd
 PKG := github.com/GoogleCloudPlatform/netd
 
 # Where to push the docker image.
-REGISTRY ?= gcr.io/varunmar-k8s-dev
+REGISTRY ?= gcr.io/google-containers
 
 # Which architecture to build - see $(ALL_ARCH) for options.
 ARCH ?= amd64

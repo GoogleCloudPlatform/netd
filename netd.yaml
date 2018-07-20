@@ -76,11 +76,11 @@ data:
               "type": "host-local",
               "ranges": [
                 [
-                  {"subnet": podCidr}
-                ]ipv6RangeOptional
+                  {"subnet": @podCidr}
+                ]@ipv6RangeOptional
               ],
               "routes": [
-                {"dst": "0.0.0.0/0"}ipv6RouteOptional
+                {"dst": "0.0.0.0/0"}@ipv6RouteOptional
               ]
           }
         },

@@ -106,25 +106,26 @@ func (r IPRuleConfig) Ensure(enabled bool) error {
 }
 
 func (r IPRuleConfig) ensureHelper(ensureCount int) error {
-	ruleCount, e := r.count()
-	if e != nil {
-		return e
-	}
 	var err error
-	for ruleCount > ensureCount {
-		if err = netlink.RuleDel(&r.Rule); err != nil {
-			glog.Errorf("failed to delete duplicated ip rule: $v, error: %v", r.Rule, err)
-		}
-		ruleCount--
+	ruleCount, err := r.count()
+	if err != nil {
+		return err
 	}
 
-	for ruleCount < ensureCount{
-		err = netlink.RuleAdd(&r.Rule)
-		if os.IsExist(err) {
-			err = nil
+	for ruleCount != ensureCount {
+		if ruleCount > ensureCount {
+			if err = netlink.RuleDel(&r.Rule); err != nil {
+				glog.Errorf("failed to delete duplicated ip rule: %v, error: %v", r.Rule, err)
+			}
+			ruleCount--
+		} else {
+			if err = netlink.RuleAdd(&r.Rule); os.IsExist(err) {
+				err = nil
+			}
+			ruleCount++
 		}
-		ruleCount++
 	}
+
 	return err
 }
 
@@ -133,7 +134,7 @@ func (r IPRuleConfig) count() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	count :=0 
+	count := 0
 	for _, rule := range rules {
 		if rule == r.Rule {
 			count++

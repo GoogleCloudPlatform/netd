@@ -109,6 +109,7 @@ func (r IPRuleConfig) ensureHelper(ensureCount int) error {
 	var err error
 	ruleCount, err := r.count()
 	if err != nil {
+		glog.Errorf("failed to get IP rule count for rule: %v, error: %v", r.Rule, err)
 		return err
 	}
 
@@ -119,8 +120,13 @@ func (r IPRuleConfig) ensureHelper(ensureCount int) error {
 			}
 			ruleCount--
 		} else {
-			if err = netlink.RuleAdd(&r.Rule); os.IsExist(err) {
-				err = nil
+			err = netlink.RuleAdd(&r.Rule)
+			if err != nil {
+				if os.IsExist(err) {
+					err = nil
+				} else {
+					glog.Errorf("failed to add ip rule: %v, error: %v", r.Rule, err)
+				}
 			}
 			ruleCount++
 		}

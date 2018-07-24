@@ -75,12 +75,10 @@ data:
           "ipam": {
               "type": "host-local",
               "ranges": [
-                [
-                  {"subnet": podCidr}
-                ]
+              @ipv4Subnet@ipv6SubnetOptional
               ],
               "routes": [
-                {"dst": "0.0.0.0/0"}
+                {"dst": "0.0.0.0/0"}@ipv6RouteOptional
               ]
           }
         },
@@ -97,6 +95,7 @@ data:
   enable_policy_routing: "true"
   enable_masquerade: "true"
   enable_calico_network_policy: "false"
+  enable_private_ipv6_access: "false"
 
 ---
 
@@ -143,6 +142,11 @@ spec:
               configMapKeyRef:
                 name: netd-config
                 key: enable_calico_network_policy
+          - name: ENABLE_PRIVATE_IPV6_ACCESS
+            valueFrom:
+              configMapKeyRef:
+                name: netd-config
+                key: enable_private_ipv6_access
         volumeMounts:
         - mountPath: /host/etc/cni/net.d
           name: cni-net-dir

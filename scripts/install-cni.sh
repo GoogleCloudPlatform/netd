@@ -23,17 +23,42 @@ fi
 
 token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
 node_url="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/nodes/${HOSTNAME}"
-pod_cidr=$(curl -k -s -H "Authorization: Bearer $token" $node_url | jq '.spec.podCIDR')
-if [ -z "${pod_cidr:-}" ]; then
+ipv4_subnet=$(curl -k -s -H "Authorization: Bearer $token" $node_url | jq '.spec.podCIDR')
+if [ -z "${ipv4_subnet:-}" ]; then
   echo "Failed to fetch PodCIDR from K8s API server. Exiting with an error (1) ..."
   exit 1
 fi
 
 if [ -w /host/etc/cni/net.d ]; then
-  cni_spec=$(echo ${CNI_SPEC_TEMPLATE:-} | sed -e "s#podCidr#${pod_cidr:-}#g")
+  echo "Adding IPV4 subnet range ${ipv4_subnet:-}."
+  cni_spec=$(echo ${CNI_SPEC_TEMPLATE:-} | sed -e "s#@ipv4Subnet#[{\"subnet\": ${ipv4_subnet:-}}]#g")
+
+  if [ "$ENABLE_PRIVATE_IPV6_ACCESS" = true ]; then
+    node_ipv6_addr=$(curl -s -k --fail "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/?recursive=true" -H "Metadata-Flavor: Google" | jq '.ipv6s[0]') ||:
+
+    if [ -n "${node_ipv6_addr:-}" ]; then
+      echo "Found IPV6 address assignment ${node_ipv6_addr:-}."
+      cni_spec=$(echo ${cni_spec:-} | sed -e
+        "s#@ipv6SubnetOptional#, [{\"subnet\": \"${node_ipv6_addr:-}/112\"}]#g; 
+         s#@ipv6RouteOptional#, {\"dst\": \"::/0\"}]#g")
+    else
+      echo "Found empty IPV6 address assignment. Skipping IPV6 subnet and range configuration."
+      cni_spec=$(echo ${cni_spec:-} | \
+        sed -e "s#@ipv6SubnetOptional##g; s#@ipv6RouteOptional##g")
+    fi
+  else
+    echo "Disabling IPV6 subnet and range configuration. Set ENABLE_PRIVATE_IPV6_ACCESS=true to configure IPV6."
+    cni_spec=$(echo ${cni_spec:-} | \
+      sed -e "s#@ipv6SubnetOptional##g; s#@ipv6RouteOptional##g")
+  fi
 
 cat >/host/etc/cni/net.d/$CNI_SPEC_NAME <<EOF
 ${cni_spec:-}
 EOF
+
 echo "Created PTP CNI spec ${CNI_SPEC_NAME}!"
+
+else
+  echo "Could not find writable directory /etc/cni/net.d, which is expected to be mounted at /host/etc/cni/net.d. Exiting with error(2)."
+  exit 2
 fi

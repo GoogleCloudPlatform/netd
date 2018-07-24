@@ -15,6 +15,11 @@
 # limitations under the License.
 
 set -u -e
+if ["${ENABLE_CALICO_NETWORK_POLICY}" = true]; then
+  echo "Calico Network Policy is enabled by ENABLE_CALICO_NETWORK_POLICY. Disabling CNI Spec generation."
+  exit 0
+fi
+  
 
 token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
 node_url="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/nodes/${HOSTNAME}"

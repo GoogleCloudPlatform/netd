@@ -96,7 +96,8 @@ data:
   cni_spec_name: "10-k8s-ptp.conflist"
   enable_policy_routing: "true"
   enable_masquerade: "true"
-  
+  enable_calico_network_policy: "false"
+
 ---
 
 kind: DaemonSet
@@ -137,6 +138,11 @@ spec:
               configMapKeyRef:
                 name: netd-config
                 key: cni_spec_name
+          - name: ENABLE_CALICO_NETWORK_POLICY
+            valueFrom:
+              configMapKeyRef:
+                name: netd-config
+                key: enable_calico_network_policy
         volumeMounts:
         - mountPath: /host/etc/cni/net.d
           name: cni-net-dir

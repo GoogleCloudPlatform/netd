@@ -132,7 +132,8 @@ container-name:
 push: .push-$(DOTFILE_IMAGE) push-name
 .push-$(DOTFILE_IMAGE): .container-$(DOTFILE_IMAGE)
 ifeq ($(findstring gcr.io,$(REGISTRY)),gcr.io)
-	@gcloud docker -- push $(IMAGE):$(VERSION)
+	@gcloud auth configure-docker
+	@docker push $(IMAGE):$(VERSION)
 else
 	@docker push $(IMAGE):$(VERSION)
 endif

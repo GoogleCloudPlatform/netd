@@ -21,7 +21,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
@@ -38,28 +37,50 @@ type Set struct {
 	Configs     []Config
 }
 
+type Sysctler func(name string, params ...string) (string, error)
 type SysctlConfig struct {
 	Key, Value, DefaultValue string
+	SysctlFunc               Sysctler
 }
 
+type RouteAdder func(route *netlink.Route) error
+type RouteDeler func(route *netlink.Route) error
 type IPRouteConfig struct {
-	Route netlink.Route
+	Route    netlink.Route
+	RouteAdd RouteAdder
+	RouteDel RouteDeler
 }
 
+type RuleAdder func(rule *netlink.Rule) error
+type RuleDeler func(rule *netlink.Rule) error
+type RuleLister func(family int) ([]netlink.Rule, error)
 type IPRuleConfig struct {
-	Rule netlink.Rule
+	Rule     netlink.Rule
+	RuleAdd  RuleAdder
+	RuleDel  RuleDeler
+	RuleList RuleLister
 }
 
 type IPTablesRuleSpec []string
 
+type IPTabler interface {
+	NewChain(table, chain string) error
+	ClearChain(table, chain string) error
+	DeleteChain(table, chain string) error
+	AppendUnique(table, chain string, rulespec ...string) error
+	Delete(table, chain string, rulespec ...string) error
+}
+
 type IPTablesChainSpec struct {
 	TableName, ChainName string
 	IsDefaultChain       bool // Is a System default chain, if yes, we won't delete it.
+	Ipt                  IPTabler
 }
 
 type IPTablesRuleConfig struct {
 	Spec      IPTablesChainSpec
 	RuleSpecs []IPTablesRuleSpec
+	Ipt       IPTabler
 }
 
 var ipt *iptables.IPTables
@@ -67,7 +88,7 @@ var ipt *iptables.IPTables
 func init() {
 	var err error
 	if ipt, err = iptables.NewWithProtocol(iptables.ProtocolIPv4); err != nil {
-		glog.Errorf("failed to initialize iptables")
+		glog.Errorf("failed to initialize iptables: %v", err)
 	}
 }
 
@@ -78,19 +99,19 @@ func (s SysctlConfig) Ensure(enabled bool) error {
 	} else {
 		value = s.DefaultValue
 	}
-	_, err := sysctl.Sysctl(s.Key, value)
+	_, err := s.SysctlFunc(s.Key, value)
 	return err
 }
 
 func (r IPRouteConfig) Ensure(enabled bool) error {
 	var err error
 	if enabled {
-		err = netlink.RouteAdd(&r.Route)
+		err = r.RouteAdd(&r.Route)
 		if os.IsExist(err) {
 			err = nil
 		}
 	} else {
-		if err = netlink.RouteDel(&r.Route); err != nil && err.(syscall.Errno) == syscall.ESRCH {
+		if err = r.RouteDel(&r.Route); err != nil && err.(syscall.Errno) == syscall.ESRCH {
 			err = nil
 		}
 	}
@@ -115,12 +136,12 @@ func (r IPRuleConfig) ensureHelper(ensureCount int) error {
 
 	for ruleCount != ensureCount {
 		if ruleCount > ensureCount {
-			if err = netlink.RuleDel(&r.Rule); err != nil {
+			if err = r.RuleDel(&r.Rule); err != nil {
 				glog.Errorf("failed to delete duplicated ip rule: %v, error: %v", r.Rule, err)
 			}
 			ruleCount--
 		} else {
-			err = netlink.RuleAdd(&r.Rule)
+			err = r.RuleAdd(&r.Rule)
 			if err != nil {
 				if os.IsExist(err) {
 					err = nil
@@ -136,7 +157,7 @@ func (r IPRuleConfig) ensureHelper(ensureCount int) error {
 }
 
 func (r IPRuleConfig) count() (int, error) {
-	rules, err := netlink.RuleList(unix.AF_INET)
+	rules, err := r.RuleList(unix.AF_INET)
 	if err != nil {
 		return 0, err
 	}
@@ -152,19 +173,19 @@ func (r IPRuleConfig) count() (int, error) {
 func (c IPTablesChainSpec) ensure(enabled bool) error {
 	var err error
 	if enabled {
-		if err = ipt.NewChain(c.TableName, c.ChainName); err != nil {
+		if err = c.Ipt.NewChain(c.TableName, c.ChainName); err != nil {
 			if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 1 {
 				return err
 			}
 		}
 	} else {
 		if !c.IsDefaultChain {
-			err = ipt.ClearChain(c.TableName, c.ChainName)
+			err = c.Ipt.ClearChain(c.TableName, c.ChainName)
 			if err != nil {
 				glog.Errorf("failed to clean chain %s in table %s: %v", c.TableName, c.ChainName, err)
 				return err
 			}
-			if err = ipt.DeleteChain(c.TableName, c.ChainName); err != nil {
+			if err = c.Ipt.DeleteChain(c.TableName, c.ChainName); err != nil {
 				if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 1 {
 					glog.Errorf("failed to delete chain %s in table %s: %v", c.TableName, c.ChainName, err)
 					return err
@@ -182,7 +203,7 @@ func (r IPTablesRuleConfig) Ensure(enabled bool) error {
 	}
 	if enabled {
 		for _, rs := range r.RuleSpecs {
-			err = ipt.AppendUnique(r.Spec.TableName, r.Spec.ChainName, rs...)
+			err = r.Ipt.AppendUnique(r.Spec.TableName, r.Spec.ChainName, rs...)
 			if err != nil {
 				glog.Errorf("failed to append rule %v in table %s chain %s: %v", rs, r.Spec.TableName, r.Spec.ChainName, err)
 				return err
@@ -191,7 +212,7 @@ func (r IPTablesRuleConfig) Ensure(enabled bool) error {
 	} else {
 		if r.Spec.IsDefaultChain {
 			for _, rs := range r.RuleSpecs {
-				if err := ipt.Delete(r.Spec.TableName, r.Spec.ChainName, rs...); err != nil {
+				if err := r.Ipt.Delete(r.Spec.TableName, r.Spec.ChainName, rs...); err != nil {
 					if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 2 {
 						// TODO: better handling the error
 						if !strings.Contains(eerr.Error(), "No chain/target/match") {

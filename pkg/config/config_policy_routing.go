@@ -106,7 +106,7 @@ func init() {
 				TableName:      tableMangle,
 				ChainName:      gcpPreRoutingChain,
 				IsDefaultChain: false,
-				Ipt:            ipt,
+				IPT:            ipt,
 			},
 			[]IPTablesRuleSpec{
 				[]string{"-j", "CONNMARK", "--restore-mark", "-m", "comment", "--comment", policyRoutingGcpPreRoutingComment},
@@ -118,7 +118,7 @@ func init() {
 				TableName:      tableMangle,
 				ChainName:      preRoutingChain,
 				IsDefaultChain: true,
-				Ipt:            ipt,
+				IPT:            ipt,
 			},
 			[]IPTablesRuleSpec{
 				[]string{"-j", gcpPreRoutingChain, "-m", "comment", "--comment", policyRoutingPreRoutingComment},
@@ -130,7 +130,7 @@ func init() {
 				TableName:      tableMangle,
 				ChainName:      gcpPostRoutingChain,
 				IsDefaultChain: false,
-				Ipt:            ipt,
+				IPT:            ipt,
 			},
 			[]IPTablesRuleSpec{
 				[]string{"-m", "mark", "--mark", fmt.Sprintf("0x%x/0x%x", hairpinMark, hairpinMask), "-j", "CONNMARK", "--save-mark", "-m", "comment", "--comment", policyRoutingGcpPostRoutingComment},
@@ -142,7 +142,7 @@ func init() {
 				TableName:      tableMangle,
 				ChainName:      postRoutingChain,
 				IsDefaultChain: true,
-				Ipt:            ipt,
+				IPT:            ipt,
 			},
 			[]IPTablesRuleSpec{
 				[]string{"-j", gcpPostRoutingChain, "-m", "comment", "--comment", policyRoutingPostRoutingComment},

@@ -74,13 +74,13 @@ type IPTabler interface {
 type IPTablesChainSpec struct {
 	TableName, ChainName string
 	IsDefaultChain       bool // Is a System default chain, if yes, we won't delete it.
-	Ipt                  IPTabler
+	IPT                  IPTabler
 }
 
 type IPTablesRuleConfig struct {
 	Spec      IPTablesChainSpec
 	RuleSpecs []IPTablesRuleSpec
-	Ipt       IPTabler
+	IPT       IPTabler
 }
 
 var ipt *iptables.IPTables
@@ -173,19 +173,19 @@ func (r IPRuleConfig) count() (int, error) {
 func (c IPTablesChainSpec) ensure(enabled bool) error {
 	var err error
 	if enabled {
-		if err = c.Ipt.NewChain(c.TableName, c.ChainName); err != nil {
+		if err = c.IPT.NewChain(c.TableName, c.ChainName); err != nil {
 			if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 1 {
 				return err
 			}
 		}
 	} else {
 		if !c.IsDefaultChain {
-			err = c.Ipt.ClearChain(c.TableName, c.ChainName)
+			err = c.IPT.ClearChain(c.TableName, c.ChainName)
 			if err != nil {
 				glog.Errorf("failed to clean chain %s in table %s: %v", c.TableName, c.ChainName, err)
 				return err
 			}
-			if err = c.Ipt.DeleteChain(c.TableName, c.ChainName); err != nil {
+			if err = c.IPT.DeleteChain(c.TableName, c.ChainName); err != nil {
 				if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 1 {
 					glog.Errorf("failed to delete chain %s in table %s: %v", c.TableName, c.ChainName, err)
 					return err
@@ -203,7 +203,7 @@ func (r IPTablesRuleConfig) Ensure(enabled bool) error {
 	}
 	if enabled {
 		for _, rs := range r.RuleSpecs {
-			err = r.Ipt.AppendUnique(r.Spec.TableName, r.Spec.ChainName, rs...)
+			err = r.IPT.AppendUnique(r.Spec.TableName, r.Spec.ChainName, rs...)
 			if err != nil {
 				glog.Errorf("failed to append rule %v in table %s chain %s: %v", rs, r.Spec.TableName, r.Spec.ChainName, err)
 				return err
@@ -212,7 +212,7 @@ func (r IPTablesRuleConfig) Ensure(enabled bool) error {
 	} else {
 		if r.Spec.IsDefaultChain {
 			for _, rs := range r.RuleSpecs {
-				if err := r.Ipt.Delete(r.Spec.TableName, r.Spec.ChainName, rs...); err != nil {
+				if err := r.IPT.Delete(r.Spec.TableName, r.Spec.ChainName, rs...); err != nil {
 					if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 2 {
 						// TODO: better handling the error
 						if !strings.Contains(eerr.Error(), "No chain/target/match") {

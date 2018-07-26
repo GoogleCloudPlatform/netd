@@ -84,9 +84,9 @@ func TestIPRuleConfigEnsure(t *testing.T) {
 		RuleList: func(family int) ([]netlink.Rule, error) { return ruleList, nil },
 	}
 	if count, _ := ipRule.count(); count != 2 {
-		t.Errorf("IPRuleConfig.count() return wrong count.")
+		t.Errorf("IPRuleConfig.count() shuld return 2.")
 	}
-	if count, _ := ipRule.count(); len(ruleList) != 3 || count != 2 {
+	if len(ruleList) != 3 {
 		t.Error("ruleList should contains 3 rules")
 	}
 	ipRule.Ensure(false)
@@ -99,27 +99,27 @@ func TestIPRuleConfigEnsure(t *testing.T) {
 	}
 }
 
-type MockIPtable struct {
+type FakeIPTable struct {
 	iptCache map[string][]string
 }
 
-func (i MockIPtable) NewChain(table, chain string) error {
+func (i FakeIPTable) NewChain(table, chain string) error {
 	if _, ok := i.iptCache[chain]; !ok {
 		i.iptCache[chain] = make([]string, 0, 5)
 	}
 	return nil
 }
 
-func (i MockIPtable) ClearChain(table, chain string) error {
+func (i FakeIPTable) ClearChain(table, chain string) error {
 	i.iptCache[chain] = make([]string, 0, 5)
 	return nil
 }
-func (i MockIPtable) DeleteChain(table, chain string) error {
+func (i FakeIPTable) DeleteChain(table, chain string) error {
 	delete(i.iptCache, chain)
 	return nil
 }
 
-func (i MockIPtable) AppendUnique(table, chain string, rulespec ...string) error {
+func (i FakeIPTable) AppendUnique(table, chain string, rulespec ...string) error {
 	rule := strings.Join(rulespec, " ")
 	for _, r := range i.iptCache[chain] {
 		if r == rule {
@@ -129,7 +129,7 @@ func (i MockIPtable) AppendUnique(table, chain string, rulespec ...string) error
 	i.iptCache[chain] = append(i.iptCache[chain], rule)
 	return nil
 }
-func (i MockIPtable) Delete(table, chain string, rulespec ...string) error {
+func (i FakeIPTable) Delete(table, chain string, rulespec ...string) error {
 	rule := strings.Join(rulespec, " ")
 	for index, r := range i.iptCache[chain] {
 		if r == rule {
@@ -140,8 +140,33 @@ func (i MockIPtable) Delete(table, chain string, rulespec ...string) error {
 	return nil
 }
 
+func TestFakeIPTable(t *testing.T) {
+	fakeIPT := FakeIPTable{
+		iptCache: make(map[string][]string),
+	}
+	fakeIPT.NewChain("table", "chain")
+	fakeIPT.AppendUnique("table", "chain", "rule1")
+	fakeIPT.AppendUnique("table", "chain", "rule1")
+	fakeIPT.AppendUnique("table", "chain", "rule2")
+	if len(fakeIPT.iptCache["chain"]) != 2 {
+		t.Error("fakeIPT['chain'] should contains 2 rules")
+	}
+	fakeIPT.Delete("table", "chain", "rule1")
+	if len(fakeIPT.iptCache["chain"]) != 1 {
+		t.Error("fakeIPT['chain'] should contains 1 rules")
+	}
+	fakeIPT.ClearChain("table", "chain")
+	if len(fakeIPT.iptCache["chain"]) != 0 {
+		t.Error("fakeIPT['chain'] should be empty")
+	}
+	fakeIPT.DeleteChain("table", "chain")
+	if len(fakeIPT.iptCache) != 0 {
+		t.Error("fakeIPT should be empty")
+	}
+}
+
 func TestIPTablesRuleConfig(t *testing.T) {
-	mockIpt := MockIPtable{
+	fakeIPT := FakeIPTable{
 		iptCache: make(map[string][]string),
 	}
 	iptableRule1 := IPTablesRuleConfig{
@@ -149,70 +174,70 @@ func TestIPTablesRuleConfig(t *testing.T) {
 			TableName:      "mangle",
 			ChainName:      "postRoutingChain",
 			IsDefaultChain: true,
-			Ipt:            mockIpt,
+			IPT:            fakeIPT,
 		},
 		[]IPTablesRuleSpec{
 			[]string{"rule1", "-m", "-j"},
 			[]string{"rule2", "-m", "-j"},
 		},
-		mockIpt,
+		fakeIPT,
 	}
 	iptableRule2 := IPTablesRuleConfig{
 		IPTablesChainSpec{
 			TableName:      "mangle",
 			ChainName:      "postRoutingChain",
 			IsDefaultChain: true,
-			Ipt:            mockIpt,
+			IPT:            fakeIPT,
 		},
 		[]IPTablesRuleSpec{
 			[]string{"rule1", "-m", "-j"},
 			[]string{"rule3", "-m", "-j"},
 		},
-		mockIpt,
+		fakeIPT,
 	}
 	iptableRule3 := IPTablesRuleConfig{
 		IPTablesChainSpec{
 			TableName:      "mangle",
 			ChainName:      "gcpPostRoutingChain",
 			IsDefaultChain: false,
-			Ipt:            mockIpt,
+			IPT:            fakeIPT,
 		},
 		[]IPTablesRuleSpec{
 			[]string{"rule1", "-m", "-j"},
 			[]string{"rule2", "-m", "-j"},
 		},
-		mockIpt,
+		fakeIPT,
 	}
 	iptableRule1.Ensure(true)
 	iptableRule2.Ensure(true)
 	iptableRule3.Ensure(true)
-	if len(mockIpt.iptCache) != 2 {
-		t.Error("MockIPtable contains 2 chains")
+	if len(fakeIPT.iptCache) != 2 {
+		t.Error("FakeIPTable contains 2 chains")
 	}
-	if len(mockIpt.iptCache["postRoutingChain"]) != 3 || len(mockIpt.iptCache["gcpPostRoutingChain"]) != 2 {
-		t.Errorf("MockIPtable postRoutingChain should contain 3 chains, but contains: %v", mockIpt.iptCache["postRoutingChain"])
-		t.Errorf("MockIPtable gcpPostRoutingChain should contain 2 chains, but contains: %v", mockIpt.iptCache["gcpPostRoutingChain"])
+	if len(fakeIPT.iptCache["postRoutingChain"]) != 3 || len(fakeIPT.iptCache["gcpPostRoutingChain"]) != 2 {
+		t.Errorf("FakeIPTable postRoutingChain should contain 3 chains, but contains: %v", fakeIPT.iptCache["postRoutingChain"])
+		t.Errorf("FakeIPTable gcpPostRoutingChain should contain 2 chains, but contains: %v", fakeIPT.iptCache["gcpPostRoutingChain"])
 	}
 	iptableRule2.Ensure(false)
 	iptableRule3.Ensure(false)
 
-	if _, ok := mockIpt.iptCache["gcpPostRoutingChain"]; ok {
+	if _, ok := fakeIPT.iptCache["gcpPostRoutingChain"]; ok {
 		t.Error("Ensure should delete IsDefaultChain: false chain.")
 	}
 
-	if _, ok := mockIpt.iptCache["postRoutingChain"]; !ok {
+	if _, ok := fakeIPT.iptCache["postRoutingChain"]; !ok {
 		t.Error("Ensure should keep IsDefaultChain: true chain.")
 	}
 
 	/*
 		// This is a bug, the chain should contain 2 rule.
-		if len(mockIpt.iptCache["postRoutingChain"]) != 2 {
+		if len(fakeIPT.iptCache["postRoutingChain"]) != 2 {
 			t.Error("Ensure should keep 2 rule for iptableRule1.")
 		}
 	*/
 
 	iptableRule1.Ensure(false)
-	if len(mockIpt.iptCache["postRoutingChain"]) != 0 {
+	if len(fakeIPT.iptCache["postRoutingChain"]) != 0 {
 		t.Error("Ensure should keep 0 rule for iptableRule1.")
 	}
 }

@@ -35,7 +35,7 @@ func init() {
 				TableName:      natTable,
 				ChainName:      postRoutingChain,
 				IsDefaultChain: true,
-				Ipt:            ipt,
+				IPT:            ipt,
 			},
 			[]IPTablesRuleSpec{
 				[]string{"-m", "addrtype", "!", "--dst-type", "LOCAL", "-j", "IP-MASQ"},
@@ -47,7 +47,7 @@ func init() {
 				TableName:      natTable,
 				ChainName:      ipMasqChain,
 				IsDefaultChain: false,
-				Ipt:            ipt,
+				IPT:            ipt,
 			},
 			[]IPTablesRuleSpec{
 				[]string{"-d", "169.254.0.0/16", "-j", "RETURN", "-m", "comment", "--comment", "ip-masq: local traffic is not subject to MASQUERADE"},

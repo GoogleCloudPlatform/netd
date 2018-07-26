@@ -38,7 +38,7 @@ func init() {
 				IPT:            ipt,
 			},
 			[]IPTablesRuleSpec{
-				[]string{"-m", "addrtype", "!", "--dst-type", "LOCAL", "-j", "IP-MASQ"},
+				[]string{"-m", "comment", "--comment", "ip-masq: ensure nat POSTROUTING directs all non-LOCAL destination traffic to our custom IP-MASQ chain", "-m", "addrtype", "!", "--dst-type", "LOCAL", "-j", "IP-MASQ"},
 			},
 			ipt,
 		},

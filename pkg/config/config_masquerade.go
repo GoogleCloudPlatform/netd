@@ -35,16 +35,19 @@ func init() {
 				TableName:      natTable,
 				ChainName:      postRoutingChain,
 				IsDefaultChain: true,
+				IPT:            ipt,
 			},
 			[]IPTablesRuleSpec{
 				[]string{"-m", "addrtype", "!", "--dst-type", "LOCAL", "-j", "IP-MASQ"},
 			},
+			ipt,
 		},
 		IPTablesRuleConfig{
 			IPTablesChainSpec{
 				TableName:      natTable,
 				ChainName:      ipMasqChain,
 				IsDefaultChain: false,
+				IPT:            ipt,
 			},
 			[]IPTablesRuleSpec{
 				[]string{"-d", "169.254.0.0/16", "-j", "RETURN", "-m", "comment", "--comment", "ip-masq: local traffic is not subject to MASQUERADE"},
@@ -53,6 +56,7 @@ func init() {
 				[]string{"-d", "192.168.0.0/16", "-j", "RETURN", "-m", "comment", "--comment", "ip-masq: local traffic is not subject to MASQUERADE"},
 				[]string{"-j", "MASQUERADE", "-m", "comment", "--comment", "ip-masq: outbound traffic is subject to MASQUERADE (must be last in chain)"},
 			},
+			ipt,
 		},
 	}
 }

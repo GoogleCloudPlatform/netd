@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
@@ -92,51 +93,61 @@ func init() {
 			Key:          sysctlReversePathFilter,
 			Value:        "2",
 			DefaultValue: "1",
+			SysctlFunc:   sysctl.Sysctl,
 		},
 		SysctlConfig{
 			Key:          sysctlSrcValidMark,
 			Value:        "1",
 			DefaultValue: "0",
+			SysctlFunc:   sysctl.Sysctl,
 		},
 		IPTablesRuleConfig{
 			IPTablesChainSpec{
 				TableName:      tableMangle,
 				ChainName:      gcpPreRoutingChain,
 				IsDefaultChain: false,
+				IPT:            ipt,
 			},
 			[]IPTablesRuleSpec{
 				[]string{"-j", "CONNMARK", "--restore-mark", "-m", "comment", "--comment", policyRoutingGcpPreRoutingComment},
 			},
+			ipt,
 		},
 		IPTablesRuleConfig{
 			IPTablesChainSpec{
 				TableName:      tableMangle,
 				ChainName:      preRoutingChain,
 				IsDefaultChain: true,
+				IPT:            ipt,
 			},
 			[]IPTablesRuleSpec{
 				[]string{"-j", gcpPreRoutingChain, "-m", "comment", "--comment", policyRoutingPreRoutingComment},
 			},
+			ipt,
 		},
 		IPTablesRuleConfig{
 			IPTablesChainSpec{
 				TableName:      tableMangle,
 				ChainName:      gcpPostRoutingChain,
 				IsDefaultChain: false,
+				IPT:            ipt,
 			},
 			[]IPTablesRuleSpec{
 				[]string{"-m", "mark", "--mark", fmt.Sprintf("0x%x/0x%x", hairpinMark, hairpinMask), "-j", "CONNMARK", "--save-mark", "-m", "comment", "--comment", policyRoutingGcpPostRoutingComment},
 			},
+			ipt,
 		},
 		IPTablesRuleConfig{
 			IPTablesChainSpec{
 				TableName:      tableMangle,
 				ChainName:      postRoutingChain,
 				IsDefaultChain: true,
+				IPT:            ipt,
 			},
 			[]IPTablesRuleSpec{
 				[]string{"-j", gcpPostRoutingChain, "-m", "comment", "--comment", policyRoutingPostRoutingComment},
 			},
+			ipt,
 		},
 		IPRouteConfig{
 			Route: netlink.Route{
@@ -145,6 +156,8 @@ func init() {
 				Gw:        defaultGateway,
 				Dst:       nil,
 			},
+			RouteAdd: netlink.RouteAdd,
+			RouteDel: netlink.RouteDel,
 		},
 		IPRuleConfig{
 			Rule: netlink.Rule{
@@ -157,6 +170,9 @@ func init() {
 				Goto:              -1,
 				Flow:              -1,
 			},
+			RuleAdd:  netlink.RuleAdd,
+			RuleDel:  netlink.RuleDel,
+			RuleList: netlink.RuleList,
 		},
 		IPRuleConfig{
 			Rule: netlink.Rule{
@@ -170,6 +186,9 @@ func init() {
 				Goto:              -1,
 				Flow:              -1,
 			},
+			RuleAdd:  netlink.RuleAdd,
+			RuleDel:  netlink.RuleDel,
+			RuleList: netlink.RuleList,
 		},
 		IPRuleConfig{
 			Rule: netlink.Rule{
@@ -184,6 +203,9 @@ func init() {
 				Goto:              -1,
 				Flow:              -1,
 			},
+			RuleAdd:  netlink.RuleAdd,
+			RuleDel:  netlink.RuleDel,
+			RuleList: netlink.RuleList,
 		},
 	}
 }

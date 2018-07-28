@@ -38,13 +38,13 @@
   branch = "master"
   name = "github.com/vishvananda/netns"
   packages = ["."]
-  revision = "ef6f981729d0289fb1807af9cda61577bdff8724"
+  revision = "13995c7128ccc8e51e9a6bd2b551020a27180abd"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "ac767d655b305d4e9612f5f6e33120b9176c4ad4"
+  revision = "bd9dbc187b6e1dacfdd2722a87e83093c2d7bd6e"
 
 [solve-meta]
   analyzer-name = "dep"

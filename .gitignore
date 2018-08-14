@@ -12,4 +12,5 @@
 .dockerfile*
 .go/
 bin/
-
+.push-gcr.*
+scripts/install-cni-build.sh

@@ -20,11 +20,13 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 
 	"github.com/GoogleCloudPlatform/netd/pkg/controllers/netconf"
 	"github.com/GoogleCloudPlatform/netd/pkg/options"
+	"github.com/GoogleCloudPlatform/netd/pkg/version"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 )
@@ -34,16 +36,18 @@ func main() {
 	config.AddFlags(pflag.CommandLine)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
-
-	glog.Infof("Starting netd ...")
+	glog.Infof("netd version: %v", version.VERSION)
+	glog.Infof("netd args: %v", strings.Join(os.Args, " "))
 
 	nc := netconf.NewNetworkConfigController(config.EnablePolicyRouting, config.EnableMasquerade)
+	nc.PrintConfig()
 
 	var wg sync.WaitGroup
 	stopCh := make(chan struct{})
 
 	wg.Add(1)
 	go nc.Run(stopCh, &wg)
+	glog.Infof("netd started")
 
 	ch := make(chan os.Signal)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)

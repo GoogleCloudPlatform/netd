@@ -31,6 +31,8 @@ if [ -z "${VERSION}" ]; then
     exit 1
 fi
 
+cat scripts/install-cni.sh | sed "s/@VERSION@/${VERSION}/" > scripts/install-cni-build.sh
+
 export CGO_ENABLED=0
 export GOARCH="${ARCH}"
 

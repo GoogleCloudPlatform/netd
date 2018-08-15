@@ -16,8 +16,10 @@
 
 set -u -e
 if [ "${ENABLE_CALICO_NETWORK_POLICY}" == "true" ]; then
-  echo "Calico Network Policy is enabled by ENABLE_CALICO_NETWORK_POLICY. Disabling CNI Spec generation."
-  exit 0
+  echo "Calico Network Policy is enabled by ENABLE_CALICO_NETWORK_POLICY. Generating Calico CNI spec."
+  cni_spec=${CALICO_CNI_SPEC_TEMPLATE}
+else
+  cni_spec=${CNI_SPEC_TEMPLATE}
 fi
 
 
@@ -31,7 +33,7 @@ fi
 
 if [ -w /host/etc/cni/net.d ]; then
   echo "Adding IPV4 subnet range ${ipv4_subnet:-}."
-  cni_spec=$(echo ${CNI_SPEC_TEMPLATE:-} | sed -e "s#@ipv4Subnet#[{\"subnet\": ${ipv4_subnet:-}}]#g")
+  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@ipv4Subnet#[{\"subnet\": ${ipv4_subnet:-}}]#g")
 
   if [ "$ENABLE_PRIVATE_IPV6_ACCESS" == "true" ]; then
     node_ipv6_addr=$(curl -s -k --fail "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/?recursive=true" -H "Metadata-Flavor: Google" | jq -r '.ipv6s[0]' ) ||:

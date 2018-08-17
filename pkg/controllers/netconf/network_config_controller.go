@@ -70,3 +70,15 @@ func (n *NetworkConfigController) ensure() {
 		}
 	}
 }
+
+func (n *NetworkConfigController) PrintConfig() {
+	glog.Infof("**** NetworkConfigs Start ****")
+	for _, cs := range n.configSets {
+		glog.Infof("** FeatureName: %s Start **", cs.FeatureName)
+		for _, c := range cs.Configs {
+			glog.Infof("%v", c)
+		}
+		glog.Infof("** FeatureName: %s End **", cs.FeatureName)
+	}
+	glog.Infof("**** NetworkConfigs End ****")
+}

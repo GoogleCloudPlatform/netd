@@ -133,6 +133,7 @@ data:
   enable_masquerade: "true"
   enable_calico_network_policy: "false"
   enable_private_ipv6_access: "false"
+  reconcile_interval_seconds: 10
 
 ---
 
@@ -204,6 +205,7 @@ spec:
         - --enable-policy-routing=$(ENABLE_POLICY_ROUTING)
         - --enable-masquerade=$(ENABLE_MASQUERADE)
         - --logtostderr
+        - --reconcile-interval-seconds=$(RECONCILE_INTERVAL_SECONDS)
         env:
           - name: ENABLE_POLICY_ROUTING
             valueFrom:
@@ -215,6 +217,11 @@ spec:
               configMapKeyRef:
                 name: netd-config
                 key: enable_masquerade
+          - name: RECONCILE_INTERVAL_SECONDS
+            valueFrom:
+              configMapKeyRef:
+                name: netd-config
+                key: reconcile_interval_seconds
       volumes:
       - name: cni-net-dir
         hostPath:

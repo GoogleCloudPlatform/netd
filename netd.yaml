@@ -148,6 +148,10 @@ spec:
   selector:
     matchLabels:
       k8s-app: netd
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10%
   template:
     metadata:
       labels:
@@ -158,6 +162,11 @@ spec:
       terminationGracePeriodSeconds: 0
       nodeSelector:
         beta.kubernetes.io/kube-netd-ready: "true"
+      tolerations:
+      - operator: "Exists"
+        effect: "NoExecute"
+      - operator: "Exists"
+        effect: "NoSchedule"
       hostNetwork: true
       initContainers:
       - image: gcr.io/google-containers/netd-amd64:latest

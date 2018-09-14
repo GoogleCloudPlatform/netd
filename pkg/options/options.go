@@ -17,10 +17,12 @@ limitations under the License.
 package options
 
 import "github.com/spf13/pflag"
+import "time"
 
 type NetdConfig struct {
-	EnablePolicyRouting bool
-	EnableMasquerade    bool
+	EnablePolicyRouting      bool
+	EnableMasquerade         bool
+	ReconcileIntervalSeconds time.Duration
 }
 
 func NewNetdConfig() *NetdConfig {
@@ -32,4 +34,6 @@ func (nc *NetdConfig) AddFlags(fs *pflag.FlagSet) {
 		"Enable policy routing.")
 	fs.BoolVar(&nc.EnableMasquerade, "enable-masquerade", true,
 		"Enable masquerade.")
+	fs.DurationVar(&nc.ReconcileIntervalSeconds, "reconcile-interval-seconds", 10,
+		"Reconcile interval in seconds.")
 }

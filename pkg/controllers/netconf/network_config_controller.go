@@ -26,10 +26,11 @@ import (
 )
 
 type NetworkConfigController struct {
-	configSets []*config.Set
+	configSets               []*config.Set
+	reconcileIntervalSeconds time.Duration
 }
 
-func NewNetworkConfigController(enablePolicyRouting, enableMasquerade bool) *NetworkConfigController {
+func NewNetworkConfigController(enablePolicyRouting, enableMasquerade bool, reconcileIntervalSeconds time.Duration) *NetworkConfigController {
 	var configSets []*config.Set
 
 	configSets = append(configSets, &config.PolicyRoutingConfigSet)
@@ -44,7 +45,8 @@ func NewNetworkConfigController(enablePolicyRouting, enableMasquerade bool) *Net
 	}
 
 	return &NetworkConfigController{
-		configSets: configSets,
+		configSets:               configSets,
+		reconcileIntervalSeconds: reconcileIntervalSeconds,
 	}
 }
 
@@ -55,7 +57,7 @@ func (n *NetworkConfigController) Run(stopCh <-chan struct{}, wg *sync.WaitGroup
 		select {
 		case <-stopCh:
 			return
-		case <-time.After(10 * time.Second):
+		case <-time.After(n.reconcileIntervalSeconds * time.Second):
 			n.ensure()
 		}
 	}

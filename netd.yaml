@@ -133,7 +133,7 @@ data:
   enable_masquerade: "true"
   enable_calico_network_policy: "false"
   enable_private_ipv6_access: "false"
-  reconcile_interval_seconds: 10
+  reconcile_interval_seconds: 60
 
 ---
 

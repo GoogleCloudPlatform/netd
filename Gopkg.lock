@@ -4,14 +4,14 @@
 [[projects]]
   name = "github.com/containernetworking/plugins"
   packages = ["pkg/utils/sysctl"]
-  revision = "72b62babeeb3d7b25c9809ea9eb9fc9c02cc0f71"
-  version = "v0.7.1"
+  revision = "19f2f28178aa88772f69c4eeb3793d4a63c244b0"
+  version = "v0.7.3"
 
 [[projects]]
   name = "github.com/coreos/go-iptables"
   packages = ["iptables"]
-  revision = "b5b1876b170881a8259f036445ee89c8669db386"
-  version = "v0.3.0"
+  revision = "47f22b0dd3355c0ba570ba12b0b8a36bf214c04b"
+  version = "v0.4.0"
 
 [[projects]]
   branch = "master"
@@ -22,8 +22,8 @@
 [[projects]]
   name = "github.com/spf13/pflag"
   packages = ["."]
-  revision = "583c0c0531f06d5278b7d917446061adc344b5cd"
-  version = "v1.0.1"
+  revision = "9a97c102cda95a86cec2345a6f09f55a939babf5"
+  version = "v1.0.2"
 
 [[projects]]
   name = "github.com/vishvananda/netlink"
@@ -44,7 +44,7 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "bd9dbc187b6e1dacfdd2722a87e83093c2d7bd6e"
+  revision = "d0be0721c37eeb5299f245a996a483160fc36940"
 
 [solve-meta]
   analyzer-name = "dep"

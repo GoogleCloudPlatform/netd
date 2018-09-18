@@ -1,8 +1,17 @@
 # netd releases
 
-## 0.1.6 [backlog]
+## 0.1.7 [backlog]
 ### Features
 ### Bug fixs
+
+## 0.1.6
+### Features
+ * Add support for generating a Calico CNI Spec.
+ * Update netd DaemonSet's updateStrategy to be RollingUpdate and tolerations.
+ * Make reconcile interval configurable.
+ * Version and config logging.
+### Bug fixs
+ * Update dependency.
 
 ## 0.1 - 0.1.5
 ### Features

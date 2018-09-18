@@ -76,6 +76,9 @@ func (n *NetworkConfigController) ensure() {
 func (n *NetworkConfigController) PrintConfig() {
 	glog.Infof("**** NetworkConfigs Start ****")
 	for _, cs := range n.configSets {
+		if !cs.Enabled {
+			continue
+		}
 		glog.Infof("** FeatureName: %s Start **", cs.FeatureName)
 		for _, c := range cs.Configs {
 			glog.Infof("%v", c)

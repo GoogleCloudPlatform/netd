@@ -54,11 +54,13 @@ func (n *NetworkConfigController) Run(stopCh <-chan struct{}, wg *sync.WaitGroup
 	defer wg.Done()
 
 	for {
+		n.ensure()
+
 		select {
 		case <-stopCh:
 			return
 		case <-time.After(n.reconcileIntervalSeconds * time.Second):
-			n.ensure()
+			continue
 		}
 	}
 }

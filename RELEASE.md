@@ -9,6 +9,7 @@
  * Add support for generating a Calico CNI Spec.
  * Update netd DaemonSet's updateStrategy to be RollingUpdate and tolerations.
  * Make reconcile interval configurable.
+ * Ensure configurations once the controller loop started.
  * Version and config logging.
 ### Bug fixs
  * Update dependency.

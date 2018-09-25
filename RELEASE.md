@@ -11,6 +11,8 @@
  * Make reconcile interval configurable.
  * Ensure configurations once the controller loop started.
  * Version and config logging.
+ * change nodeSelector label to gke instead of k8s
+ * update the addonmanager mode to Reconcile
 ### Bug fixs
  * Update dependency.
 

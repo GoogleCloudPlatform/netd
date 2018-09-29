@@ -20,6 +20,9 @@ echo "netd version: @VERSION@"
 
 if [ "${ENABLE_CALICO_NETWORK_POLICY}" == "true" ]; then
   echo "Calico Network Policy is enabled by ENABLE_CALICO_NETWORK_POLICY. Generating Calico CNI spec."
+  # TODO(varunmar): when calico network policy is enabled, generate CNI spec
+  # template in CNI_NETWORK_CONFIG_FILE understood by Calico's install-cni container.
+  exit 0
   cni_spec=${CALICO_CNI_SPEC_TEMPLATE}
 else
   cni_spec=${CNI_SPEC_TEMPLATE}

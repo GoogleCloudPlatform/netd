@@ -55,7 +55,7 @@ if [ -w /host/etc/cni/net.d ]; then
         sed -e "s#@ipv6SubnetOptional##g; s#@ipv6RouteOptional##g")
     fi
   else
-    echo "Disabling IPV6 subnet and range configuration. Set ENABLE_PRIVATE_IPV6_ACCESS=true to configure IPV6."
+    echo "Disabling IPV6 subnet and range configuration as ENABLE_PRIVATE_IPV6_ACCESS=false."
     cni_spec=$(echo ${cni_spec:-} | \
       sed -e "s#@ipv6SubnetOptional##g; s#@ipv6RouteOptional##g")
   fi

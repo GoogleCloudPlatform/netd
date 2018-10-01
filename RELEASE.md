@@ -1,8 +1,12 @@
 # netd releases
 
-## 0.1.7 [backlog]
+## 0.1.8 [backlog]
 ### Features
 ### Bug fixs
+
+## 0.1.7
+### Bug fixs
+ * Quick fix to avoid unnecessary CNI spec generation. PR#44
 
 ## 0.1.6
 ### Features

@@ -229,13 +229,6 @@ func TestIPTablesRuleConfig(t *testing.T) {
 		t.Error("Ensure should keep IsDefaultChain: true chain.")
 	}
 
-	/*
-		// This is a bug, the chain should contain 2 rule.
-		if len(fakeIPT.iptCache["postRoutingChain"]) != 2 {
-			t.Error("Ensure should keep 2 rule for iptableRule1.")
-		}
-	*/
-
 	iptableRule1.Ensure(false)
 	if len(fakeIPT.iptCache["postRoutingChain"]) != 0 {
 		t.Error("Ensure should keep 0 rule for iptableRule1.")

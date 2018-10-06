@@ -29,19 +29,6 @@ var MasqueradeConfigSet = Set{
 
 func init() {
 	MasqueradeConfigSet.Configs = []Config{
-
-		IPTablesRuleConfig{
-			IPTablesChainSpec{
-				TableName:      natTable,
-				ChainName:      postRoutingChain,
-				IsDefaultChain: true,
-				IPT:            ipt,
-			},
-			[]IPTablesRuleSpec{
-				[]string{"-m", "comment", "--comment", "ip-masq: ensure nat POSTROUTING directs all non-LOCAL destination traffic to our custom IP-MASQ chain", "-m", "addrtype", "!", "--dst-type", "LOCAL", "-j", "IP-MASQ"},
-			},
-			ipt,
-		},
 		IPTablesRuleConfig{
 			IPTablesChainSpec{
 				TableName:      natTable,
@@ -55,6 +42,18 @@ func init() {
 				[]string{"-d", "172.16.0.0/12", "-j", "RETURN", "-m", "comment", "--comment", "ip-masq: local traffic is not subject to MASQUERADE"},
 				[]string{"-d", "192.168.0.0/16", "-j", "RETURN", "-m", "comment", "--comment", "ip-masq: local traffic is not subject to MASQUERADE"},
 				[]string{"-j", "MASQUERADE", "-m", "comment", "--comment", "ip-masq: outbound traffic is subject to MASQUERADE (must be last in chain)"},
+			},
+			ipt,
+		},
+		IPTablesRuleConfig{
+			IPTablesChainSpec{
+				TableName:      natTable,
+				ChainName:      postRoutingChain,
+				IsDefaultChain: true,
+				IPT:            ipt,
+			},
+			[]IPTablesRuleSpec{
+				[]string{"-m", "comment", "--comment", "ip-masq: ensure nat POSTROUTING directs all non-LOCAL destination traffic to our custom IP-MASQ chain", "-m", "addrtype", "!", "--dst-type", "LOCAL", "-j", "IP-MASQ"},
 			},
 			ipt,
 		},

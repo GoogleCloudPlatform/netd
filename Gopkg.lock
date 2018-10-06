@@ -22,8 +22,8 @@
 [[projects]]
   name = "github.com/spf13/pflag"
   packages = ["."]
-  revision = "9a97c102cda95a86cec2345a6f09f55a939babf5"
-  version = "v1.0.2"
+  revision = "298182f68c66c05229eb03ac171abe6e309ee79a"
+  version = "v1.0.3"
 
 [[projects]]
   name = "github.com/vishvananda/netlink"
@@ -44,7 +44,7 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "d0be0721c37eeb5299f245a996a483160fc36940"
+  revision = "4497e2df6f9e69048a54498c7affbbec3294ad47"
 
 [solve-meta]
   analyzer-name = "dep"

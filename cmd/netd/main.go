@@ -41,14 +41,14 @@ func main() {
 
 	nc := netconf.NewNetworkConfigController(config.EnablePolicyRouting, config.EnableMasquerade,
 		config.ReconcileIntervalSeconds)
-	nc.PrintConfig()
 
-	var wg sync.WaitGroup
 	stopCh := make(chan struct{})
 
+	var wg sync.WaitGroup
 	wg.Add(1)
+
+	glog.Infof("Starting netd")
 	go nc.Run(stopCh, &wg)
-	glog.Infof("netd started")
 
 	ch := make(chan os.Signal)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)

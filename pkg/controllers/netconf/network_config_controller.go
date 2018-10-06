@@ -26,15 +26,15 @@ import (
 )
 
 type NetworkConfigController struct {
-	configSets               []*config.Set
+	configSet                []*config.Set
 	reconcileIntervalSeconds time.Duration
 }
 
 func NewNetworkConfigController(enablePolicyRouting, enableMasquerade bool, reconcileIntervalSeconds time.Duration) *NetworkConfigController {
-	var configSets []*config.Set
+	var configSet []*config.Set
 
-	configSets = append(configSets, &config.PolicyRoutingConfigSet)
-	configSets = append(configSets, &config.MasqueradeConfigSet)
+	configSet = append(configSet, &config.PolicyRoutingConfigSet)
+	configSet = append(configSet, &config.MasqueradeConfigSet)
 
 	if enablePolicyRouting {
 		config.PolicyRoutingConfigSet.Enabled = true
@@ -45,13 +45,15 @@ func NewNetworkConfigController(enablePolicyRouting, enableMasquerade bool, reco
 	}
 
 	return &NetworkConfigController{
-		configSets:               configSets,
+		configSet:                configSet,
 		reconcileIntervalSeconds: reconcileIntervalSeconds,
 	}
 }
 
 func (n *NetworkConfigController) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
+
+	n.printConfig()
 
 	for {
 		n.ensure()
@@ -66,7 +68,7 @@ func (n *NetworkConfigController) Run(stopCh <-chan struct{}, wg *sync.WaitGroup
 }
 
 func (n *NetworkConfigController) ensure() {
-	for _, cs := range n.configSets {
+	for _, cs := range n.configSet {
 		for _, c := range cs.Configs {
 			if err := c.Ensure(cs.Enabled); err != nil {
 				glog.Errorf("found an error for %v: %v when ensuring %v", cs.FeatureName, err, reflect.ValueOf(c))
@@ -75,17 +77,15 @@ func (n *NetworkConfigController) ensure() {
 	}
 }
 
-func (n *NetworkConfigController) PrintConfig() {
-	glog.Infof("**** NetworkConfigs Start ****")
-	for _, cs := range n.configSets {
+func (n *NetworkConfigController) printConfig() {
+	glog.Infof("**** NetworkConfigController configurations ****")
+	for _, cs := range n.configSet {
 		if !cs.Enabled {
 			continue
 		}
-		glog.Infof("** FeatureName: %s Start **", cs.FeatureName)
+		glog.Infof("** FeatureName: %s is enabled **", cs.FeatureName)
 		for _, c := range cs.Configs {
 			glog.Infof("%v", c)
 		}
-		glog.Infof("** FeatureName: %s End **", cs.FeatureName)
 	}
-	glog.Infof("**** NetworkConfigs End ****")
 }

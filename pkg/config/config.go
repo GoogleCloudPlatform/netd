@@ -38,6 +38,7 @@ type Set struct {
 }
 
 type Sysctler func(name string, params ...string) (string, error)
+
 type SysctlConfig struct {
 	Key, Value, DefaultValue string
 	SysctlFunc               Sysctler
@@ -45,6 +46,7 @@ type SysctlConfig struct {
 
 type RouteAdder func(route *netlink.Route) error
 type RouteDeler func(route *netlink.Route) error
+
 type IPRouteConfig struct {
 	Route    netlink.Route
 	RouteAdd RouteAdder
@@ -54,6 +56,7 @@ type IPRouteConfig struct {
 type RuleAdder func(rule *netlink.Rule) error
 type RuleDeler func(rule *netlink.Rule) error
 type RuleLister func(family int) ([]netlink.Rule, error)
+
 type IPRuleConfig struct {
 	Rule     netlink.Rule
 	RuleAdd  RuleAdder

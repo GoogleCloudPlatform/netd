@@ -1,8 +1,13 @@
 # netd releases
 
-## 0.1.8 [backlog]
+## 0.1.9 [backlog]
 ### Features
 ### Bug fixs
+
+## 0.1.8 [backlog]
+### Bug fixs
+ * fix reconcile and ipmasq chain bug
+ * update comments
 
 ## 0.1.7
 ### Bug fixs

@@ -98,7 +98,8 @@ data:
       "plugins": [
         {
         "type": "calico",
-        "log_level": "debug",
+        "mtu": 1460,
+        "log_level": "info",
         "datastore_type": "kubernetes",
         "nodename": "__KUBERNETES_NODE_NAME__",
         "ipam": {

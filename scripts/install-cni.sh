@@ -16,8 +16,6 @@
 
 set -u -e
 
-echo "netd version: @VERSION@"
-
 if [ "${ENABLE_CALICO_NETWORK_POLICY}" == "true" ]; then
   echo "Calico Network Policy is enabled by ENABLE_CALICO_NETWORK_POLICY. Generating Calico CNI spec."
   # TODO(varunmar): when calico network policy is enabled, generate CNI spec

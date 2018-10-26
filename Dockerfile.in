@@ -19,7 +19,7 @@ MAINTAINER Jing Ai <jinga@google.com>
 RUN apk --update add --no-cache curl iptables jq \
     && rm -rf /var/cache/apk/*
 
-ADD scripts/install-cni-build.sh /install-cni.sh
+ADD scripts/install-cni.sh /install-cni.sh
 ADD bin/ARG_ARCH/ARG_BIN /ARG_BIN
 
 ENTRYPOINT ["/ARG_BIN"]

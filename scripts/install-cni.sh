@@ -16,55 +16,63 @@
 
 set -u -e
 
+# Get CNI spec template if needed.
 if [ "${ENABLE_CALICO_NETWORK_POLICY}" == "true" ]; then
-  echo "Calico Network Policy is enabled by ENABLE_CALICO_NETWORK_POLICY. Generating Calico CNI spec."
-  # TODO(varunmar): when calico network policy is enabled, generate CNI spec
-  # template in CNI_NETWORK_CONFIG_FILE understood by Calico's install-cni container.
-  exit 0
+  echo "Calico Network Policy is enabled"
+  if [ -z "${CALICO_CNI_SPEC_TEMPLATE_FILE:-}" ]; then
+    echo "No Calico CNI spec template is specified. Exiting (0)..."
+    exit 0
+  fi
+  if [ -z "${CALICO_CNI_SPEC_TEMPLATE}" ]; then
+    echo "No Calico CNI spec template is specified. Exiting (0)..."
+    exit 0
+  fi
   cni_spec=${CALICO_CNI_SPEC_TEMPLATE}
 else
   cni_spec=${CNI_SPEC_TEMPLATE}
 fi
 
-
+# Fill CNI spec template.
 token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
 node_url="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/nodes/${HOSTNAME}"
 ipv4_subnet=$(curl -k -s -H "Authorization: Bearer $token" $node_url | jq '.spec.podCIDR')
 if [ -z "${ipv4_subnet:-}" ]; then
-  echo "Failed to fetch PodCIDR from K8s API server. Exiting with an error (1) ..."
+  echo "Failed to fetch PodCIDR from K8s API server. Exiting (1)..."
   exit 1
 fi
 
-if [ -w /host/etc/cni/net.d ]; then
-  echo "Adding IPV4 subnet range ${ipv4_subnet:-}."
-  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@ipv4Subnet#[{\"subnet\": ${ipv4_subnet:-}}]#g")
+echo "Filling IPv4 subnet ${ipv4_subnet:-}"
+cni_spec=$(echo ${cni_spec:-} | sed -e "s#@ipv4Subnet#[{\"subnet\": ${ipv4_subnet:-}}]#g")
 
-  if [ "$ENABLE_PRIVATE_IPV6_ACCESS" == "true" ]; then
-    node_ipv6_addr=$(curl -s -k --fail "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/?recursive=true" -H "Metadata-Flavor: Google" | jq -r '.ipv6s[0]' ) ||:
+if [ "$ENABLE_PRIVATE_IPV6_ACCESS" == "true" ]; then
+  node_ipv6_addr=$(curl -s -k --fail "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/?recursive=true" -H "Metadata-Flavor: Google" | jq -r '.ipv6s[0]' ) ||:
 
-    if [ -n "${node_ipv6_addr:-}" ] && [ "${node_ipv6_addr}" != "null" ]; then
-      echo "Found IPV6 address assignment ${node_ipv6_addr:-}."
-      cni_spec=$(echo ${cni_spec:-} | sed -e \
-        "s#@ipv6SubnetOptional#, [{\"subnet\": \"${node_ipv6_addr:-}/112\"}]#g;
-         s#@ipv6RouteOptional#, {\"dst\": \"::/0\"}#g")
-    else
-      echo "Found empty IPV6 address assignment. Skipping IPV6 subnet and range configuration."
-      cni_spec=$(echo ${cni_spec:-} | \
-        sed -e "s#@ipv6SubnetOptional##g; s#@ipv6RouteOptional##g")
-    fi
+  if [ -n "${node_ipv6_addr:-}" ] && [ "${node_ipv6_addr}" != "null" ]; then
+    echo "Found nic0 IPv6 address ${node_ipv6_addr:-}. Filling IPv6 subnet and route..."
+    cni_spec=$(echo ${cni_spec:-} | sed -e \
+      "s#@ipv6SubnetOptional#, [{\"subnet\": \"${node_ipv6_addr:-}/112\"}]#g;
+       s#@ipv6RouteOptional#, {\"dst\": \"::/0\"}#g")
   else
-    echo "Disabling IPV6 subnet and range configuration as ENABLE_PRIVATE_IPV6_ACCESS=false."
+    echo "No IPv6 address found for nic0. Clearing IPv6 subnet and route..."
     cni_spec=$(echo ${cni_spec:-} | \
       sed -e "s#@ipv6SubnetOptional##g; s#@ipv6RouteOptional##g")
   fi
+else
+  echo "Clearing IPv6 subnet and route given private IPv6 access is disabled..."
+  cni_spec=$(echo ${cni_spec:-} | \
+    sed -e "s#@ipv6SubnetOptional##g; s#@ipv6RouteOptional##g")
+fi
 
-cat >/host/etc/cni/net.d/$CNI_SPEC_NAME <<EOF
+# Output CNI spec (template).
+output_file=""
+if [ "${CALICO_CNI_SPEC_TEMPLATE_FILE:-}" ]; then
+  output_file=${CALICO_CNI_SPEC_TEMPLATE_FILE}
+  echo "Creating Calico CNI spec template..."
+else
+  output_file="/host/etc/cni/net.d/${CNI_SPEC_NAME}"
+  echo "Creating CNI spec..."
+fi
+
+cat >${output_file} <<EOF
 ${cni_spec:-}
 EOF
-
-echo "Created PTP CNI spec ${CNI_SPEC_NAME}!"
-
-else
-  echo "Could not find writable directory /etc/cni/net.d, which is expected to be mounted at /host/etc/cni/net.d. Exiting with error(2)."
-  exit 2
-fi

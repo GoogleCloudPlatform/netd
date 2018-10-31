@@ -1,8 +1,16 @@
 # netd releases
 
-## 0.1.9 [backlog]
+## 0.2.0 [backlog]
 ### Features
 ### Bug fixs
+
+## 0.1.9
+### Features
+### Bug fixs
+ * Reduce Calico CNI's log_level from debug to info, Add MTU=1460 for Calico CNI on GCP
+ * Remove version info from init container script.
+ * Remove calico_cni_spec_template from netd yaml
+ * Enable IPv6 forwarding when Calico CNI is used.
 
 ## 0.1.8 [backlog]
 ### Bug fixs

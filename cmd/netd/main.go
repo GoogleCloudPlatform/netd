@@ -25,6 +25,7 @@ import (
 	"syscall"
 
 	"github.com/GoogleCloudPlatform/netd/pkg/controllers/netconf"
+	"github.com/GoogleCloudPlatform/netd/pkg/metrics"
 	"github.com/GoogleCloudPlatform/netd/pkg/options"
 	"github.com/GoogleCloudPlatform/netd/pkg/version"
 	"github.com/golang/glog"
@@ -49,6 +50,11 @@ func main() {
 
 	glog.Infof("Starting netd")
 	go nc.Run(stopCh, &wg)
+
+	err := metrics.StartCollector()
+	if err != nil {
+		glog.Errorf("Could not start metrics collector: %v", err)
+	}
 
 	ch := make(chan os.Signal)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)

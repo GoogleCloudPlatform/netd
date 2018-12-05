@@ -25,11 +25,13 @@ import (
 	"github.com/golang/glog"
 )
 
+// NetworkConfigController defines the controller
 type NetworkConfigController struct {
 	configSet                []*config.Set
 	reconcileIntervalSeconds time.Duration
 }
 
+// NewNetworkConfigController creates a new NetworkConfigController
 func NewNetworkConfigController(enablePolicyRouting, enableMasquerade bool, reconcileIntervalSeconds time.Duration) *NetworkConfigController {
 	var configSet []*config.Set
 
@@ -50,6 +52,7 @@ func NewNetworkConfigController(enablePolicyRouting, enableMasquerade bool, reco
 	}
 }
 
+// Run runs the NetworkConfigController
 func (n *NetworkConfigController) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 

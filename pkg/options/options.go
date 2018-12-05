@@ -19,16 +19,19 @@ package options
 import "github.com/spf13/pflag"
 import "time"
 
+// NetdConfig defines the netd config
 type NetdConfig struct {
 	EnablePolicyRouting      bool
 	EnableMasquerade         bool
 	ReconcileIntervalSeconds time.Duration
 }
 
+// NewNetdConfig creates a new netd config
 func NewNetdConfig() *NetdConfig {
 	return &NetdConfig{}
 }
 
+// AddFlags init flags from pflag
 func (nc *NetdConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&nc.EnablePolicyRouting, "enable-policy-routing", false,
 		"Enable policy routing.")

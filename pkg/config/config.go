@@ -27,46 +27,52 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// Config interface
 type Config interface {
 	Ensure(enabled bool) error
 }
 
+// Set defines the set of Config
 type Set struct {
 	Enabled     bool
 	FeatureName string
 	Configs     []Config
 }
 
-type Sysctler func(name string, params ...string) (string, error)
+type sysctler func(name string, params ...string) (string, error)
 
+// SysctlConfig defines sysctl config
 type SysctlConfig struct {
 	Key, Value, DefaultValue string
-	SysctlFunc               Sysctler
+	SysctlFunc               sysctler
 }
 
-type RouteAdder func(route *netlink.Route) error
-type RouteDeler func(route *netlink.Route) error
+type routeAdder func(route *netlink.Route) error
+type routeDeler func(route *netlink.Route) error
 
+// IPRouteConfig defines route config
 type IPRouteConfig struct {
 	Route    netlink.Route
-	RouteAdd RouteAdder
-	RouteDel RouteDeler
+	RouteAdd routeAdder
+	RouteDel routeDeler
 }
 
-type RuleAdder func(rule *netlink.Rule) error
-type RuleDeler func(rule *netlink.Rule) error
-type RuleLister func(family int) ([]netlink.Rule, error)
+type ruleAdder func(rule *netlink.Rule) error
+type ruleDeler func(rule *netlink.Rule) error
+type ruleLister func(family int) ([]netlink.Rule, error)
 
+// IPRuleConfig defines the config for ip rule
 type IPRuleConfig struct {
 	Rule     netlink.Rule
-	RuleAdd  RuleAdder
-	RuleDel  RuleDeler
-	RuleList RuleLister
+	RuleAdd  ruleAdder
+	RuleDel  ruleDeler
+	RuleList ruleLister
 }
 
+// IPTablesRuleSpec defines the config for ip table rule
 type IPTablesRuleSpec []string
 
-type IPTabler interface {
+type iptabler interface {
 	NewChain(table, chain string) error
 	ClearChain(table, chain string) error
 	DeleteChain(table, chain string) error
@@ -74,16 +80,18 @@ type IPTabler interface {
 	Delete(table, chain string, rulespec ...string) error
 }
 
+// IPTablesChainSpec defines iptable chain
 type IPTablesChainSpec struct {
 	TableName, ChainName string
 	IsDefaultChain       bool // Is a System default chain, if yes, we won't delete it.
-	IPT                  IPTabler
+	IPT                  iptabler
 }
 
+// IPTablesRuleConfig defines iptable rule
 type IPTablesRuleConfig struct {
 	Spec      IPTablesChainSpec
 	RuleSpecs []IPTablesRuleSpec
-	IPT       IPTabler
+	IPT       iptabler
 }
 
 var ipt *iptables.IPTables
@@ -95,6 +103,7 @@ func init() {
 	}
 }
 
+// Ensure SysctlConfig
 func (s SysctlConfig) Ensure(enabled bool) error {
 	var value string
 	if enabled {
@@ -106,6 +115,7 @@ func (s SysctlConfig) Ensure(enabled bool) error {
 	return err
 }
 
+// Ensure IPRouteConfig
 func (r IPRouteConfig) Ensure(enabled bool) error {
 	var err error
 	if enabled {
@@ -122,6 +132,7 @@ func (r IPRouteConfig) Ensure(enabled bool) error {
 	return err
 }
 
+// Ensure IPRuleConfig
 func (r IPRuleConfig) Ensure(enabled bool) error {
 	if enabled {
 		return r.ensureHelper(1)
@@ -199,6 +210,7 @@ func (c IPTablesChainSpec) ensure(enabled bool) error {
 	return nil
 }
 
+// Ensure IPTablesRuleConfig
 func (r IPTablesRuleConfig) Ensure(enabled bool) error {
 	var err error
 	if err = r.Spec.ensure(enabled); err != nil {

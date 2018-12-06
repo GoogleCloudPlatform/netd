@@ -62,6 +62,7 @@ var (
 	localNetdev      string
 )
 
+// PolicyRoutingConfigSet defines the Policy Routing rules
 var PolicyRoutingConfigSet = Set{
 	false,
 	"PolicyRouting",

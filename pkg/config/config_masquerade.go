@@ -21,6 +21,7 @@ const (
 	ipMasqChain = "IP-MASQ"
 )
 
+// MasqueradeConfigSet defines the MASQ rules
 var MasqueradeConfigSet = Set{
 	false,
 	"Masquerade",

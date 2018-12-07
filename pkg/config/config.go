@@ -155,7 +155,6 @@ func (r IPRuleConfig) ensureHelper(ensureCount int) error {
 			ruleCount++
 		}
 	}
-
 	return err
 }
 

@@ -1,8 +1,14 @@
 # netd releases
 
-## 0.2.0 [backlog]
+## 0.2.1 [backlog]
 ### Features
 ### Bug fixs
+
+## 0.2.0
+### Features
+ * Add network metrics collection
+### Bug fixs
+ * Fix golint errors
 
 ## 0.1.9
 ### Features

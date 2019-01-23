@@ -99,6 +99,17 @@ data:
   reconcile_interval_seconds: "60s"
 
 ---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: networking-metrics-config
+  namespace: kube-system
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
+data:
+  metrics_collectors: "conntrack,socket"
+  metrics_address: "localhost:10231"
+---
 
 kind: DaemonSet
 apiVersion: extensions/v1beta1
@@ -173,6 +184,8 @@ spec:
         - --enable-masquerade=$(ENABLE_MASQUERADE)
         - --logtostderr
         - --reconcile-interval-seconds=$(RECONCILE_INTERVAL_SECONDS)
+        - --metrics-collectors=$(METRICS_COLLECTORS)
+        - --metrics-address=$(METRICS_ADDRESS)
         env:
           - name: ENABLE_POLICY_ROUTING
             valueFrom:
@@ -189,6 +202,16 @@ spec:
               configMapKeyRef:
                 name: netd-config
                 key: reconcile_interval_seconds
+          - name: METRICS_COLLECTORS
+            valueFrom:
+              configMapKeyRef:
+                name: networking-metrics-config
+                key: metrics_collectors
+          - name: METRICS_ADDRESS
+            valueFrom:
+              configMapKeyRef:
+                name: networking-metrics-config
+                key: metrics_address
       volumes:
       - name: cni-net-dir
         hostPath:

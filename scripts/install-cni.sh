@@ -52,6 +52,28 @@ if [ "$ENABLE_PRIVATE_IPV6_ACCESS" == "true" ]; then
     cni_spec=$(echo ${cni_spec:-} | sed -e \
       "s#@ipv6SubnetOptional#, [{\"subnet\": \"${node_ipv6_addr:-}/112\"}]#g;
        s#@ipv6RouteOptional#, {\"dst\": \"::/0\"}#g")
+    
+    # Ensure the IPv6 firewall rules are as expected.
+    # These rules mirror the IPv4 rules installed by kubernetes/cluster/gce/gci/configure-helper.sh
+    if ip6tables -w -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
+      echo "Add rules to accept all forwarded TCP/UDP/ICMP/SCTP IPv6 packets"
+      ip6tables -A FORWARD -w -p tcp -j ACCEPT
+      ip6tables -A FORWARD -w -p udp -j ACCEPT
+      ip6tables -A FORWARD -w -p icmpv6 -j ACCEPT
+      ip6tables -A FORWARD -w -p sctp -j ACCEPT
+    fi
+
+    # Ensure the other IPv6 rules we need are also installed, and in before any other node rules.
+    # Always allow ICMP
+    ip6tables -I INPUT -p icmpv6 -j ACCEPT -w
+    ip6tables -I OUTPUT -p icmpv6 -j ACCEPT -w
+    # Note that this expects dhclient to actually obtain and assign an IPv6 address to eth0.
+    ip6tables -I INPUT -p udp -m udp --dport 546 -j ACCEPT
+    # Accept return traffic inbound
+    ip6tables -I INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT -w
+    # Accept new and return traffic outbound
+    ip6tables -I OUTPUT -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT -w
+
     if [ "${ENABLE_CALICO_NETWORK_POLICY}" == "true" ]; then
       echo "Enabling IPv6 forwarding..."
       sysctl -w net.ipv6.conf.all.forwarding=1

@@ -171,6 +171,12 @@ spec:
         volumeMounts:
         - mountPath: /host/etc/cni/net.d
           name: cni-net-dir
+        - mountPath: /var/lib/kubelet/pki/
+          name: kubelet-client-certs
+          readOnly: true
+        - mountPath: /etc/srv/kubernetes/pki/
+          name: ca-cert
+          readOnly: true
       containers:
       - image: gcr.io/google-containers/netd-amd64:latest
         name: netd
@@ -216,3 +222,11 @@ spec:
       - name: cni-net-dir
         hostPath:
           path: /etc/cni/net.d
+      - name: kubelet-client-certs
+        hostPath:
+          path: /var/lib/kubelet/pki/
+          type: Directory
+      - name: ca-cert
+        hostPath:
+          path: /etc/srv/kubernetes/pki/
+          type: Directory

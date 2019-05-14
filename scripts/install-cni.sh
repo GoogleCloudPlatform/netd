@@ -34,8 +34,21 @@ fi
 
 # Fill CNI spec template.
 token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+kubelet_client_cert=/var/lib/kubelet/pki/kubelet-client-current.pem
+kubelet_client_key=/var/lib/kubelet/pki/kubelet-client-current.pem
+ca_cert=/etc/srv/kubernetes/pki/ca-certificates.crt
 node_url="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/nodes/${HOSTNAME}"
-ipv4_subnet=$(curl -k -s -H "Authorization: Bearer $token" $node_url | jq '.spec.podCIDR')
+ipv4_subnet=""
+if [ -f "${kubelet_client_cert}" ] && [ -f "${kubelet_client_key}" ] && [ -f "${ca_cert}"]; then
+  # use client certification authentication strategy
+  # `var/lib/kubelet/pki/` and `/etc/srv/kubernetes/pki/` should be mounted into
+  # the container for this option
+  ipv4_subnet=$(curl -s --cert $kubelet_client_cert --key $kubelet_client_key --cacert $ca_cert $node_url | jq '.spec.podCIDR')
+else
+  # use service account token authentication strategy
+  # a service account token should be mounted into the container for this option
+  ipv4_subnet=$(curl -k -s -H "Authorization: Bearer $token" $node_url | jq '.spec.podCIDR')
+fi
 if [ -z "${ipv4_subnet:-}" ]; then
   echo "Failed to fetch PodCIDR from K8s API server. Exiting (1)..."
   exit 1

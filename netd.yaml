@@ -70,7 +70,7 @@ data:
       "cniVersion": "0.3.1",
       "plugins": [
         {
-          "type": "ptp",
+          "type": "@cniType",
           "mtu": 1460,
           "ipam": {
               "type": "host-local",
@@ -171,6 +171,9 @@ spec:
         volumeMounts:
         - mountPath: /host/etc/cni/net.d
           name: cni-net-dir
+        - mountPath: /host/home/kubernetes/bin
+          name: kubernetes-bin
+          readOnly: true
       containers:
       - image: gcr.io/google-containers/netd-amd64:latest
         name: netd
@@ -216,3 +219,7 @@ spec:
       - name: cni-net-dir
         hostPath:
           path: /etc/cni/net.d
+      - name: kubernetes-bin
+        hostPath:
+          path: /home/kubernetes/bin
+          type: Directory

@@ -32,6 +32,13 @@ else
   cni_spec=${CNI_SPEC_TEMPLATE}
 fi
 
+if [ -f "/host/home/kubernetes/bin/gke" ]
+then
+	cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniType#gke#g")
+else
+	cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniType#ptp#g")
+fi
+
 # Fill CNI spec template.
 token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
 node_url="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/nodes/${HOSTNAME}"

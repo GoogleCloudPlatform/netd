@@ -1,8 +1,15 @@
 # netd releases
 
-## 0.2.1 [backlog]
+## 0.2.2 [backlog]
 ### Features
 ### Bug fixs
+
+## 0.2.1
+### Features
+### Bug fixs
+ * Add some required IPv6 firewall rules when IPv6 support is enabled
+ * GKE CNI support
+ * Remove unused config: noSnat for portMap
 
 ## 0.2.0
 ### Features

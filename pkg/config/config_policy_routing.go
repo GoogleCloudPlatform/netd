@@ -27,8 +27,7 @@ import (
 )
 
 const (
-	sysctlReversePathFilter = "net.ipv4.conf.all.rp_filter"
-	sysctlSrcValidMark      = "net.ipv4.conf.all.src_valid_mark"
+	sysctlSrcValidMark = "net.ipv4.conf.all.src_valid_mark"
 )
 
 const (
@@ -89,6 +88,7 @@ func init() {
 	defaultLinkIndex, defaultNetdev, defaultGateway = f(net.IPv4(8, 8, 8, 8))
 	localLinkIndex, localNetdev, _ = f(net.IPv4(127, 0, 0, 1))
 
+	sysctlReversePathFilter := fmt.Sprintf("net.ipv4.conf.%s.rp_filter", defaultNetdev)
 	PolicyRoutingConfigSet.Configs = []Config{
 		SysctlConfig{
 			Key:          sysctlReversePathFilter,

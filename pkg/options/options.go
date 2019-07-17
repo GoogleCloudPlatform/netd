@@ -36,7 +36,7 @@ func (nc *NetdConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&nc.EnablePolicyRouting, "enable-policy-routing", false,
 		"Enable policy routing.")
 	fs.BoolVar(&nc.EnableMasquerade, "enable-masquerade", true,
-		"Enable masquerade.")
+		"[Deprecated]Enable masquerade.")
 	fs.DurationVar(&nc.ReconcileIntervalSeconds, "reconcile-interval-seconds", 10,
 		"Reconcile interval in seconds.")
 }

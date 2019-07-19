@@ -92,6 +92,7 @@ data:
     }
   cni_spec_name: "10-gke-ptp.conflist"
   enable_policy_routing: "true"
+  enable_masquerade: "true"
   enable_calico_network_policy: "false"
   enable_private_ipv6_access: "false"
   reconcile_interval_seconds: "60s"
@@ -182,6 +183,7 @@ spec:
             add: ["NET_ADMIN"]
         args:
         - --enable-policy-routing=$(ENABLE_POLICY_ROUTING)
+        - --enable-masquerade=$(ENABLE_MASQUERADE)
         - --logtostderr
         - --reconcile-interval-seconds=$(RECONCILE_INTERVAL_SECONDS)
         - --metrics-collectors=$(METRICS_COLLECTORS)
@@ -192,6 +194,11 @@ spec:
               configMapKeyRef:
                 name: netd-config
                 key: enable_policy_routing
+          - name: ENABLE_MASQUERADE
+            valueFrom:
+              configMapKeyRef:
+                name: netd-config
+                key: enable_masquerade
           - name: RECONCILE_INTERVAL_SECONDS
             valueFrom:
               configMapKeyRef:

@@ -36,9 +36,14 @@ func NewNetworkConfigController(enablePolicyRouting, enableMasquerade bool, reco
 	var configSet []*config.Set
 
 	configSet = append(configSet, &config.PolicyRoutingConfigSet)
+	configSet = append(configSet, &config.MasqueradeConfigSet)
 
 	if enablePolicyRouting {
 		config.PolicyRoutingConfigSet.Enabled = true
+	}
+
+	if enableMasquerade {
+		config.MasqueradeConfigSet.Enabled = true
 	}
 
 	return &NetworkConfigController{

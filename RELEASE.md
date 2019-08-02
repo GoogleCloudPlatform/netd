@@ -1,8 +1,15 @@
 # netd releases
 
+## 0.2.3 [backlog]
+### Features
+### Bug fixs
+
 ## 0.2.2 [backlog]
 ### Features
 ### Bug fixs
+ * Limit rp filter loose config only to eth0 interface
+ * netd should not reconciling ip-masq rules
+ * Makefile updates
 
 ## 0.2.1
 ### Features

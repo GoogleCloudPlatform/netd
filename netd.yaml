@@ -71,7 +71,7 @@ data:
       "plugins": [
         {
           "type": "@cniType",
-          "mtu": 1460,
+          "mtu": @mtu,
           "ipam": {
               "type": "host-local",
               "ranges": [

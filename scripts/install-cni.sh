@@ -124,6 +124,17 @@ else
     sed -e "s#@ipv6SubnetOptional##g; s#@ipv6RouteOptional##g")
 fi
 
+# Set mtu
+default_nic=$(ip route get 8.8.8.8 | sed -nr "s/.*dev ([^\ ]+).*/\1/p")
+if [ -f "/sys/class/net/$default_nic/mtu" ]; then
+  MTU=$(cat /sys/class/net/$default_nic/mtu)
+  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@mtu#$MTU#g")
+  echo "Set the default mtu to $MTU, inherited from dev $default_nic"
+else
+  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@mtu#1460#g")
+  echo "Failed to read mtu from dev $default_nic, set the default mtu to 1460"
+fi
+
 # Output CNI spec (template).
 output_file=""
 if [ "${CALICO_CNI_SPEC_TEMPLATE_FILE:-}" ]; then

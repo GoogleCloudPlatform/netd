@@ -16,7 +16,7 @@ FROM ARG_FROM
 
 MAINTAINER Jing Ai <jinga@google.com>
 
-RUN apk --update add --no-cache curl iptables jq \
+RUN apk --update add --no-cache curl iptables ip6tables jq \
     && rm -rf /var/cache/apk/*
 
 ADD scripts/install-cni.sh /install-cni.sh

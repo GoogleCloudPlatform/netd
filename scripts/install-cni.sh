@@ -42,9 +42,15 @@ fi
 # Fill CNI spec template.
 token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
 node_url="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/nodes/${HOSTNAME}"
-ipv4_subnet=$(curl -k -s -H "Authorization: Bearer $token" $node_url | jq '.spec.podCIDR')
-if [ -z "${ipv4_subnet:-}" ]; then
-  echo "Failed to fetch PodCIDR from K8s API server. Exiting (1)..."
+response=$(curl -k -s -H "Authorization: Bearer $token" $node_url)
+ipv4_subnet=$(echo $response | jq '.spec.podCIDR')
+
+if expr "${ipv4_subnet:-}" : '"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/[0-9][0-9]*"' >/dev/null; then
+  echo "PodCIDR validation succeeded: ${ipv4_subnet:-}"
+else
+  echo "Response from $node_url"
+  echo "$response"
+  echo "Failed to fetch/validate PodCIDR from K8s API server, ipv4_subnet=${ipv4_subnet:-}. Exiting (1)..."
   exit 1
 fi
 

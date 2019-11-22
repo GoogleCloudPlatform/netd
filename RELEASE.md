@@ -1,10 +1,17 @@
 # netd releases
 
-## 0.2.3 [backlog]
+## 0.2.5 [backlog]
 ### Features
 ### Bug fixs
 
-## 0.2.2 [backlog]
+## 0.2.4
+### Features
+ * Read the mtu from default nic.
+### Bug fixs
+ * Install the ip6tables package in the init container along with iptables.
+ * Add PodCidr validation.
+
+## 0.2.2
 ### Features
 ### Bug fixs
  * Limit rp filter loose config only to eth0 interface

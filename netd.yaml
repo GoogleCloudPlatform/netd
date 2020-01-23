@@ -87,7 +87,7 @@ data:
           "capabilities": {
             "portMappings": true
           }
-        }
+        }@cniBandwidthPlugin
       ]
     }
   cni_spec_name: "10-gke-ptp.conflist"
@@ -95,6 +95,7 @@ data:
   enable_masquerade: "true"
   enable_calico_network_policy: "false"
   enable_private_ipv6_access: "false"
+  enable_bandwidth_plugin: "true"
   reconcile_interval_seconds: "60s"
 
 ---
@@ -172,6 +173,11 @@ spec:
               configMapKeyRef:
                 name: netd-config
                 key: enable_masquerade
+          - name: ENABLE_BANDWIDTH_PLUGIN
+            valueFrom:
+              configMapKeyRef:
+                name: netd-config
+                key: enable_bandwidth_plugin
         volumeMounts:
         - mountPath: /host/etc/cni/net.d
           name: cni-net-dir

@@ -39,6 +39,13 @@ else
 	cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniType#ptp#g")
 fi
 
+if [ "${ENABLE_BANDWIDTH_PLUGIN}" == "true" ] && [ -f "/host/home/kubernetes/bin/bandwidth" ]
+then
+	cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniBandwidthPlugin#,{\"type\": \"bandwidth\",\"capabilities\": {\"bandwidth\": true}}#g")
+else
+	cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniBandwidthPlugin##g")
+fi
+
 # Fill CNI spec template.
 token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
 node_url="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/nodes/${HOSTNAME}"

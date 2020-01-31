@@ -1,8 +1,12 @@
 # netd releases
 
-## 0.2.5 [backlog]
+## 0.2.6 [backlog]
 ### Features
 ### Bug fixs
+
+## 0.2.5
+### Features
+ * bandwidth plugin support.
 
 ## 0.2.4
 ### Features

@@ -17,16 +17,16 @@
 # overide calico network policy config if its cni is not installed as expected
 echo "Calico network policy config: " $ENABLE_CALICO_NETWORK_POLICY
 if [[ ${ENABLE_CALICO_NETWORK_POLICY} == "true" ]]; then
-  cni_file=`ls /host/etc/cni/net.d/*calico* 2> /dev/null`
+  cni_file=`ls /host/etc/cni/net.d/*calico*.conflist 2> /dev/null`
   WAITED=0
-  while [[ ${cni_file} == ""  && ${WAITED} -lt 120 ]]
+  while [ -z "${cni_file}" ]  && [ ${WAITED} -lt 120 ]
   do
-      echo "calico cni file not found"
+      echo "calico cni file not found ($WAITED)..."
       WAITED=$((WAITED+2))
       sleep 2
-      cni_file=`ls /host/etc/cni/net.d/*calico* 2> /dev/null`
+      cni_file=`ls /host/etc/cni/net.d/*calico*.conflist 2> /dev/null`
   done
-  if [[ $cni_file == "" ]]; then
+  if [ -z "${cni_file}" ]; then
     ENABLE_CALICO_NETWORK_POLICY=false
     echo "Update calico network policy config to " $ENABLE_CALICO_NETWORK_POLICY
   fi

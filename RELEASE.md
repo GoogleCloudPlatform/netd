@@ -1,8 +1,12 @@
 # netd releases
 
-## 0.2.6 [backlog]
+## 0.2.7 [backlog]
 ### Features
 ### Bug fixs
+
+## 0.2.6
+### Bug fixs
+ * Overide calico network policy config if it didn't install CNI
 
 ## 0.2.5
 ### Features

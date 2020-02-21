@@ -87,7 +87,7 @@ data:
           "capabilities": {
             "portMappings": true
           }
-        }@cniBandwidthPlugin
+        }@cniBandwidthPlugin@cniCiliumPlugin
       ]
     }
   cni_spec_name: "10-gke-ptp.conflist"
@@ -96,6 +96,7 @@ data:
   enable_calico_network_policy: "false"
   enable_private_ipv6_access: "false"
   enable_bandwidth_plugin: "true"
+  enable_cilium_plugin: "true"
   reconcile_interval_seconds: "60s"
 
 ---
@@ -178,6 +179,11 @@ spec:
               configMapKeyRef:
                 name: netd-config
                 key: enable_bandwidth_plugin
+          - name: ENABLE_CILIUM_PLUGIN
+            valueFrom:
+              configMapKeyRef:
+                name: netd-config
+                key: enable_cilium_plugin
         volumeMounts:
         - mountPath: /host/etc/cni/net.d
           name: cni-net-dir

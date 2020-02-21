@@ -64,6 +64,13 @@ else
 	cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniBandwidthPlugin##g")
 fi
 
+if [ "${ENABLE_CILIUM_PLUGIN}" == "true" ]
+then
+        cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniCiliumPlugin#,{\"type\": \"cilium-cni\"}#g")
+else
+        cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniCiliumPlugin##g")
+fi
+
 # Fill CNI spec template.
 token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
 node_url="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/nodes/${HOSTNAME}"

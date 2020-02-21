@@ -1,8 +1,12 @@
 # netd releases
 
-## 0.2.7 [backlog]
+## 0.2.8 [backlog]
 ### Features
 ### Bug fixs
+
+## 0.2.7
+### Features
+ * Support Cilium plugin.
 
 ## 0.2.6
 ### Bug fixs

@@ -14,6 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+### Fix the IPAM store issue, should remove once no cluster in the problematic version.
+if [ -d "/var/lib/cni/networks/generic-veth" ] && [ ! -d "/var/lib/cni/networks/gke-pod-network" ]; then
+echo "Migrating IPAM store..."
+cp -r /var/lib/cni/networks/generic-veth /var/lib/cni/networks/gke-pod-network
+fi
+###
+
 # overide calico network policy config if its cni is not installed as expected
 echo "Calico network policy config: " $ENABLE_CALICO_NETWORK_POLICY
 if [[ ${ENABLE_CALICO_NETWORK_POLICY} == "true" ]]; then

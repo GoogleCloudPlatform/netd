@@ -183,6 +183,8 @@ else
   echo "Creating CNI spec..."
 fi
 
-cat >${output_file} <<EOF
+cat > "${output_file}.tmp" <<EOF
 ${cni_spec:-}
 EOF
+
+mv "${output_file}.tmp" ${output_file}

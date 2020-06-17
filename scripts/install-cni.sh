@@ -190,5 +190,7 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 trap "rm -f ${temp_file}" EXIT
-echo ${cni_spec:-} > ${temp_file}
+cat > ${temp_file} <<EOF
+${cni_spec:-}
+EOF
 mv ${temp_file} ${output_file}

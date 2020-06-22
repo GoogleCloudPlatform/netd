@@ -183,6 +183,14 @@ else
   echo "Creating CNI spec..."
 fi
 
-cat >${output_file} <<EOF
+# Atomically write CNI spec
+temp_file=$(mktemp ${output_file}.tmp.XXXXXX)
+if [ $? -ne 0 ]; then
+  echo "Failed to create temp file, Exiting (1)..."
+  exit 1
+fi
+trap "rm -f ${temp_file}" EXIT
+cat > ${temp_file} <<EOF
 ${cni_spec:-}
 EOF
+mv ${temp_file} ${output_file}

@@ -36,12 +36,12 @@ func TestSysctlConfigEnsure(t *testing.T) {
 	}
 
 	c.Ensure(true)
-	if v := mSysctl["net.ipv4.conf.all.rp_filter"]; v == "" || v != "2" {
+	if v := mSysctl["net.ipv4.conf.all.rp_filter"]; v != "2" {
 		t.Error("failed to Ensure sysctlConfig rule")
 	}
 
 	c.Ensure(false)
-	if v := mSysctl["net.ipv4.conf.all.rp_filter"]; v == "" || v != "1" {
+	if v := mSysctl["net.ipv4.conf.all.rp_filter"]; v != "1" {
 		t.Error("failed to disable sysctlConfig rule")
 	}
 }
@@ -50,21 +50,21 @@ func TestIPRouteConfigEnsure(t *testing.T) {
 	r := IPRouteConfig{
 		Route:    netlink.Route{},
 		RouteAdd: func(route *netlink.Route) error { return os.ErrExist },
-		RouteDel: func(route *netlink.Route) error { return syscall.Errno(syscall.ESRCH) },
+		RouteDel: func(route *netlink.Route) error { return syscall.ESRCH },
 	}
 	if err := r.Ensure(true); err != nil {
-		t.Error("ipRouteConfig.Ensure(true) should ingore the os.ErrExist Error.")
+		t.Error("ipRouteConfig.Ensure(true) should ignore the os.ErrExist Error.")
 	}
 	if err := r.Ensure(false); err != nil {
-		t.Error("ipRouteConfig.Ensure(false) should ingore the syscall.ESRCH Error.")
+		t.Error("ipRouteConfig.Ensure(false) should ignore the syscall.ESRCH Error.")
 	}
 }
 
 func TestIPRuleConfigEnsure(t *testing.T) {
 	ruleList := []netlink.Rule{
-		netlink.Rule{SuppressIfgroup: -1, SuppressPrefixlen: -1, Mark: -1, Mask: -1, Goto: -1},
-		netlink.Rule{SuppressIfgroup: 1, SuppressPrefixlen: 2, Mark: -1, Mask: -1, Goto: -1},
-		netlink.Rule{SuppressIfgroup: -1, SuppressPrefixlen: -1, Mark: -1, Mask: -1, Goto: -1},
+		{SuppressIfgroup: -1, SuppressPrefixlen: -1, Mark: -1, Mask: -1, Goto: -1},
+		{SuppressIfgroup: 1, SuppressPrefixlen: 2, Mark: -1, Mask: -1, Goto: -1},
+		{SuppressIfgroup: -1, SuppressPrefixlen: -1, Mark: -1, Mask: -1, Goto: -1},
 	}
 
 	mockRuleDel := func(rule *netlink.Rule) error {
@@ -84,10 +84,10 @@ func TestIPRuleConfigEnsure(t *testing.T) {
 		RuleList: func(family int) ([]netlink.Rule, error) { return ruleList, nil },
 	}
 	if count, _ := ipRule.count(); count != 2 {
-		t.Errorf("IPRuleConfig.count() shuld return 2.")
+		t.Errorf("IPRuleConfig.count() should return 2.")
 	}
 	if len(ruleList) != 3 {
-		t.Error("ruleList should contains 3 rules")
+		t.Error("ruleList should contain 3 rules")
 	}
 	ipRule.Ensure(false)
 	if count, _ := ipRule.count(); len(ruleList) != 1 || count != 0 {
@@ -149,11 +149,11 @@ func TestFakeIPTable(t *testing.T) {
 	fakeIPT.AppendUnique("table", "chain", "rule1")
 	fakeIPT.AppendUnique("table", "chain", "rule2")
 	if len(fakeIPT.iptCache["chain"]) != 2 {
-		t.Error("fakeIPT['chain'] should contains 2 rules")
+		t.Error("fakeIPT['chain'] should contain 2 rules")
 	}
 	fakeIPT.Delete("table", "chain", "rule1")
 	if len(fakeIPT.iptCache["chain"]) != 1 {
-		t.Error("fakeIPT['chain'] should contains 1 rules")
+		t.Error("fakeIPT['chain'] should contain 1 rules")
 	}
 	fakeIPT.ClearChain("table", "chain")
 	if len(fakeIPT.iptCache["chain"]) != 0 {

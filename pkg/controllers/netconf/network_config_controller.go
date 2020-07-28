@@ -21,8 +21,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/netd/pkg/config"
 	"github.com/golang/glog"
+
+	"github.com/GoogleCloudPlatform/netd/pkg/config"
 )
 
 // NetworkConfigController defines the controller

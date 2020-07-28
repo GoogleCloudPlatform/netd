@@ -134,7 +134,9 @@ func init() {
 				IPT:            ipt,
 			},
 			[]IPTablesRuleSpec{
-				[]string{"-m", "mark", "--mark", fmt.Sprintf("0x%x/0x%x", hairpinMark, hairpinMask), "-j", "CONNMARK", "--save-mark", "-m", "comment", "--comment", policyRoutingGcpPostRoutingComment},
+				[]string{"-m", "mark", "--mark",
+					fmt.Sprintf("0x%x/0x%x", hairpinMark, hairpinMask),
+					"-j", "CONNMARK", "--save-mark", "-m", "comment", "--comment", policyRoutingGcpPostRoutingComment},
 			},
 			ipt,
 		},

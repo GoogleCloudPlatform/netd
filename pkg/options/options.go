@@ -24,9 +24,9 @@ import (
 
 // NetdConfig defines the netd config
 type NetdConfig struct {
-	EnablePolicyRouting      bool
-	EnableMasquerade         bool
-	ReconcileIntervalSeconds time.Duration
+	EnablePolicyRouting bool
+	EnableMasquerade    bool
+	ReconcileInterval   time.Duration
 }
 
 // NewNetdConfig creates a new netd config
@@ -40,6 +40,6 @@ func (nc *NetdConfig) AddFlags(fs *pflag.FlagSet) {
 		"Enable policy routing.")
 	fs.BoolVar(&nc.EnableMasquerade, "enable-masquerade", true,
 		"[Deprecated]Enable masquerade.")
-	fs.DurationVar(&nc.ReconcileIntervalSeconds, "reconcile-interval-seconds", 10,
+	fs.DurationVar(&nc.ReconcileInterval, "reconcile-interval-seconds", 10*time.Second,
 		"Reconcile interval in seconds.")
 }

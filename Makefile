@@ -32,6 +32,8 @@ VERSION ?= $(shell git describe --tags --always --dirty)
 # This version-strategy uses a manual value to set the version string
 # VERSION := 1.2.3
 
+GOLANGCI_LINT_VERSION := v1.30.0
+
 ###
 ### These variables should not need tweaking.
 ###
@@ -194,6 +196,28 @@ test: init
 shell: init
 	@echo "launching a shell in the containerized build environment"
 	@$(DOCKER_RUN) /bin/sh $(CMD)
+
+.PHONY: lint-go
+lint-go:
+	@docker run												\
+		--rm 												\
+		-u $$(id -u):$$(id -g)                              \
+		-v "$(CURDIR)/.go/.cache:/.cache"                   \
+		-v "$$(pwd):/app"									\
+		-w /app												\
+		golangci/golangci-lint:$(GOLANGCI_LINT_VERSION)		\
+		golangci-lint run -v -c "/app/.golangci.yml"
+
+.PHONY: format-go
+format-go:
+	@docker run												\
+		--rm 												\
+		-u $$(id -u):$$(id -g)                              \
+		-v "$(CURDIR)/.go/.cache:/.cache"                   \
+		-v "$$(pwd):/app"									\
+		-w /app												\
+		golangci/golangci-lint:$(GOLANGCI_LINT_VERSION)		\
+		golangci-lint run --fix -v -c "/app/.golangci-format.yml"
 
 #-----------------------------------------------------------------------------
 # Target: clean

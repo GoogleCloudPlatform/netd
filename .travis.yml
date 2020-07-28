@@ -6,4 +6,5 @@ go:
 install: skip
 script:
   - make
+  - make lint-go
   - make test

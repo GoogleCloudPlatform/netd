@@ -84,6 +84,8 @@ bin/$(ARCH)/$(BIN): build-dirs
 	@echo "building: $@"
 	@docker run                                                             \
 	    --rm                                                                \
+	    -u $$(id -u):$$(id -g)                                              \
+	    -v "$$(pwd)/.go/.cache:/.cache"                                     \
 	    -v "$$(pwd)/.go:/go"                                                \
 	    -v "$$(pwd):/go/src/$(PKG)"                                         \
 	    -v "$$(pwd)/bin/$(ARCH):/go/bin"                                    \
@@ -104,6 +106,7 @@ shell: build-dirs
 	@docker run                                                             \
 	    --rm                                                                \
 	    -u $$(id -u):$$(id -g)                                              \
+	    -v "$$(pwd)/.go/.cache:/.cache"                                     \
 	    -v "$$(pwd)/.go:/go"                                                \
 	    -v "$$(pwd):/go/src/$(PKG)"                                         \
 	    -v "$$(pwd)/bin/$(ARCH):/go/bin"                                    \
@@ -147,6 +150,8 @@ version:
 test: build-dirs
 	@docker run                                                             \
 	    --rm                                                                \
+	    -u $$(id -u):$$(id -g)                                              \
+	    -v "$$(pwd)/.go/.cache:/.cache"                                     \
 	    -v "$$(pwd)/.go:/go"                                                \
 	    -v "$$(pwd):/go/src/$(PKG)"                                         \
 	    -v "$$(pwd)/bin/$(ARCH):/go/bin"                                    \
@@ -157,9 +162,10 @@ test: build-dirs
 	        ./build/test.sh $(SRC_DIRS)                                     \
 	    "
 
+# Initialize directories for build container to avoid root permissions
 build-dirs:
 	@mkdir -p bin/$(ARCH)
-	@mkdir -p .go/src/$(PKG) .go/pkg .go/bin .go/std/$(ARCH)
+	@mkdir -p .go/src/$(PKG) .go/.cache .go/pkg .go/bin .go/std/$(ARCH)
 
 clean: container-clean bin-clean
 

@@ -1,0 +1,2 @@
+# The .go scratch directory is not used to build the images
+.go

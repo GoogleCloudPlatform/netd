@@ -42,16 +42,16 @@ ALL_ARCH := amd64 arm arm64 ppc64le
 
 # Set default base image dynamically for each arch
 ifeq ($(ARCH), amd64)
-    BASEIMAGE ?= alpine
+    BASE_IMAGE ?= alpine
 endif
 ifeq ($(ARCH), arm)
-    BASEIMAGE ?= armel/busybox
+    BASE_IMAGE ?= armel/busybox
 endif
 ifeq ($(ARCH), arm64)
-    BASEIMAGE ?= aarch64/busybox
+    BASE_IMAGE ?= aarch64/busybox
 endif
 ifeq ($(ARCH), ppc64le)
-    BASEIMAGE ?= ppc64le/busybox
+    BASE_IMAGE ?= ppc64le/busybox
 endif
 
 IMAGE := $(REGISTRY)/$(BIN)-$(ARCH)
@@ -59,6 +59,8 @@ IMAGE := $(REGISTRY)/$(BIN)-$(ARCH)
 BUILD_IMAGE ?= golang:1.14-alpine
 
 # Docker run command prefix for containerized build environment
+# Any target that runs this command must also run `init` as a prerequisite rule
+# to ensure the directories specified in $(BUILD_DIRS) are created
 DOCKER_RUN = docker run                                                               \
 				--rm                                                                  \
 				-u $$(id -u):$$(id -g)                                                \
@@ -71,29 +73,54 @@ DOCKER_RUN = docker run                                                         
 				-w "/go/src/$(PKG)"                                                   \
 				$(BUILD_IMAGE)
 
+BUILD_DIRS := bin/$(ARCH) .go/src/$(PKG) .go/.cache .go/pkg .go/bin .go/std/$(ARCH)
+
+.PHONY: all
+all: init build
+
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-container' rule.
 # If you want to build AND push all containers, see the 'all-push' rule.
-all: build
+BUILD_ALL_ARCH = $(addprefix build-, $(ALL_ARCH))
+CONTAINER_ALL_ARCH = $(addprefix container-, $(ALL_ARCH))
+PUSH_ALL_ARCH = $(addprefix push-, $(ALL_ARCH))
 
-build-%:
+.PHONY: all-build $(BUILD_ALL_ARCH)
+all-build: $(BUILD_ALL_ARCH)
+
+.PHONY: all-container $(CONTAINER_ALL_ARCH)
+all-container: $(CONTAINER_ALL_ARCH)
+
+.PHONY: all-push $(PUSH_ALL_ARCH)
+all-push: $(PUSH_ALL_ARCH)
+
+$(BUILD_ALL_ARCH): build-%:
 	@$(MAKE) --no-print-directory ARCH=$* build
 
-container-%:
+$(CONTAINER_ALL_ARCH): container-%:
 	@$(MAKE) --no-print-directory ARCH=$* container
 
-push-%:
+$(PUSH_ALL_ARCH): push-%:
 	@$(MAKE) --no-print-directory ARCH=$* push
 
-all-build: $(addprefix build-, $(ALL_ARCH))
+#-----------------------------------------------------------------------------
+# Target: init
+#-----------------------------------------------------------------------------
+.PHONY: init
+init: $(BUILD_DIRS)
 
-all-container: $(addprefix container-, $(ALL_ARCH))
+# Initialize directories for build container to avoid root permissions
+$(BUILD_DIRS):
+	@mkdir -p $@
 
-all-push: $(addprefix push-, $(ALL_ARCH))
-
+#-----------------------------------------------------------------------------
+# Target: build
+#-----------------------------------------------------------------------------
+.PHONY: build
 build: bin/$(ARCH)/$(BIN)
 
-bin/$(ARCH)/$(BIN): build-dirs
+.PHONY: bin/$(ARCH)/$(BIN)
+bin/$(ARCH)/$(BIN): init
 	@echo "building: $@"
 	@$(DOCKER_RUN)             \
 	    /bin/sh -c "           \
@@ -103,26 +130,27 @@ bin/$(ARCH)/$(BIN): build-dirs
 	        ./build/build.sh   \
 	    "
 
-# Example: make shell CMD="-c 'date > datefile'"
-shell: build-dirs
-	@echo "launching a shell in the containerized build environment"
-	@$(DOCKER_RUN) /bin/sh $(CMD)
-
+#-----------------------------------------------------------------------------
+# Target: docker build and push
+#-----------------------------------------------------------------------------
 DOTFILE_IMAGE = $(subst :,_,$(subst /,_,$(IMAGE))-$(VERSION))
 
+.PHONY: container .container-$(DOTFILE_IMAGE)
 container: .container-$(DOTFILE_IMAGE) container-name
-.container-$(DOTFILE_IMAGE): bin/$(ARCH)/$(BIN) Dockerfile.in
+.container-$(DOTFILE_IMAGE): build Dockerfile.in
 	@sed \
 	    -e 's|ARG_BIN|$(BIN)|g' \
 	    -e 's|ARG_ARCH|$(ARCH)|g' \
-	    -e 's|ARG_FROM|$(BASEIMAGE)|g' \
+	    -e 's|ARG_FROM|$(BASE_IMAGE)|g' \
 	    Dockerfile.in > .dockerfile-$(ARCH)
 	@docker build -t $(IMAGE):$(VERSION) -f .dockerfile-$(ARCH) .
 	@docker images -q $(IMAGE):$(VERSION) > $@
 
+.PHONY: container-name
 container-name:
 	@echo "container: $(IMAGE):$(VERSION)"
 
+.PHONY: push .push-$(DOTFILE_IMAGE)
 push: .push-$(DOTFILE_IMAGE) push-name
 .push-$(DOTFILE_IMAGE): .container-$(DOTFILE_IMAGE)
 ifeq ($(findstring gcr.io,$(REGISTRY)),gcr.io)
@@ -133,24 +161,39 @@ else
 endif
 	@docker images -q $(IMAGE):$(VERSION) > $@
 
+.PHONY: push-name
 push-name:
 	@echo "pushed: $(IMAGE):$(VERSION)"
 
+.PHONY: version
 version:
 	@echo $(VERSION)
 
-test: build-dirs
+#-----------------------------------------------------------------------------
+# Target: test
+#-----------------------------------------------------------------------------
+.PHONY: test
+test: init
 	@$(DOCKER_RUN) /bin/sh -c "./build/test.sh $(SRC_DIRS)"
 
-# Initialize directories for build container to avoid root permissions
-build-dirs:
-	@mkdir -p bin/$(ARCH)
-	@mkdir -p .go/src/$(PKG) .go/.cache .go/pkg .go/bin .go/std/$(ARCH)
+#-----------------------------------------------------------------------------
+# Target: tools
+#-----------------------------------------------------------------------------
+.PHONY: shell
+# Example: make shell CMD="-c 'date > datefile'"
+shell: init
+	@echo "launching a shell in the containerized build environment"
+	@$(DOCKER_RUN) /bin/sh $(CMD)
 
-clean: container-clean bin-clean
+#-----------------------------------------------------------------------------
+# Target: clean
+#-----------------------------------------------------------------------------
+.PHONY: clean clean-container clean-build
 
-container-clean:
+clean: clean-container clean-build
+
+clean-container:
 	rm -rf .container-* .dockerfile-* .push-*
 
-bin-clean:
+clean-build:
 	rm -rf .go bin

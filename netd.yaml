@@ -94,6 +94,7 @@ data:
   enable_policy_routing: "true"
   enable_masquerade: "true"
   enable_calico_network_policy: "false"
+  overwrite_calico_cni_file: "false"
   enable_private_ipv6_access: "false"
   enable_bandwidth_plugin: "true"
   enable_cilium_plugin: "true"
@@ -164,6 +165,11 @@ spec:
               configMapKeyRef:
                 name: netd-config
                 key: enable_calico_network_policy
+          - name: OVERWRITE_CALICO_CNI_FILE
+            valueFrom:
+              configMapKeyRef:
+                name: netd-config
+                key: overwrite_calico_cni_file
           - name: ENABLE_PRIVATE_IPV6_ACCESS
             valueFrom:
               configMapKeyRef:

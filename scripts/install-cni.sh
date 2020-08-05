@@ -17,16 +17,16 @@
 # overide calico network policy config if its cni is not installed as expected
 echo "Calico network policy config: " $ENABLE_CALICO_NETWORK_POLICY
 if [[ ${ENABLE_CALICO_NETWORK_POLICY} == "true" ]]; then
-  cni_file=`ls /host/etc/cni/net.d/*calico*.conflist 2> /dev/null`
+  calico_cni_file=`ls /host/etc/cni/net.d/*calico*.conflist 2> /dev/null`
   WAITED=0
-  while [ -z "${cni_file}" ]  && [ ${WAITED} -lt 120 ]
+  while [ -z "${calico_cni_file}" ]  && [ ${WAITED} -lt 120 ]
   do
       echo "calico cni file not found ($WAITED)..."
       WAITED=$((WAITED+2))
       sleep 2
-      cni_file=`ls /host/etc/cni/net.d/*calico*.conflist 2> /dev/null`
+      calico_cni_file=`ls /host/etc/cni/net.d/*calico*.conflist 2> /dev/null`
   done
-  if [ -z "${cni_file}" ]; then
+  if [ -z "${calico_cni_file}" ]; then
     ENABLE_CALICO_NETWORK_POLICY=false
     echo "Update calico network policy config to " $ENABLE_CALICO_NETWORK_POLICY
   fi
@@ -37,18 +37,13 @@ set -u -e
 # Get CNI spec template if needed.
 if [ "${ENABLE_CALICO_NETWORK_POLICY}" == "true" ]; then
   echo "Calico Network Policy is enabled"
-  if [ -z "${CALICO_CNI_SPEC_TEMPLATE_FILE:-}" ]; then
-    echo "No Calico CNI spec template is specified. Exiting (0)..."
+  if [ "${OVERWRITE_CALICO_CNI_FILE}" == "false" ]; then
+    echo "OVERWRITE_CALICO_CNI_FILE set to false. Exiting (0)..."
     exit 0
   fi
-  if [ -z "${CALICO_CNI_SPEC_TEMPLATE}" ]; then
-    echo "No Calico CNI spec template is specified. Exiting (0)..."
-    exit 0
-  fi
-  cni_spec=${CALICO_CNI_SPEC_TEMPLATE}
-else
-  cni_spec=${CNI_SPEC_TEMPLATE}
 fi
+
+cni_spec=${CNI_SPEC_TEMPLATE}
 
 if [ -f "/host/home/kubernetes/bin/gke" ]
 then
@@ -175,9 +170,9 @@ fi
 
 # Output CNI spec (template).
 output_file=""
-if [ "${CALICO_CNI_SPEC_TEMPLATE_FILE:-}" ]; then
-  output_file=${CALICO_CNI_SPEC_TEMPLATE_FILE}
-  echo "Creating Calico CNI spec template..."
+if [ "${ENABLE_CALICO_NETWORK_POLICY}" == "true" ]; then
+  output_file=${calico_cni_file}
+  echo "Overwriting Calico CNI spec..."
 else
   output_file="/host/etc/cni/net.d/${CNI_SPEC_NAME}"
   echo "Creating CNI spec..."

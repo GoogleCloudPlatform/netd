@@ -37,13 +37,19 @@ set -u -e
 # Get CNI spec template if needed.
 if [ "${ENABLE_CALICO_NETWORK_POLICY}" == "true" ]; then
   echo "Calico Network Policy is enabled"
-  if [ "${OVERWRITE_CALICO_CNI_FILE}" == "false" ]; then
+  # Backwards compatibility support
+  if [ -n "${CALICO_CNI_SPEC_TEMPLATE_FILE}" ] && [ -n "${CALICO_CNI_SPEC_TEMPLATE}" ]; then
+    # Use environment overrides
+    calico_cni_file="${CALICO_CNI_SPEC_TEMPLATE_FILE}"
+    cni_spec="${CALICO_CNI_SPEC_TEMPLATE}"
+  elif [ "${OVERWRITE_CALICO_CNI_FILE:-"false"}" == "false" ]; then
     echo "OVERWRITE_CALICO_CNI_FILE set to false. Exiting (0)..."
     exit 0
   fi
 fi
 
-cni_spec=${CNI_SPEC_TEMPLATE}
+# If cni_spec hasn't been set, set it to CNI_SPEC_TEMPLATE
+cni_spec=${cni_spec:-${CNI_SPEC_TEMPLATE}}
 
 if [ -f "/host/home/kubernetes/bin/gke" ]
 then

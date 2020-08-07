@@ -15,11 +15,14 @@ package config
 
 import (
 	"os"
-	"strings"
 	"syscall"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/vishvananda/netlink"
+
+	"github.com/GoogleCloudPlatform/netd/internal/ipt"
+	"github.com/GoogleCloudPlatform/netd/internal/ipt/ipttest"
 )
 
 func TestSysctlConfigEnsure(t *testing.T) {
@@ -99,138 +102,68 @@ func TestIPRuleConfigEnsure(t *testing.T) {
 	}
 }
 
-type FakeIPTable struct {
-	iptCache map[string][]string
-}
+func TestIPTablesRulesConfig(t *testing.T) {
+	fakeIPT := ipttest.NewFakeIPTables()
 
-func (i FakeIPTable) NewChain(table, chain string) error {
-	if _, ok := i.iptCache[chain]; !ok {
-		i.iptCache[chain] = make([]string, 0, 5)
+	iptableRule1 := IPTablesRulesConfig{
+		Spec: ipt.IPTablesSpec{
+			TableName: "mangle",
+			ChainName: "postRoutingChain",
+			Rules: []ipt.IPTablesRule{
+				[]string{"rule1", "-m", "-j"},
+				[]string{"rule2", "-m", "-j"},
+			},
+			IPT: fakeIPT,
+		},
+		IsDefaultChain: true,
 	}
-	return nil
-}
+	iptableRule2 := IPTablesRulesConfig{
+		Spec: ipt.IPTablesSpec{
+			TableName: "mangle",
+			ChainName: "postRoutingChain",
+			Rules: []ipt.IPTablesRule{
+				[]string{"rule1", "-m", "-j"},
+				[]string{"rule3", "-m", "-j"},
+			},
+			IPT: fakeIPT,
+		},
+		IsDefaultChain: true,
+	}
+	iptableRule3 := IPTablesRulesConfig{
+		Spec: ipt.IPTablesSpec{
+			TableName: "mangle",
+			ChainName: "gcpPostRoutingChain",
+			Rules: []ipt.IPTablesRule{
+				[]string{"rule1", "-m", "-j"},
+				[]string{"rule2", "-m", "-j"},
+			},
+			IPT: fakeIPT,
+		},
+		IsDefaultChain: false,
+	}
+	assert.NoError(t, iptableRule1.Ensure(true))
+	assert.NoError(t, iptableRule2.Ensure(true))
+	assert.NoError(t, iptableRule3.Ensure(true))
+	if len(fakeIPT.IPTCache) != 2 {
+		t.Error("FakeIPTables contains 2 chains")
+	}
+	if len(fakeIPT.IPTCache["postRoutingChain"]) != 3 || len(fakeIPT.IPTCache["gcpPostRoutingChain"]) != 2 {
+		t.Errorf("FakeIPTables postRoutingChain should contain 3 chains, but contains: %v", fakeIPT.IPTCache["postRoutingChain"])
+		t.Errorf("FakeIPTables gcpPostRoutingChain should contain 2 chains, but contains: %v", fakeIPT.IPTCache["gcpPostRoutingChain"])
+	}
+	assert.NoError(t, iptableRule2.Ensure(false))
+	assert.NoError(t, iptableRule3.Ensure(false))
 
-func (i FakeIPTable) ClearChain(table, chain string) error {
-	i.iptCache[chain] = make([]string, 0, 5)
-	return nil
-}
-func (i FakeIPTable) DeleteChain(table, chain string) error {
-	delete(i.iptCache, chain)
-	return nil
-}
-
-func (i FakeIPTable) AppendUnique(table, chain string, rulespec ...string) error {
-	rule := strings.Join(rulespec, " ")
-	for _, r := range i.iptCache[chain] {
-		if r == rule {
-			return nil
-		}
-	}
-	i.iptCache[chain] = append(i.iptCache[chain], rule)
-	return nil
-}
-func (i FakeIPTable) Delete(table, chain string, rulespec ...string) error {
-	rule := strings.Join(rulespec, " ")
-	for index, r := range i.iptCache[chain] {
-		if r == rule {
-			i.iptCache[chain] = append(i.iptCache[chain][:index], i.iptCache[chain][index+1:]...)
-			return nil
-		}
-	}
-	return nil
-}
-
-func TestFakeIPTable(t *testing.T) {
-	fakeIPT := FakeIPTable{
-		iptCache: make(map[string][]string),
-	}
-	fakeIPT.NewChain("table", "chain")
-	fakeIPT.AppendUnique("table", "chain", "rule1")
-	fakeIPT.AppendUnique("table", "chain", "rule1")
-	fakeIPT.AppendUnique("table", "chain", "rule2")
-	if len(fakeIPT.iptCache["chain"]) != 2 {
-		t.Error("fakeIPT['chain'] should contain 2 rules")
-	}
-	fakeIPT.Delete("table", "chain", "rule1")
-	if len(fakeIPT.iptCache["chain"]) != 1 {
-		t.Error("fakeIPT['chain'] should contain 1 rules")
-	}
-	fakeIPT.ClearChain("table", "chain")
-	if len(fakeIPT.iptCache["chain"]) != 0 {
-		t.Error("fakeIPT['chain'] should be empty")
-	}
-	fakeIPT.DeleteChain("table", "chain")
-	if len(fakeIPT.iptCache) != 0 {
-		t.Error("fakeIPT should be empty")
-	}
-}
-
-func TestIPTablesRuleConfig(t *testing.T) {
-	fakeIPT := FakeIPTable{
-		iptCache: make(map[string][]string),
-	}
-	iptableRule1 := IPTablesRuleConfig{
-		IPTablesChainSpec{
-			TableName:      "mangle",
-			ChainName:      "postRoutingChain",
-			IsDefaultChain: true,
-			IPT:            fakeIPT,
-		},
-		[]IPTablesRuleSpec{
-			[]string{"rule1", "-m", "-j"},
-			[]string{"rule2", "-m", "-j"},
-		},
-		fakeIPT,
-	}
-	iptableRule2 := IPTablesRuleConfig{
-		IPTablesChainSpec{
-			TableName:      "mangle",
-			ChainName:      "postRoutingChain",
-			IsDefaultChain: true,
-			IPT:            fakeIPT,
-		},
-		[]IPTablesRuleSpec{
-			[]string{"rule1", "-m", "-j"},
-			[]string{"rule3", "-m", "-j"},
-		},
-		fakeIPT,
-	}
-	iptableRule3 := IPTablesRuleConfig{
-		IPTablesChainSpec{
-			TableName:      "mangle",
-			ChainName:      "gcpPostRoutingChain",
-			IsDefaultChain: false,
-			IPT:            fakeIPT,
-		},
-		[]IPTablesRuleSpec{
-			[]string{"rule1", "-m", "-j"},
-			[]string{"rule2", "-m", "-j"},
-		},
-		fakeIPT,
-	}
-	iptableRule1.Ensure(true)
-	iptableRule2.Ensure(true)
-	iptableRule3.Ensure(true)
-	if len(fakeIPT.iptCache) != 2 {
-		t.Error("FakeIPTable contains 2 chains")
-	}
-	if len(fakeIPT.iptCache["postRoutingChain"]) != 3 || len(fakeIPT.iptCache["gcpPostRoutingChain"]) != 2 {
-		t.Errorf("FakeIPTable postRoutingChain should contain 3 chains, but contains: %v", fakeIPT.iptCache["postRoutingChain"])
-		t.Errorf("FakeIPTable gcpPostRoutingChain should contain 2 chains, but contains: %v", fakeIPT.iptCache["gcpPostRoutingChain"])
-	}
-	iptableRule2.Ensure(false)
-	iptableRule3.Ensure(false)
-
-	if _, ok := fakeIPT.iptCache["gcpPostRoutingChain"]; ok {
+	if _, ok := fakeIPT.IPTCache["gcpPostRoutingChain"]; ok {
 		t.Error("Ensure should delete IsDefaultChain: false chain.")
 	}
 
-	if _, ok := fakeIPT.iptCache["postRoutingChain"]; !ok {
+	if _, ok := fakeIPT.IPTCache["postRoutingChain"]; !ok {
 		t.Error("Ensure should keep IsDefaultChain: true chain.")
 	}
 
-	iptableRule1.Ensure(false)
-	if len(fakeIPT.iptCache["postRoutingChain"]) != 0 {
+	assert.NoError(t, iptableRule1.Ensure(false))
+	if len(fakeIPT.IPTCache["postRoutingChain"]) != 0 {
 		t.Error("Ensure should keep 0 rule for iptableRule1.")
 	}
 }

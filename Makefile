@@ -38,7 +38,7 @@ GOLANGCI_LINT_VERSION := v1.30.0
 ### These variables should not need tweaking.
 ###
 
-SRC_DIRS := cmd pkg # directories which hold app source (not vendored)
+SRC_DIRS := cmd pkg internal # directories which hold app source (not vendored)
 
 ALL_ARCH := amd64 arm arm64 ppc64le
 

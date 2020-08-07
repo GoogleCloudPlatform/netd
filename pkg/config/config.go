@@ -18,13 +18,13 @@ package config
 
 import (
 	"os"
-	"strings"
 	"syscall"
 
-	"github.com/coreos/go-iptables/iptables"
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
+
+	"github.com/GoogleCloudPlatform/netd/internal/ipt"
 )
 
 // Config interface
@@ -69,38 +69,10 @@ type IPRuleConfig struct {
 	RuleList ruleLister
 }
 
-// IPTablesRuleSpec defines the config for ip table rule
-type IPTablesRuleSpec []string
-
-type iptabler interface {
-	NewChain(table, chain string) error
-	ClearChain(table, chain string) error
-	DeleteChain(table, chain string) error
-	AppendUnique(table, chain string, rulespec ...string) error
-	Delete(table, chain string, rulespec ...string) error
-}
-
-// IPTablesChainSpec defines iptable chain
-type IPTablesChainSpec struct {
-	TableName, ChainName string
-	IsDefaultChain       bool // Is a System default chain, if yes, we won't delete it.
-	IPT                  iptabler
-}
-
-// IPTablesRuleConfig defines iptable rule
-type IPTablesRuleConfig struct {
-	Spec      IPTablesChainSpec
-	RuleSpecs []IPTablesRuleSpec
-	IPT       iptabler
-}
-
-var ipt *iptables.IPTables
-
-func init() {
-	var err error
-	if ipt, err = iptables.NewWithProtocol(iptables.ProtocolIPv4); err != nil {
-		glog.Errorf("failed to initialize iptables: %v", err)
-	}
+type IPTablesRulesConfig struct {
+	Spec ipt.IPTablesSpec
+	// If IsDefaultChain is true (system default chain), don't delete it
+	IsDefaultChain bool
 }
 
 // Ensure SysctlConfig
@@ -181,24 +153,29 @@ func (r IPRuleConfig) count() (int, error) {
 	return count, nil
 }
 
-func (c IPTablesChainSpec) ensure(enabled bool) error {
+// Ensure IPTablesRulesConfig
+func (r IPTablesRulesConfig) Ensure(enabled bool) error {
 	var err error
+	if err = r.ensureChain(enabled); err != nil {
+		return err
+	}
+
+	// Ensure chain rules
 	if enabled {
-		if err = c.IPT.NewChain(c.TableName, c.ChainName); err != nil {
-			if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 1 {
+		for _, rs := range r.Spec.Rules {
+			err = r.Spec.IPT.AppendUnique(r.Spec.TableName, r.Spec.ChainName, rs...)
+			if err != nil {
+				glog.Errorf("failed to append rule %v in table %s chain %s: %v", rs, r.Spec.TableName, r.Spec.ChainName, err)
 				return err
 			}
 		}
-	} else {
-		if !c.IsDefaultChain {
-			err = c.IPT.ClearChain(c.TableName, c.ChainName)
-			if err != nil {
-				glog.Errorf("failed to clean chain %s in table %s: %v", c.TableName, c.ChainName, err)
-				return err
-			}
-			if err = c.IPT.DeleteChain(c.TableName, c.ChainName); err != nil {
-				if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 1 {
-					glog.Errorf("failed to delete chain %s in table %s: %v", c.TableName, c.ChainName, err)
+	} else if r.IsDefaultChain {
+		// Only delete rules added to system default chains.
+		// Non-system default chains should have already been deleted so no need to clear the rules.
+		for _, rs := range r.Spec.Rules {
+			if err := r.Spec.IPT.Delete(r.Spec.TableName, r.Spec.ChainName, rs...); err != nil {
+				if eerr, eok := err.(ipt.Error); !eok || !eerr.IsNotExist() {
+					// Error not caused by a nonexistent chain/rule
 					return err
 				}
 			}
@@ -207,28 +184,26 @@ func (c IPTablesChainSpec) ensure(enabled bool) error {
 	return nil
 }
 
-// Ensure IPTablesRuleConfig
-func (r IPTablesRuleConfig) Ensure(enabled bool) error {
+func (r IPTablesRulesConfig) ensureChain(enabled bool) error {
 	var err error
-	if err = r.Spec.ensure(enabled); err != nil {
-		return err
-	}
 	if enabled {
-		for _, rs := range r.RuleSpecs {
-			err = r.IPT.AppendUnique(r.Spec.TableName, r.Spec.ChainName, rs...)
-			if err != nil {
-				glog.Errorf("failed to append rule %v in table %s chain %s: %v", rs, r.Spec.TableName, r.Spec.ChainName, err)
+		if err = r.Spec.IPT.NewChain(r.Spec.TableName, r.Spec.ChainName); err != nil {
+			if eerr, eok := err.(ipt.Error); !eok || eerr.ExitStatus() != 1 {
+				// Error not caused by already existent chain
 				return err
 			}
 		}
-	} else if r.Spec.IsDefaultChain {
-		for _, rs := range r.RuleSpecs {
-			if err := r.IPT.Delete(r.Spec.TableName, r.Spec.ChainName, rs...); err != nil {
-				if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 2 {
-					if !strings.Contains(eerr.Error(), "No chain/target/match") {
-						return err
-					}
-				}
+	} else if !r.IsDefaultChain {
+		err = r.Spec.IPT.ClearChain(r.Spec.TableName, r.Spec.ChainName)
+		if err != nil {
+			glog.Errorf("failed to clear chain %s in table %s: %v", r.Spec.TableName, r.Spec.ChainName, err)
+			return err
+		}
+		if err = r.Spec.IPT.DeleteChain(r.Spec.TableName, r.Spec.ChainName); err != nil {
+			if eerr, eok := err.(ipt.Error); !eok || !eerr.IsNotExist() {
+				// Error not caused by a nonexistent chain
+				glog.Errorf("failed to delete chain %s in table %s: %v", r.Spec.TableName, r.Spec.ChainName, err)
+				return err
 			}
 		}
 	}

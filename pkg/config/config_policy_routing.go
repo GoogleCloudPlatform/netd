@@ -24,6 +24,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
+
+	"github.com/GoogleCloudPlatform/netd/internal/ipt"
 )
 
 const (
@@ -102,55 +104,51 @@ func init() {
 			DefaultValue: "0",
 			SysctlFunc:   sysctl.Sysctl,
 		},
-		IPTablesRuleConfig{
-			IPTablesChainSpec{
-				TableName:      tableMangle,
-				ChainName:      gcpPreRoutingChain,
-				IsDefaultChain: false,
-				IPT:            ipt,
+		IPTablesRulesConfig{
+			Spec: ipt.IPTablesSpec{
+				TableName: tableMangle,
+				ChainName: gcpPreRoutingChain,
+				Rules: []ipt.IPTablesRule{
+					[]string{"-j", "CONNMARK", "--restore-mark", "-m", "comment", "--comment", policyRoutingGcpPreRoutingComment},
+				},
+				IPT: ipt.IPv4Tables,
 			},
-			[]IPTablesRuleSpec{
-				[]string{"-j", "CONNMARK", "--restore-mark", "-m", "comment", "--comment", policyRoutingGcpPreRoutingComment},
-			},
-			ipt,
+			IsDefaultChain: false,
 		},
-		IPTablesRuleConfig{
-			IPTablesChainSpec{
-				TableName:      tableMangle,
-				ChainName:      preRoutingChain,
-				IsDefaultChain: true,
-				IPT:            ipt,
+		IPTablesRulesConfig{
+			Spec: ipt.IPTablesSpec{
+				TableName: tableMangle,
+				ChainName: preRoutingChain,
+				Rules: []ipt.IPTablesRule{
+					[]string{"-j", gcpPreRoutingChain, "-m", "comment", "--comment", policyRoutingPreRoutingComment},
+				},
+				IPT: ipt.IPv4Tables,
 			},
-			[]IPTablesRuleSpec{
-				[]string{"-j", gcpPreRoutingChain, "-m", "comment", "--comment", policyRoutingPreRoutingComment},
-			},
-			ipt,
+			IsDefaultChain: true,
 		},
-		IPTablesRuleConfig{
-			IPTablesChainSpec{
-				TableName:      tableMangle,
-				ChainName:      gcpPostRoutingChain,
-				IsDefaultChain: false,
-				IPT:            ipt,
+		IPTablesRulesConfig{
+			Spec: ipt.IPTablesSpec{
+				TableName: tableMangle,
+				ChainName: gcpPostRoutingChain,
+				Rules: []ipt.IPTablesRule{
+					[]string{"-m", "mark", "--mark",
+						fmt.Sprintf("0x%x/0x%x", hairpinMark, hairpinMask),
+						"-j", "CONNMARK", "--save-mark", "-m", "comment", "--comment", policyRoutingGcpPostRoutingComment},
+				},
+				IPT: ipt.IPv4Tables,
 			},
-			[]IPTablesRuleSpec{
-				[]string{"-m", "mark", "--mark",
-					fmt.Sprintf("0x%x/0x%x", hairpinMark, hairpinMask),
-					"-j", "CONNMARK", "--save-mark", "-m", "comment", "--comment", policyRoutingGcpPostRoutingComment},
-			},
-			ipt,
+			IsDefaultChain: false,
 		},
-		IPTablesRuleConfig{
-			IPTablesChainSpec{
-				TableName:      tableMangle,
-				ChainName:      postRoutingChain,
-				IsDefaultChain: true,
-				IPT:            ipt,
+		IPTablesRulesConfig{
+			Spec: ipt.IPTablesSpec{
+				TableName: tableMangle,
+				ChainName: postRoutingChain,
+				Rules: []ipt.IPTablesRule{
+					[]string{"-j", gcpPostRoutingChain, "-m", "comment", "--comment", policyRoutingPostRoutingComment},
+				},
+				IPT: ipt.IPv4Tables,
 			},
-			[]IPTablesRuleSpec{
-				[]string{"-j", gcpPostRoutingChain, "-m", "comment", "--comment", policyRoutingPostRoutingComment},
-			},
-			ipt,
+			IsDefaultChain: true,
 		},
 		IPRouteConfig{
 			Route: netlink.Route{

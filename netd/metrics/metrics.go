@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/netd/pkg/metrics/collector"
+	"github.com/GoogleCloudPlatform/netd/netd/metrics/collector"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"

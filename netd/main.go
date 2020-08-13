@@ -24,10 +24,10 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/GoogleCloudPlatform/netd/pkg/controllers/netconf"
-	"github.com/GoogleCloudPlatform/netd/pkg/metrics"
-	"github.com/GoogleCloudPlatform/netd/pkg/options"
-	"github.com/GoogleCloudPlatform/netd/pkg/version"
+	"github.com/GoogleCloudPlatform/netd/netd/controllers/netconf"
+	"github.com/GoogleCloudPlatform/netd/netd/metrics"
+	"github.com/GoogleCloudPlatform/netd/netd/options"
+	"github.com/GoogleCloudPlatform/netd/netd/version"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 )

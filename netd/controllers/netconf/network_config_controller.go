@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/netd/pkg/config"
+	"github.com/GoogleCloudPlatform/netd/netd/config"
 	"github.com/golang/glog"
 )
 

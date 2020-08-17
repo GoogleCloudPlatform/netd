@@ -3,9 +3,7 @@ services:
 language: go
 go:
   - 1.14.x
-install:
-  - go get -u github.com/golang/dep/...
-  - dep ensure
+install: skip
 script:
   - make
   - make test

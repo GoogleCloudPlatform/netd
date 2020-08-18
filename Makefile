@@ -113,6 +113,16 @@ init: $(BUILD_DIRS)
 $(BUILD_DIRS):
 	@mkdir -p $@
 
+.PHONY: mod-vendor
+# Copies dependencies into a vendor directory
+mod-vendor: mod-tidy
+	@go mod vendor
+
+.PHONY: mod-tidy
+# Cleans up unused dependencies
+mod-tidy:
+	@go mod tidy
+
 #-----------------------------------------------------------------------------
 # Target: build
 #-----------------------------------------------------------------------------

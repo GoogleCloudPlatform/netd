@@ -225,6 +225,9 @@ spec:
               configMapKeyRef:
                 name: networking-metrics-config
                 key: metrics_address
+        volumeMounts:
+        - mountPath: /var/run/netns
+          name: netns
       volumes:
       - name: cni-net-dir
         hostPath:
@@ -232,4 +235,8 @@ spec:
       - name: kubernetes-bin
         hostPath:
           path: /home/kubernetes/bin
+          type: Directory
+      - name:
+        hostPath:
+          path: /var/run/docker/netns
           type: Directory

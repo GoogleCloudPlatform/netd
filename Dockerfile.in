@@ -16,9 +16,11 @@ FROM ARG_FROM
 
 MAINTAINER Jing Ai <jinga@google.com>
 
+// TODO remove jq
 RUN apk --update add --no-cache curl iptables ip6tables jq \
     && rm -rf /var/cache/apk/*
 
+// TODO use golang binary
 ADD scripts/install-cni.sh /install-cni.sh
 ADD bin/ARG_ARCH/ARG_BIN /ARG_BIN
 

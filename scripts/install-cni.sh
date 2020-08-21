@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO remove file
 # overide calico network policy config if its cni is not installed as expected
 echo "Calico network policy config: " $ENABLE_CALICO_NETWORK_POLICY
 if [[ ${ENABLE_CALICO_NETWORK_POLICY} == "true" ]]; then

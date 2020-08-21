@@ -17,8 +17,11 @@ limitations under the License.
 package config
 
 import (
+	"errors"
 	"fmt"
 	"net"
+
+	"github.com/GoogleCloudPlatform/netd/internal/systemutil"
 
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/golang/glog"
@@ -72,19 +75,18 @@ var PolicyRoutingConfigSet = Set{
 
 func init() {
 	f := func(ip net.IP) (linkIndex int, netdev string, gw net.IP) {
-		routes, err := netlink.RouteGet(ip)
+		nic, err := systemutil.GetNIC(ip)
 		if err != nil {
-			glog.Errorf("failed to get route for IP: %v (%v)", ip, err)
-			return
+			glog.Error(err)
+			if errors.Is(err, systemutil.ErrFailedRoute) {
+				return
+			}
 		}
-		gw = routes[0].Gw
-		linkIndex = routes[0].LinkIndex
 
-		l, err := netlink.LinkByIndex(linkIndex)
-		if err != nil {
-			glog.Errorf("failed to get the link by index: %v (%v)", linkIndex, err)
-		}
-		netdev = l.Attrs().Name
+		gw = nic.Route.Gw
+		linkIndex = nic.Route.LinkIndex
+		netdev = nic.Link.Name
+
 		return
 	}
 	defaultLinkIndex, defaultNetdev, defaultGateway = f(net.IPv4(8, 8, 8, 8))

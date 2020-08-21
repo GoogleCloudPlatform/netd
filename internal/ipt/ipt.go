@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package ipt defines the iptables interfaces.
 package ipt
 
 import (
@@ -23,12 +24,16 @@ import (
 
 var (
 	IPv4Tables *iptables.IPTables
+	IPv6Tables *iptables.IPTables
 )
 
 func init() {
 	var err error
 	if IPv4Tables, err = iptables.NewWithProtocol(iptables.ProtocolIPv4); err != nil {
 		glog.Errorf("failed to initialize iptables: %v", err)
+	}
+	if IPv6Tables, err = iptables.NewWithProtocol(iptables.ProtocolIPv6); err != nil {
+		glog.Errorf("failed to initialize ip6tables: %v", err)
 	}
 }
 
@@ -41,11 +46,13 @@ type IPTabler interface {
 	NewChain(table, chain string) error
 	ClearChain(table, chain string) error
 	DeleteChain(table, chain string) error
+	List(table, chain string) ([]string, error)
+	Insert(table, chain string, pos int, rulespec ...string) error
 	AppendUnique(table, chain string, rulespec ...string) error
 	Delete(table, chain string, rulespec ...string) error
 }
 
-// IPTablesRuleSpec defines the config for ip tables rule
+// IPTablesRule defines an iptables rule
 type IPTablesRule []string
 
 // IPTablesSpec defines iptables rules and the associated table and chain

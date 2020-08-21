@@ -25,6 +25,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/GoogleCloudPlatform/netd/internal/ipt"
+	"github.com/GoogleCloudPlatform/netd/internal/systemutil"
 )
 
 // Config interface
@@ -39,12 +40,10 @@ type Set struct {
 	Configs     []Config
 }
 
-type sysctler func(name string, params ...string) (string, error)
-
 // SysctlConfig defines sysctl config
 type SysctlConfig struct {
 	Key, Value, DefaultValue string
-	SysctlFunc               sysctler
+	SysctlFunc               systemutil.SysctlFunc
 }
 
 type routeAdder func(route *netlink.Route) error

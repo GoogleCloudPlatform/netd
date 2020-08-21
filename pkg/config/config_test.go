@@ -23,29 +23,31 @@ import (
 
 	"github.com/GoogleCloudPlatform/netd/internal/ipt"
 	"github.com/GoogleCloudPlatform/netd/internal/ipt/ipttest"
+	"github.com/GoogleCloudPlatform/netd/internal/systemutil/sysctltest"
 )
 
 func TestSysctlConfigEnsure(t *testing.T) {
-	mSysctl := make(map[string]string)
+	fakeSysctl := make(sysctltest.FakeSysctl)
 
 	c := SysctlConfig{
 		Key:          "net.ipv4.conf.all.rp_filter",
 		Value:        "2",
 		DefaultValue: "1",
-		SysctlFunc: func(name string, params ...string) (string, error) {
-			mSysctl[name] = params[0]
-			return "", nil
-		},
+		SysctlFunc:   fakeSysctl.Sysctl,
 	}
 
-	c.Ensure(true)
-	if v := mSysctl["net.ipv4.conf.all.rp_filter"]; v != "2" {
-		t.Error("failed to Ensure sysctlConfig rule")
+	assert.NoError(t, c.Ensure(true))
+	if v, err := fakeSysctl.Sysctl("net.ipv4.conf.all.rp_filter"); err != nil {
+		t.Errorf("failed to ensure sysctlConfig rule: %v", err)
+	} else {
+		assert.Equal(t, c.Value, v, "failed to ensure sysctlConfig rule")
 	}
 
-	c.Ensure(false)
-	if v := mSysctl["net.ipv4.conf.all.rp_filter"]; v != "1" {
-		t.Error("failed to disable sysctlConfig rule")
+	assert.NoError(t, c.Ensure(false))
+	if v, err := fakeSysctl.Sysctl("net.ipv4.conf.all.rp_filter"); err != nil {
+		t.Errorf("failed to disable sysctlConfig rule: %v", err)
+	} else {
+		assert.Equal(t, c.DefaultValue, v, "failed to disable sysctlConfig rule")
 	}
 }
 
@@ -103,7 +105,7 @@ func TestIPRuleConfigEnsure(t *testing.T) {
 }
 
 func TestIPTablesRulesConfig(t *testing.T) {
-	fakeIPT := ipttest.NewFakeIPTables()
+	fakeIPT := ipttest.NewFakeIPTables("mangle")
 
 	iptableRule1 := IPTablesRulesConfig{
 		Spec: ipt.IPTablesSpec{
@@ -144,26 +146,26 @@ func TestIPTablesRulesConfig(t *testing.T) {
 	assert.NoError(t, iptableRule1.Ensure(true))
 	assert.NoError(t, iptableRule2.Ensure(true))
 	assert.NoError(t, iptableRule3.Ensure(true))
-	if len(fakeIPT.IPTCache) != 2 {
+	if len(fakeIPT.Tables["mangle"].Rules) != 2 {
 		t.Error("FakeIPTables contains 2 chains")
 	}
-	if len(fakeIPT.IPTCache["postRoutingChain"]) != 3 || len(fakeIPT.IPTCache["gcpPostRoutingChain"]) != 2 {
-		t.Errorf("FakeIPTables postRoutingChain should contain 3 chains, but contains: %v", fakeIPT.IPTCache["postRoutingChain"])
-		t.Errorf("FakeIPTables gcpPostRoutingChain should contain 2 chains, but contains: %v", fakeIPT.IPTCache["gcpPostRoutingChain"])
+	if len(fakeIPT.Tables["mangle"].Rules["postRoutingChain"]) != 3 || len(fakeIPT.Tables["mangle"].Rules["gcpPostRoutingChain"]) != 2 {
+		t.Errorf("FakeIPTables postRoutingChain should contain 3 chains, but contains: %v", fakeIPT.Tables["mangle"].Rules["postRoutingChain"])
+		t.Errorf("FakeIPTables gcpPostRoutingChain should contain 2 chains, but contains: %v", fakeIPT.Tables["mangle"].Rules["gcpPostRoutingChain"])
 	}
 	assert.NoError(t, iptableRule2.Ensure(false))
 	assert.NoError(t, iptableRule3.Ensure(false))
 
-	if _, ok := fakeIPT.IPTCache["gcpPostRoutingChain"]; ok {
+	if _, ok := fakeIPT.Tables["mangle"].Rules["gcpPostRoutingChain"]; ok {
 		t.Error("Ensure should delete IsDefaultChain: false chain.")
 	}
 
-	if _, ok := fakeIPT.IPTCache["postRoutingChain"]; !ok {
+	if _, ok := fakeIPT.Tables["mangle"].Rules["postRoutingChain"]; !ok {
 		t.Error("Ensure should keep IsDefaultChain: true chain.")
 	}
 
 	assert.NoError(t, iptableRule1.Ensure(false))
-	if len(fakeIPT.IPTCache["postRoutingChain"]) != 0 {
+	if len(fakeIPT.Tables["mangle"].Rules["postRoutingChain"]) != 0 {
 		t.Error("Ensure should keep 0 rule for iptableRule1.")
 	}
 }

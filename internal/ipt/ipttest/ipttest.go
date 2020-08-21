@@ -14,11 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package iptest provides utilities for IPTables mock testing.
+// Package ipttest provides utilities for IPTables mock testing.
 package ipttest
 
 import (
+	"fmt"
 	"strings"
+)
+
+const (
+	AcceptPolicy = "ACCEPT"
+	DropPolicy   = "DROP"
 )
 
 const (
@@ -48,57 +54,111 @@ func (e *FakeError) IsNotExist() bool {
 	return e.exitStatus == NotExistErr
 }
 
-type FakeIPTables struct {
-	IPTCache map[string][]string
+type FakeIPTable struct {
+	Rules    map[string][]string
+	Policies map[string]string
 }
 
-func NewFakeIPTables() *FakeIPTables {
+type FakeIPTables struct {
+	Tables map[string]*FakeIPTable
+}
+
+func NewFakeIPTable() *FakeIPTable {
+	return &FakeIPTable{
+		Rules:    make(map[string][]string),
+		Policies: make(map[string]string),
+	}
+}
+
+func NewFakeIPTables(tableNames ...string) *FakeIPTables {
+	tables := make(map[string]*FakeIPTable)
+	for _, name := range tableNames {
+		tables[name] = NewFakeIPTable()
+	}
 	return &FakeIPTables{
-		IPTCache: make(map[string][]string),
+		Tables: tables,
 	}
 }
 
 func (i FakeIPTables) NewChain(table, chain string) error {
-	if _, ok := i.IPTCache[chain]; ok {
+	if _, ok := i.Tables[table].Rules[chain]; ok {
 		// Chain already exists
 		return NewFakeError(AlreadyExistErr)
 	}
 
-	i.IPTCache[chain] = make([]string, 0, 5)
+	i.Tables[table].Rules[chain] = make([]string, 0, 5)
+	// Default chain policy
+	i.Tables[table].Policies[chain] = AcceptPolicy
 	return nil
 }
 
 func (i FakeIPTables) ClearChain(table, chain string) error {
-	i.IPTCache[chain] = make([]string, 0, 5)
+	i.Tables[table].Rules[chain] = make([]string, 0, 5)
 	return nil
 }
 func (i FakeIPTables) DeleteChain(table, chain string) error {
-	if _, ok := i.IPTCache[chain]; !ok {
+	if _, ok := i.Tables[table].Rules[chain]; !ok {
 		// Chain does not exist
 		return NewFakeError(NotExistErr)
 	}
 
-	delete(i.IPTCache, chain)
+	delete(i.Tables[table].Rules, chain)
+	delete(i.Tables[table].Policies, chain)
+
+	return nil
+}
+
+func (i FakeIPTables) List(table, chain string) ([]string, error) {
+	if _, ok := i.Tables[table].Rules[chain]; !ok {
+		// Chain does not exist
+		return nil, NewFakeError(NotExistErr)
+	}
+
+	return append([]string{fmt.Sprintf("-P %s %s", chain, i.Tables[table].Policies[chain])}, i.Tables[table].Rules[chain]...), nil
+}
+
+func (i FakeIPTables) Insert(table, chain string, pos int, rulespec ...string) error {
+	rule := strings.Join(rulespec, " ")
+	if _, ok := i.Tables[table].Rules[chain]; !ok {
+		// Chain does not exist
+		return NewFakeError(NotExistErr)
+	}
+	// Valid iptables rules position: 1 to len(chain) + 1
+	index := pos - 1
+	if index < 0 || pos > len(i.Tables[table].Rules[chain]) {
+		return fmt.Errorf("pos out of bounds: %d", pos)
+	}
+
+	if index == len(i.Tables[table].Rules[chain]) {
+		i.Tables[table].Rules[chain] = append(i.Tables[table].Rules[chain], rule)
+	} else {
+		i.Tables[table].Rules[chain] = append(i.Tables[table].Rules[chain][:index+1], i.Tables[table].Rules[chain][index:]...)
+		i.Tables[table].Rules[chain][index] = rule
+	}
+
 	return nil
 }
 
 func (i FakeIPTables) AppendUnique(table, chain string, rulespec ...string) error {
 	rule := strings.Join(rulespec, " ")
-	for _, r := range i.IPTCache[chain] {
+	for _, r := range i.Tables[table].Rules[chain] {
 		if r == rule {
 			return nil
 		}
 	}
-	i.IPTCache[chain] = append(i.IPTCache[chain], rule)
+	i.Tables[table].Rules[chain] = append(i.Tables[table].Rules[chain], rule)
 	return nil
 }
 func (i FakeIPTables) Delete(table, chain string, rulespec ...string) error {
 	rule := strings.Join(rulespec, " ")
-	for index, r := range i.IPTCache[chain] {
+	for index, r := range i.Tables[table].Rules[chain] {
 		if r == rule {
-			i.IPTCache[chain] = append(i.IPTCache[chain][:index], i.IPTCache[chain][index+1:]...)
+			i.Tables[table].Rules[chain] = append(i.Tables[table].Rules[chain][:index], i.Tables[table].Rules[chain][index+1:]...)
 			return nil
 		}
 	}
+
+	delete(i.Tables[table].Rules, chain)
+
 	return nil
 }

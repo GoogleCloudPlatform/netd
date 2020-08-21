@@ -17,6 +17,7 @@ limitations under the License.
 package ipttest
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -25,7 +26,7 @@ import (
 )
 
 func TestFakeIPTables(t *testing.T) {
-	fakeIPT := NewFakeIPTables()
+	fakeIPT := NewFakeIPTables("table")
 
 	assert.NoError(t, fakeIPT.NewChain("table", "chain"))
 	// Trying to create an already existent chain should return an error with exitStatus == AlreadyExistErr
@@ -40,25 +41,37 @@ func TestFakeIPTables(t *testing.T) {
 	fakeIPT.AppendUnique("table", "chain", "rule1")
 	fakeIPT.AppendUnique("table", "chain", "rule1")
 	fakeIPT.AppendUnique("table", "chain", "rule2")
+	assert.Len(t, fakeIPT.Tables["table"].Rules["chain"], 2)
 
-	if len(fakeIPT.IPTCache["chain"]) != 2 {
-		t.Error("fakeIPT['chain'] should contain 2 rules")
-	}
+	rulesList, err := fakeIPT.List("table", "chain")
+	assert.NoError(t, err)
+	expectedList := []string{"-P chain ACCEPT", "rule1", "rule2"}
+	assert.Equal(t, expectedList, rulesList)
+
+	pos := 0
+	assert.EqualError(t, fakeIPT.Insert("table", "chain", pos, "inserted", "rule1"), fmt.Sprintf("pos out of bounds: %d", pos))
+	pos = len(fakeIPT.Tables["table"].Rules["chain"]) + 1
+	assert.EqualError(t, fakeIPT.Insert("table", "chain", pos, "inserted", "rule1"), fmt.Sprintf("pos out of bounds: %d", pos))
+	pos = 1
+	assert.NoError(t, fakeIPT.Insert("table", "chain", pos, "inserted", "rule1"))
+	assert.Len(t, fakeIPT.Tables["table"].Rules["chain"], 3)
+	pos = 2
+	assert.NoError(t, fakeIPT.Insert("table", "chain", pos, "inserted", "rule2"))
+	assert.Len(t, fakeIPT.Tables["table"].Rules["chain"], 4)
+	pos = len(fakeIPT.Tables["table"].Rules["chain"])
+	assert.NoError(t, fakeIPT.Insert("table", "chain", pos, "inserted", "rule3"))
+	assert.Len(t, fakeIPT.Tables["table"].Rules["chain"], 5)
 
 	fakeIPT.Delete("table", "chain", "rule1")
-	if len(fakeIPT.IPTCache["chain"]) != 1 {
-		t.Error("fakeIPT['chain'] should contain 1 rules")
-	}
+	assert.Len(t, fakeIPT.Tables["table"].Rules["chain"], 4)
 
 	fakeIPT.ClearChain("table", "chain")
-	if len(fakeIPT.IPTCache["chain"]) != 0 {
-		t.Error("fakeIPT['chain'] should be empty")
-	}
+	assert.Len(t, fakeIPT.Tables["table"].Rules["chain"], 0)
 
 	assert.NoError(t, fakeIPT.DeleteChain("table", "chain"))
-	if len(fakeIPT.IPTCache) != 0 {
-		t.Error("fakeIPT should be empty")
-	}
+	assert.Empty(t, fakeIPT.Tables["table"].Rules)
+	assert.Empty(t, fakeIPT.Tables["table"].Policies)
+
 	// Trying to delete a nonexistent chain should return an error with exitStatus == NotExistErr
 	if err := fakeIPT.DeleteChain("table", "chain"); err != nil {
 		if eerr, eok := err.(ipt.Error); eok {

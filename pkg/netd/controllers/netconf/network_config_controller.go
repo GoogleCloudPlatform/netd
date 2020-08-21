@@ -23,7 +23,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"github.com/GoogleCloudPlatform/netd/pkg/config"
+	"github.com/GoogleCloudPlatform/netd/pkg/netd/config"
 )
 
 // NetworkConfigController defines the controller

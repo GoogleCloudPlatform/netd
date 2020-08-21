@@ -25,7 +25,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/GoogleCloudPlatform/netd/pkg/metrics/collector"
+	"github.com/GoogleCloudPlatform/netd/pkg/netd/metrics/collector"
 )
 
 var mcfg struct {

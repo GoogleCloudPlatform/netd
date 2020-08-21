@@ -24,12 +24,13 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/golang/glog"
+	"github.com/spf13/pflag"
+
 	"github.com/GoogleCloudPlatform/netd/pkg/controllers/netconf"
 	"github.com/GoogleCloudPlatform/netd/pkg/metrics"
 	"github.com/GoogleCloudPlatform/netd/pkg/options"
 	"github.com/GoogleCloudPlatform/netd/pkg/version"
-	"github.com/golang/glog"
-	"github.com/spf13/pflag"
 )
 
 func main() {
@@ -41,7 +42,7 @@ func main() {
 	glog.Infof("netd args: %v", strings.Join(os.Args, " "))
 
 	nc := netconf.NewNetworkConfigController(config.EnablePolicyRouting, config.EnableMasquerade,
-		config.ReconcileIntervalSeconds)
+		config.ReconcileInterval)
 
 	stopCh := make(chan struct{})
 
@@ -56,7 +57,7 @@ func main() {
 		glog.Errorf("Could not start metrics collector: %v", err)
 	}
 
-	ch := make(chan os.Signal)
+	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	<-ch
 

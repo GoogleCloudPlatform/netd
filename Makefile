@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO refactor Makefile to build multiple binaries https://github.com/thockin/go-build-template/blob/master/Makefile
 # The binary to build (just the basename).
 BIN := netd
 

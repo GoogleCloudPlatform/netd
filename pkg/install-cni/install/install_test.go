@@ -21,4 +21,6 @@ import (
 )
 
 func TestCNIInstaller(t *testing.T) {
+	// TODO add unit tests for the Run() function or just test it in the integration tests
+	// or break the Run() function into smaller helper function for unit testing
 }

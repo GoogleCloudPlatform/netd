@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/multierr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -43,6 +44,7 @@ func (o *statusOptions) Complete() error {
 
 		for _, a := range node.Status.Addresses {
 			if a.Type == corev1.NodeInternalIP {
+				fmt.Printf("Node %q has IP Address %q\n", o.node, a.Address)
 				o.addrs = append(o.addrs, &net.IPAddr{IP: net.ParseIP(a.Address)})
 			}
 		}
@@ -59,6 +61,7 @@ func (o *statusOptions) Complete() error {
 			return err
 		}
 
+		fmt.Printf("Pod %q has IP Address %q\n", o.pod, pod.Status.PodIP)
 		o.addrs = append(o.addrs, &net.IPAddr{IP: net.ParseIP(pod.Status.PodIP)})
 	}
 
@@ -80,12 +83,30 @@ func (o *statusOptions) Complete() error {
 		ip := net.ParseIP(service.Spec.ClusterIP)
 		for _, port := range service.Spec.Ports {
 			if port.Protocol == corev1.ProtocolTCP {
+				fmt.Printf("Service %q has Address %s:%d\n", o.service, ip, port.Port)
 				o.addrs = append(o.addrs, &net.TCPAddr{IP: ip, Port: int(port.Port)})
 			}
 		}
 	}
 
 	return nil
+}
+
+func (o statusOptions) SendProbe() error {
+	var err error
+	for _, addr := range o.addrs {
+		switch addr.(type) {
+		case *net.IPAddr:
+			traceICMPProbe()
+			err = multierr.Append(err, sendICMPProbe(addr.(*net.IPAddr)))
+		case *net.TCPAddr:
+			err = multierr.Append(err, sendTCPProbe(addr.(*net.TCPAddr)))
+		default:
+			err = multierr.Append(err, fmt.Errorf("Address %v is of unknown type %T", addr, addr))
+		}
+	}
+
+	return err
 }
 
 func statusCmd() *cobra.Command {
@@ -96,6 +117,7 @@ func statusCmd() *cobra.Command {
 		Short: "Send a probe to node, pod or service.",
 		Run: func(cmd *cobra.Command, args []string) {
 			checkErr(o.Complete())
+			checkErr(o.SendProbe())
 		},
 	}
 

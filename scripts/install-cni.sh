@@ -14,9 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# overide calico network policy config if its cni is not installed as expected
+# Overide calico network policy config if its cni is not installed as expected.
+# This can happen if the calico daemonset is removed but the master addon still exists.
+#
+# If this script is being run in order to generate the Calico config file, then skip this
+# check.
 echo "Calico network policy config: " $ENABLE_CALICO_NETWORK_POLICY
-if [[ ${ENABLE_CALICO_NETWORK_POLICY} == "true" ]]; then
+if [[ ${ENABLE_CALICO_NETWORK_POLICY} == "true" ]] && [[ ${WRITE_CALICO_CONFIG_FILE} != "true" ]]; then
   cni_file=`ls /host/etc/cni/net.d/*calico*.conflist 2> /dev/null`
   WAITED=0
   while [ -z "${cni_file}" ]  && [ ${WAITED} -lt 120 ]

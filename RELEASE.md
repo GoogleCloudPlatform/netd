@@ -1,8 +1,12 @@
 # netd releases
 
-## 0.2.8 [backlog]
+## 0.2.8
 ### Features
-### Bug fixs
+ * Write the generated CNI files atomically
+ * Update to use golang 1.14
+### Bug fixes
+ * ReconcileInterval is now correctly set to 10s
+ * Only wait for the Calico CNI spec if not generating the calico template file
 
 ## 0.2.7
 ### Features

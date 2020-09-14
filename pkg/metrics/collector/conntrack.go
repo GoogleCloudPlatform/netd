@@ -38,6 +38,11 @@ var (
 		"Conntrack counters.",
 		[]string{"type"}, nil,
 	)
+	conntrackSizeDesc = prometheus.NewDesc(
+		"conntrack_size",
+		"Size of connection tracking table.",
+		nil, nil,
+	)
 )
 
 type conntrackCollector struct {
@@ -156,6 +161,12 @@ func (c *conntrackCollector) Update(ch chan<- prometheus.Metric) error {
 		return nil
 	}
 	ch <- prometheus.MustNewConstMetric(conntrackEntriesDesc, prometheus.GaugeValue, float64(value))
+
+	size, err := readUintFromFile(procFilePath("sys/net/netfilter/nf_conntrack_max"))
+	if err != nil {
+		return nil
+	}
+	ch <- prometheus.MustNewConstMetric(conntrackSizeDesc, prometheus.GaugeValue, float64(size))
 
 	stats, err := getConntrackStats(procFilePath("net/stat/nf_conntrack"))
 	if err != nil {

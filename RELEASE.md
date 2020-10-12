@@ -1,5 +1,9 @@
 # netd releases
 
+## 0.2.9
+### Features
+ * network metrics - Collect nf_conntrack_max value
+
 ## 0.2.8
 ### Features
  * Write the generated CNI files atomically

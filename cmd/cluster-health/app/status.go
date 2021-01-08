@@ -97,7 +97,6 @@ func (o statusOptions) SendProbe() error {
 	for _, addr := range o.addrs {
 		switch addr.(type) {
 		case *net.IPAddr:
-			traceICMPProbe()
 			err = multierr.Append(err, sendICMPProbe(addr.(*net.IPAddr)))
 		case *net.TCPAddr:
 			err = multierr.Append(err, sendTCPProbe(addr.(*net.TCPAddr)))

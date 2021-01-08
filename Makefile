@@ -56,14 +56,14 @@ endif
 
 IMAGE := $(REGISTRY)/$(BIN)-$(ARCH)
 
-BUILD_IMAGE ?= golang:1.14-alpine
+BUILD_IMAGE ?= gcr.io/anishshah-gke-dev/golang:1.14-alpine
 
 # Docker run command prefix for containerized build environment
 # Any target that runs this command must also run `init` as a prerequisite rule
 # to ensure the directories specified in $(BUILD_DIRS) are created
 DOCKER_RUN = docker run                                                               \
 				--rm                                                                  \
-				-u $$(id -u):$$(id -g)                                                \
+				-u $$(id -u):$$(id -g)																								\
 				-v "$(CURDIR)/.go/.cache:/.cache"                                     \
 				-v "$(CURDIR)/.go:/go"                                                \
 				-v "$(CURDIR):/go/src/$(PKG)"                                         \

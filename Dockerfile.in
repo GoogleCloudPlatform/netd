@@ -16,10 +16,11 @@ FROM ARG_FROM
 
 MAINTAINER Jing Ai <jinga@google.com>
 
-RUN apk --update add --no-cache curl iptables ip6tables jq \
+RUN apk --update add --no-cache curl iptables ip6tables jq libpcap-dev \
     && rm -rf /var/cache/apk/*
 
 ADD scripts/install-cni.sh /install-cni.sh
+ADD bin/ARG_ARCH/cluster-health /usr/bin/cluster-health
 ADD bin/ARG_ARCH/ARG_BIN /ARG_BIN
 
 ENTRYPOINT ["/ARG_BIN"]

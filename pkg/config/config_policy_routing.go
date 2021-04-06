@@ -89,6 +89,7 @@ func init() {
 	localLinkIndex, localNetdev, _ = f(net.IPv4(127, 0, 0, 1))
 
 	sysctlReversePathFilter := fmt.Sprintf("net.ipv4.conf.%s.rp_filter", defaultNetdev)
+	hairpinMaskStr := fmt.Sprintf("0x%x", hairpinMask)
 	PolicyRoutingConfigSet.Configs = []Config{
 		SysctlConfig{
 			Key:          sysctlReversePathFilter,
@@ -110,7 +111,10 @@ func init() {
 				IPT:            ipt,
 			},
 			[]IPTablesRuleSpec{
-				[]string{"-j", "CONNMARK", "--restore-mark", "-m", "comment", "--comment", policyRoutingGcpPreRoutingComment},
+				[]string{
+					"-j", "CONNMARK", "--restore-mark", "--nfmask", hairpinMaskStr, "--ctmask", hairpinMaskStr,
+					"-m", "comment", "--comment", policyRoutingGcpPreRoutingComment,
+				},
 			},
 			ipt,
 		},
@@ -136,7 +140,8 @@ func init() {
 			[]IPTablesRuleSpec{
 				[]string{"-m", "mark", "--mark",
 					fmt.Sprintf("0x%x/0x%x", hairpinMark, hairpinMask),
-					"-j", "CONNMARK", "--save-mark", "-m", "comment", "--comment", policyRoutingGcpPostRoutingComment},
+					"-j", "CONNMARK", "--save-mark", "--nfmask", hairpinMaskStr, "--ctmask", hairpinMaskStr, "-m",
+					"comment", "--comment", policyRoutingGcpPostRoutingComment},
 			},
 			ipt,
 		},

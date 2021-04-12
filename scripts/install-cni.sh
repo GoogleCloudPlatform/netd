@@ -121,15 +121,16 @@ if [ "$ENABLE_MASQUERADE" == "true" ]; then
   fi
 fi
 
-if [ "$ENABLE_PRIVATE_IPV6_ACCESS" == "true" ]; then
+if [ "$ENABLE_PRIVATE_IPV6_ACCESS" == "true" ] || [ "$ENABLE_IPV6" == "true" ]; then
   node_ipv6_addr=$(curl -s -k --fail "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/?recursive=true" -H "Metadata-Flavor: Google" | jq -r '.ipv6s[0]' ) ||:
 
   if [ -n "${node_ipv6_addr:-}" ] && [ "${node_ipv6_addr}" != "null" ]; then
     echo "Found nic0 IPv6 address ${node_ipv6_addr:-}. Filling IPv6 subnet and route..."
+
     cni_spec=$(echo ${cni_spec:-} | sed -e \
       "s#@ipv6SubnetOptional#, [{\"subnet\": \"${node_ipv6_addr:-}/112\"}]#g;
        s#@ipv6RouteOptional#, {\"dst\": \"::/0\"}#g")
-    
+
     # Ensure the IPv6 firewall rules are as expected.
     # These rules mirror the IPv4 rules installed by kubernetes/cluster/gce/gci/configure-helper.sh
     if ip6tables -w -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then

@@ -129,7 +129,6 @@ if [ "$ENABLE_PRIVATE_IPV6_ACCESS" == "true" ] || [ "$ENABLE_IPV6" == "true" ]; 
 
     if [ "$ENABLE_IPV6" == "true" ]; then
       ipv6_subnet=${node_ipv6_addr%:*:*}:ffff:/112
-      echo "IPv6 subnet: ${ipv6_subnet:-}"
       cni_spec=$(echo ${cni_spec:-} | sed -e \
         "s#@ipv6SubnetOptional#, [{\"subnet\": ${ipv6_subnet:-}}]#g;
         s#@ipv6RouteOptional#, {\"dst\": \"::/0\"}#g")

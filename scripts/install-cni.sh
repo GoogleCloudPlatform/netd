@@ -127,16 +127,9 @@ if [ "$ENABLE_PRIVATE_IPV6_ACCESS" == "true" ] || [ "$ENABLE_IPV6" == "true" ]; 
   if [ -n "${node_ipv6_addr:-}" ] && [ "${node_ipv6_addr}" != "null" ]; then
     echo "Found nic0 IPv6 address ${node_ipv6_addr:-}. Filling IPv6 subnet and route..."
 
-    if [ "$ENABLE_IPV6" == "true" ]; then
-      ipv6_subnet=${node_ipv6_addr%:*:*}:ffff:/112
-      cni_spec=$(echo ${cni_spec:-} | sed -e \
-        "s#@ipv6SubnetOptional#, [{\"subnet\": ${ipv6_subnet:-}}]#g;
-        s#@ipv6RouteOptional#, {\"dst\": \"::/0\"}#g")
-    else
-      cni_spec=$(echo ${cni_spec:-} | sed -e \
-        "s#@ipv6SubnetOptional#, [{\"subnet\": \"${node_ipv6_addr:-}/112\"}]#g;
-        s#@ipv6RouteOptional#, {\"dst\": \"::/0\"}#g")
-    fi
+    cni_spec=$(echo ${cni_spec:-} | sed -e \
+      "s#@ipv6SubnetOptional#, [{\"subnet\": \"${node_ipv6_addr:-}/112\"}]#g;
+      s#@ipv6RouteOptional#, {\"dst\": \"::/0\"}#g")
 
     # Ensure the IPv6 firewall rules are as expected.
     # These rules mirror the IPv4 rules installed by kubernetes/cluster/gce/gci/configure-helper.sh

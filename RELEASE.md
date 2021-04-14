@@ -1,5 +1,9 @@
 # netd releases
 
+## 0.2.10
+### Features
+ * Add support to handle GKE ENABLE_IPV6 flag and populate ipv6Subnet
+
 ## 0.2.9
 ### Features
  * network metrics - Collect nf_conntrack_max value

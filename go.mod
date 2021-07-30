@@ -15,8 +15,7 @@ require (
 	github.com/prometheus/common v0.0.0-20181015124227-bcb74de08d37 // indirect
 	github.com/prometheus/procfs v0.0.0-20181005140218-185b4288413d // indirect
 	github.com/spf13/pflag v1.0.3
-	github.com/vishvananda/netlink v1.0.0
-	github.com/vishvananda/netns v0.0.0-20180720170159-13995c7128cc // indirect
+	github.com/vishvananda/netlink v1.1.0
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208 // indirect
-	golang.org/x/sys v0.0.0-20181011152604-fa43e7bc11ba
+	golang.org/x/sys v0.0.0-20190606203320-7fc4e5ec1444
 )

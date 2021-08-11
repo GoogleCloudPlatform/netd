@@ -35,7 +35,8 @@ var mcfg struct {
 }
 
 func init() {
-	flag.StringVar(&mcfg.enabledCollectors, "metrics-collectors", "", "Enable given metrics collectors (options: conntrack,socket).")
+	flag.StringVar(&mcfg.enabledCollectors, "metrics-collectors", "",
+		"Enable given metrics collectors (options: conntrack,socket,kernel_metrics,netlink_metrics).")
 	flag.StringVar(&mcfg.listenAddress, "metrics-address", "localhost:10231", "Address on which to expose metrics.")
 	flag.StringVar(&mcfg.procPath, "metrics-proc-path", "/proc", "Proc directory to read metrics.")
 }

@@ -31,7 +31,8 @@ if [ -z "${VERSION}" ]; then
     exit 1
 fi
 
-export CGO_ENABLED=0
+export CGO_ENABLED=1
+export GOOS=linux
 export GOARCH="${ARCH}"
 
 go install                                                         \

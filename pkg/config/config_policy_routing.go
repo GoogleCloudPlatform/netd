@@ -47,8 +47,13 @@ const (
 )
 
 const (
-	customRouteTable    = 1
-	hairpinRulePriority = 30000 + iota
+	customRouteTable = 1
+)
+
+const (
+	hairpinDNSRequestRulePriority = 29999 + iota
+	hairpinDNSResponseRulePriority
+	hairpinRulePriority
 	localRulePriority
 	policyRoutingRulePriority
 )
@@ -216,4 +221,39 @@ func init() {
 			RuleList: netlink.RuleList,
 		},
 	}
+}
+
+var ExcludeDNSIPRuleConfigs = []Config{
+	IPRuleConfig{
+		Rule: netlink.Rule{
+			Table:             unix.RT_TABLE_MAIN,
+			Priority:          hairpinDNSRequestRulePriority,
+			Dport:             netlink.NewRulePortRange(53, 53),
+			SuppressIfgroup:   -1,
+			SuppressPrefixlen: -1,
+			Mark:              -1,
+			Mask:              -1,
+			Goto:              -1,
+			Flow:              -1,
+		},
+		RuleAdd:  netlink.RuleAdd,
+		RuleDel:  netlink.RuleDel,
+		RuleList: netlink.RuleList,
+	},
+	IPRuleConfig{
+		Rule: netlink.Rule{
+			Table:             unix.RT_TABLE_MAIN,
+			Priority:          hairpinDNSResponseRulePriority,
+			Sport:             netlink.NewRulePortRange(53, 53),
+			SuppressIfgroup:   -1,
+			SuppressPrefixlen: -1,
+			Mark:              -1,
+			Mask:              -1,
+			Goto:              -1,
+			Flow:              -1,
+		},
+		RuleAdd:  netlink.RuleAdd,
+		RuleDel:  netlink.RuleDel,
+		RuleList: netlink.RuleList,
+	},
 }

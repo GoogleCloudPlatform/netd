@@ -12,7 +12,8 @@ require (
 	github.com/prometheus/common v0.0.0-20181015124227-bcb74de08d37 // indirect
 	github.com/prometheus/procfs v0.0.0-20181005140218-185b4288413d // indirect
 	github.com/spf13/pflag v1.0.5
-	github.com/vishvananda/netlink v1.1.0
+	github.com/vishvananda/netlink v1.1.1-0.20200210145206-a2e8781202af
+	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df
 	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22
 	k8s.io/api v0.20.0
 	k8s.io/apimachinery v0.20.0

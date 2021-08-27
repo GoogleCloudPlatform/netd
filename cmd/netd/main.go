@@ -42,7 +42,7 @@ func main() {
 	glog.Infof("netd args: %v", strings.Join(os.Args, " "))
 
 	nc := netconf.NewNetworkConfigController(config.EnablePolicyRouting, config.EnableMasquerade,
-		config.ReconcileInterval)
+		config.ExcludeDNS, config.ReconcileInterval)
 
 	stopCh := make(chan struct{})
 

@@ -42,19 +42,7 @@ SRC_DIRS := cmd pkg # directories which hold app source (not vendored)
 
 ALL_ARCH := amd64 arm arm64 ppc64le
 
-# Set default base image dynamically for each arch
-ifeq ($(ARCH), amd64)
-    BASE_IMAGE ?= alpine
-endif
-ifeq ($(ARCH), arm)
-    BASE_IMAGE ?= armel/busybox
-endif
-ifeq ($(ARCH), arm64)
-    BASE_IMAGE ?= aarch64/busybox
-endif
-ifeq ($(ARCH), ppc64le)
-    BASE_IMAGE ?= ppc64le/busybox
-endif
+BASE_IMAGE ?= k8s.gcr.io/build-image/debian-iptables-$(ARCH):buster-v1.8.0
 
 IMAGE := $(REGISTRY)/$(BIN)-$(ARCH)
 

@@ -17,7 +17,7 @@ FROM ARG_FROM
 MAINTAINER Zihong Zheng <zihongz@google.com>
 
 RUN apt-get -y update
-RUN apt-get -y install curl jq
+RUN apt-get -y install curl jq bash iproute2
 ADD scripts/install-cni.sh /install-cni.sh
 ADD bin/ARG_ARCH/ARG_BIN /ARG_BIN
 

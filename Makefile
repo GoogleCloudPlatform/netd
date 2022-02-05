@@ -44,6 +44,7 @@ ALL_ARCH := amd64 arm arm64 ppc64le
 
 BASE_IMAGE ?= k8s.gcr.io/build-image/debian-iptables-$(ARCH):buster-v1.8.0
 
+MANIFEST_IMAGE := $(REGISTRY)/$(BIN)
 IMAGE := $(REGISTRY)/$(BIN)-$(ARCH)
 
 BUILD_IMAGE ?= golang:1.14-alpine
@@ -74,6 +75,7 @@ all: init build
 BUILD_ALL_ARCH = $(addprefix build-, $(ALL_ARCH))
 CONTAINER_ALL_ARCH = $(addprefix container-, $(ALL_ARCH))
 PUSH_ALL_ARCH = $(addprefix push-, $(ALL_ARCH))
+MANIFEST_PUSH_ALL_ARCH = $(addprefix manifest-push-, $(ALL_ARCH))
 
 .PHONY: all-build $(BUILD_ALL_ARCH)
 all-build: $(BUILD_ALL_ARCH)
@@ -82,7 +84,11 @@ all-build: $(BUILD_ALL_ARCH)
 all-container: $(CONTAINER_ALL_ARCH)
 
 .PHONY: all-push $(PUSH_ALL_ARCH)
-all-push: $(PUSH_ALL_ARCH)
+all-push: $(PUSH_ALL_ARCH) all-manifest-push
+
+.PHONY: all-manifest-push $(MANIFEST_PUSH_ALL_ARCH)
+all-manifest-push: $(MANIFEST_PUSH_ALL_ARCH)
+	docker manifest push -p $(MANIFEST_IMAGE):$(VERSION)
 
 $(BUILD_ALL_ARCH): build-%:
 	@$(MAKE) --no-print-directory ARCH=$* build
@@ -92,6 +98,9 @@ $(CONTAINER_ALL_ARCH): container-%:
 
 $(PUSH_ALL_ARCH): push-%:
 	@$(MAKE) --no-print-directory ARCH=$* push
+
+$(MANIFEST_PUSH_ALL_ARCH): manifest-push-%:
+	@$(MAKE) --no-print-directory ARCH=$* manifest-push
 
 #-----------------------------------------------------------------------------
 # Target: init
@@ -135,15 +144,25 @@ bin/$(ARCH)/$(BIN): init
 #-----------------------------------------------------------------------------
 DOTFILE_IMAGE = $(subst :,_,$(subst /,_,$(IMAGE))-$(VERSION))
 
+# Create a buildx builder which will create cross platform builds.
+# The default builder does not support multi-arch.
+.PHONY: buildx-setup
+buildx-setup:
+	docker buildx inspect img-builder > /dev/null || docker buildx create --name img-builder --use
+
 .PHONY: container .container-$(DOTFILE_IMAGE)
 container: .container-$(DOTFILE_IMAGE) container-name
-.container-$(DOTFILE_IMAGE): build Dockerfile.in
+.container-$(DOTFILE_IMAGE): buildx-setup build Dockerfile.in
 	@sed \
 	    -e 's|ARG_BIN|$(BIN)|g' \
 	    -e 's|ARG_ARCH|$(ARCH)|g' \
 	    -e 's|ARG_FROM|$(BASE_IMAGE)|g' \
 	    Dockerfile.in > .dockerfile-$(ARCH)
-	@docker build -t $(IMAGE):$(VERSION) -f .dockerfile-$(ARCH) .
+	@docker buildx build \
+		--platform=$(ARCH) \
+		--output=type=docker \
+		-t $(IMAGE):$(VERSION) \
+		-f .dockerfile-$(ARCH) .
 	@docker images -q $(IMAGE):$(VERSION) > $@
 
 .PHONY: container-name
@@ -164,6 +183,12 @@ endif
 .PHONY: push-name
 push-name:
 	@echo "pushed: $(IMAGE):$(VERSION)"
+
+.PHONY: manifest-push .manifest-push-$(DOTFILE_IMAGE)
+manifest-push: .manifest-push-$(DOTFILE_IMAGE)
+.manifest-push-$(DOTFILE_IMAGE):
+	@docker manifest create --amend $(MANIFEST_IMAGE):$(VERSION) $(IMAGE):$(VERSION)
+	@docker manifest annotate --os=linux --arch=$(ARCH) $(MANIFEST_IMAGE):$(VERSION) $(IMAGE):$(VERSION)
 
 .PHONY: version
 version:

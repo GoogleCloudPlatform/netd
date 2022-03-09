@@ -71,6 +71,12 @@ fi
 if [ "${ENABLE_CILIUM_PLUGIN}" == "true" ]
 then
   cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniCiliumPlugin#,{\"type\": \"cilium-cni\"}#g")
+  cilium_bin="/host/home/kubernetes/bin/cilium-cni"
+  while [ ! -f "$cilium_bin" ]
+  do
+    echo "Waiting for $cilium_bin to be ready..."
+    sleep 2
+  done
 else
   cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniCiliumPlugin##g")
 fi

@@ -148,7 +148,7 @@ spec:
       initContainers:
       - image: gcr.io/google-containers/netd-amd64:latest
         name: install-cni
-        command: ["sh", "/install-cni.sh"]
+        command: ["/install-cni.sh"]
         env:
           - name: CNI_SPEC_TEMPLATE
             valueFrom:

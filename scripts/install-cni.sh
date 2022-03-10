@@ -56,23 +56,32 @@ fi
 
 if [ -f "/host/home/kubernetes/bin/gke" ]
 then
-	cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniType#gke#g")
+  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniType#gke#g")
 else
-	cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniType#ptp#g")
+  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniType#ptp#g")
 fi
 
 if [ "${ENABLE_BANDWIDTH_PLUGIN}" == "true" ] && [ -f "/host/home/kubernetes/bin/bandwidth" ]
 then
-	cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniBandwidthPlugin#,{\"type\": \"bandwidth\",\"capabilities\": {\"bandwidth\": true}}#g")
+  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniBandwidthPlugin#,{\"type\": \"bandwidth\",\"capabilities\": {\"bandwidth\": true}}#g")
 else
-	cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniBandwidthPlugin##g")
+  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniBandwidthPlugin##g")
 fi
 
 if [ "${ENABLE_CILIUM_PLUGIN}" == "true" ]
 then
-        cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniCiliumPlugin#,{\"type\": \"cilium-cni\"}#g")
+  echo "Adding Cilium plug-in to the CNI config."
+  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniCiliumPlugin#,{\"type\": \"cilium-cni\"}#g")
+  cilium_bin="/host/home/kubernetes/bin/cilium-cni"
+  while [ ! -f "$cilium_bin" ]
+  do
+    echo "Waiting for $cilium_bin to be ready..."
+    sleep 2
+  done
+  echo "$cilium_bin found."
 else
-        cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniCiliumPlugin##g")
+  echo "Not using Cilium plug-in."
+  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniCiliumPlugin##g")
 fi
 
 # Fill CNI spec template.

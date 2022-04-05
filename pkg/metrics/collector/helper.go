@@ -24,6 +24,7 @@ import (
 )
 
 var procPath string
+var stackType string
 
 // readUintFromFile reads a uint from file given by path. The file is supposed to only contain a single uint
 // in base 10. Otherwise, an error will be returned.

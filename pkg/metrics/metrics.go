@@ -32,13 +32,15 @@ var mcfg struct {
 	enabledCollectors string
 	listenAddress     string
 	procPath          string
+	stackType					string
 }
 
 func init() {
 	flag.StringVar(&mcfg.enabledCollectors, "metrics-collectors", "",
-		"Enable given metrics collectors (options: conntrack,socket,kernel_metrics,netlink_metrics).")
+		"Enable given metrics collectors (options: conntrack,socket,kernel_metrics,netlink_metrics,pod_ip_metrics).")
 	flag.StringVar(&mcfg.listenAddress, "metrics-address", "localhost:10231", "Address on which to expose metrics.")
 	flag.StringVar(&mcfg.procPath, "metrics-proc-path", "/proc", "Proc directory to read metrics.")
+	flag.StringVar(&mcfg.stackType, "stack-type", "IPV4", "Stack type.")
 }
 
 // StartCollector starts the metrics collector with mcfg configured from input flag
@@ -48,7 +50,7 @@ func StartCollector() error {
 		return nil
 	}
 	enabledCollectors := strings.Split(mcfg.enabledCollectors, ",")
-	nc, pc, err := collector.NewNodeCollector(enabledCollectors, mcfg.procPath)
+	nc, pc, err := collector.NewNodeCollector(enabledCollectors, mcfg.procPath, mcfg.stackType)
 	if err != nil {
 		return err
 	}

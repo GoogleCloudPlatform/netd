@@ -65,8 +65,9 @@ type NodeCollector struct {
 
 // NewNodeCollector creates a new NodeCollector with given enabledCollectors (a list
 // of enabled collectors name) and a list of prometheus collector
-func NewNodeCollector(enabledCollectors []string, proc string) (*NodeCollector, []prometheus.Collector, error) {
+func NewNodeCollector(enabledCollectors []string, proc string, stack string) (*NodeCollector, []prometheus.Collector, error) {
 	procPath = proc
+	stackType = stack
 	collectors := make(map[string]Collector)
 	for _, name := range enabledCollectors {
 		createFunc, exist := factories[name]

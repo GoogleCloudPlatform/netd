@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 )
 
 func mustCreateFile(t *testing.T, dir, name, content string) {
@@ -15,6 +16,13 @@ func mustCreateFile(t *testing.T, dir, name, content string) {
 	defer f.Close()
 	if _, err := f.WriteString(content); err != nil {
 		t.Fatalf("Error writing to file %s: %v", path, err)
+	}
+}
+
+func mustDeleteFile(t *testing.T, dir, name string) {
+	path := dir + "/" + name
+	if err := os.Remove(path); err != nil {
+		t.Fatalf("Error removing file path %s: %v", path, err)
 	}
 }
 
@@ -54,53 +62,53 @@ func TestListIpAddresses(t *testing.T) {
 	mustCreateFile(t, dir3, "2600:1900::2", "hash1")
 
 	for _, tc := range []struct {
-		desc string
-		dir string
-		stackType string
-		wantUsedIpv4Count uint64
-		wantUsedIpv6Count uint64
-		wantDualStackCount uint64
+		desc                  string
+		dir                   string
+		stackType             string
+		wantUsedIpv4Count     uint64
+		wantUsedIpv6Count     uint64
+		wantDualStackCount    uint64
 		wantDualStackErrCount uint64
-		wantDuplicateIpCount uint64
-		wantErr bool
-	} {
+		wantDuplicateIpCount  uint64
+		wantErr               bool
+	}{
 		{
-			desc: "bad directory",
-			dir: "bogus",
+			desc:      "bad directory",
+			dir:       "bogus",
 			stackType: "IPV4",
-			wantErr: true,
+			wantErr:   true,
 		},
 		{
-			desc: "dir1 with 2 IPv4 and 2 IPv6 addresses. Single stack",
-			dir: dir1,
-			stackType: "IPV4",
+			desc:              "dir1 with 2 IPv4 and 2 IPv6 addresses. Single stack",
+			dir:               dir1,
+			stackType:         "IPV4",
 			wantUsedIpv4Count: 2,
 			wantUsedIpv6Count: 2,
 		},
 		{
-			desc: "dir1 with 2 IPv4 and 2 IPv6 addresses. dual stack",
-			dir: dir1,
-			stackType: "IPV4_IPV6",
-			wantUsedIpv4Count: 2,
-			wantUsedIpv6Count: 2,
+			desc:               "dir1 with 2 IPv4 and 2 IPv6 addresses. dual stack",
+			dir:                dir1,
+			stackType:          "IPV4_IPV6",
+			wantUsedIpv4Count:  2,
+			wantUsedIpv6Count:  2,
 			wantDualStackCount: 2,
 		},
 		{
-			desc: "dir2 with dual stack errors",
-			dir: dir2,
-			stackType: "IPV4_IPV6",
-			wantUsedIpv4Count: 2,
-			wantUsedIpv6Count: 2,
-			wantDualStackCount: 1,
+			desc:                  "dir2 with dual stack errors",
+			dir:                   dir2,
+			stackType:             "IPV4_IPV6",
+			wantUsedIpv4Count:     2,
+			wantUsedIpv6Count:     2,
+			wantDualStackCount:    1,
 			wantDualStackErrCount: 2,
 		},
 		{
-			desc: "dir2 with dual stack and dup IPs",
-			dir: dir3,
-			stackType: "IPV4_IPV6",
-			wantUsedIpv4Count: 2,
-			wantUsedIpv6Count: 2,
-			wantDualStackCount: 1,
+			desc:                 "dir2 with dual stack and dup IPs",
+			dir:                  dir3,
+			stackType:            "IPV4_IPV6",
+			wantUsedIpv4Count:    2,
+			wantUsedIpv6Count:    2,
+			wantDualStackCount:   1,
 			wantDuplicateIpCount: 2,
 		},
 	} {
@@ -128,5 +136,77 @@ func TestListIpAddresses(t *testing.T) {
 				t.Errorf("duplicateIpCount. want: %d, got %d", tc.wantDuplicateIpCount, mc.duplicateIpCount)
 			}
 		})
+	}
+}
+
+func TestSetupDirectoryWatcher(t *testing.T) {
+	// dir1 has 2 IPv4 addresses and 2 IPv6 addresses for dual stack pods
+	dir1 := mustCreateIpAddrDir(t, "dir1")
+	mustCreateFile(t, dir1, "10.0.0.1", "hash1")
+	mustCreateFile(t, dir1, "10.0.0.2", "hash2")
+	mustCreateFile(t, dir1, "2600:1900::1", "hash1")
+	mustCreateFile(t, dir1, "2600:1900::2", "hash2")
+	stackType = "IPV4_IPV6"
+
+	// Setup directory watcher and verify metrics
+	mc := podIpMetricsCollector{}
+	if err := mc.setupDirectoryWatcher(dir1); err != nil {
+		t.Fatalf("Got error %v while setting up directory watcher", err)
+	}
+	if mc.usedIpv4AddrCount != 2 {
+		t.Errorf("usedIpv4AddrCount. want: 2, got %d", mc.usedIpv4AddrCount)
+	}
+	if mc.usedIpv6AddrCount != 2 {
+		t.Errorf("usedIpv6AddrCount. want: 2, got %d", mc.usedIpv6AddrCount)
+	}
+	if mc.dualStackCount != 2 {
+		t.Errorf("dualStackCount. want: 2, got %d", mc.dualStackCount)
+	}
+	if mc.dualStackErrorCount != 0 {
+		t.Errorf("dualStackErrorCount. want: 0, got %d", mc.dualStackErrorCount)
+	}
+	if mc.duplicateIpCount != 0 {
+		t.Errorf("duplicateIpCount. want: 0, got %d", mc.duplicateIpCount)
+	}
+	if !podIpMetricsWatcherSetup {
+		t.Fatal("podIpMetricsWatcherSetup: want: true, got: false")
+	}
+
+	//Add a new file to the directory. Verify metrics
+	mustCreateFile(t, dir1, "10.0.0.3", "hash3")
+	time.Sleep(1 * time.Second)
+	if mc.usedIpv4AddrCount != 3 {
+		t.Errorf("usedIpv4AddrCount. want: 3, got %d", mc.usedIpv4AddrCount)
+	}
+	if mc.usedIpv6AddrCount != 2 {
+		t.Errorf("usedIpv6AddrCount. want: 2, got %d", mc.usedIpv6AddrCount)
+	}
+	if mc.dualStackCount != 2 {
+		t.Errorf("dualStackCount. want: 2, got %d", mc.dualStackCount)
+	}
+	if mc.dualStackErrorCount != 1 {
+		t.Errorf("dualStackErrorCount. want: 1, got %d", mc.dualStackErrorCount)
+	}
+	if mc.duplicateIpCount != 0 {
+		t.Errorf("duplicateIpCount. want: 0, got %d", mc.duplicateIpCount)
+	}
+
+	//Remove a file from the directory. Verify metrics
+	mustDeleteFile(t, dir1, "10.0.0.3")
+	time.Sleep(1 * time.Second)
+	if mc.usedIpv4AddrCount != 2 {
+		t.Errorf("usedIpv4AddrCount. want: 2, got %d", mc.usedIpv4AddrCount)
+	}
+	if mc.usedIpv6AddrCount != 2 {
+		t.Errorf("usedIpv6AddrCount. want: 2, got %d", mc.usedIpv6AddrCount)
+	}
+	if mc.dualStackCount != 2 {
+		t.Errorf("dualStackCount. want: 2, got %d", mc.dualStackCount)
+	}
+	if mc.dualStackErrorCount != 0 {
+		t.Errorf("dualStackErrorCount. want: 0, got %d", mc.dualStackErrorCount)
+	}
+	if mc.duplicateIpCount != 0 {
+		t.Errorf("duplicateIpCount. want: 0, got %d", mc.duplicateIpCount)
 	}
 }

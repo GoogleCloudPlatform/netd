@@ -23,6 +23,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -30,11 +31,12 @@ import (
 type ipFamily int
 
 const (
-	gkePodNetworkDir = "/host/var/lib/cni/networks/gke-pod-network"
 	ipv4 ipFamily = iota
-	ipv6 = 1
-	dual = 2
-	dualStack = "IPV4_IPV6"
+	ipv6
+	dual
+
+	gkePodNetworkDir = "/host/var/lib/cni/networks/gke-pod-network"
+	dualStack        = "IPV4_IPV6"
 )
 
 var (
@@ -63,14 +65,15 @@ var (
 		"Indicates how many pods had more than one IP per family.",
 		nil, nil,
 	)
+	podIpMetricsWatcherSetup = false
 )
 
 type podIpMetricsCollector struct {
-	usedIpv4AddrCount uint64
-	usedIpv6AddrCount uint64
-	dualStackCount uint64
+	usedIpv4AddrCount   uint64
+	usedIpv6AddrCount   uint64
+	dualStackCount      uint64
 	dualStackErrorCount uint64
-	duplicateIpCount uint64
+	duplicateIpCount    uint64
 }
 
 func (ip ipFamily) String() string {
@@ -164,10 +167,56 @@ func (c *podIpMetricsCollector) listIpAddresses(dir string) error {
 	return nil
 }
 
+func (c *podIpMetricsCollector) setupDirectoryWatcher(dir string) error {
+	if err := c.listIpAddresses(dir); err != nil {
+		return err
+	}
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		glog.Errorf("NewWatcher failed: %v", err)
+		return err
+	}
+
+	go func() {
+		defer func() {
+			watcher.Close()
+			podIpMetricsWatcherSetup = false
+		}()
+
+		for {
+			select {
+			case _, ok := <-watcher.Events:
+				if !ok {
+					glog.Error("watcher is not ok")
+					return
+				}
+				if err := c.listIpAddresses(dir); err != nil {
+					return
+				}
+
+			case err, ok := <-watcher.Errors:
+				glog.Errorf("Received error from watcher %v, ok: %t", err, ok)
+				if !ok {
+					return
+				}
+			}
+		}
+	}()
+
+	err = watcher.Add(dir)
+	if err != nil {
+		glog.Errorf("Failed to add watcher for directory %s: %v", dir, err)
+	}
+	podIpMetricsWatcherSetup = true
+	return nil
+}
+
 func (c *podIpMetricsCollector) Update(ch chan<- prometheus.Metric) error {
-	if err := c.listIpAddresses(gkePodNetworkDir); err != nil {
-		glog.Errorf("ListIpAddresses returned error: %v", err)
-		return nil
+	if !podIpMetricsWatcherSetup {
+		if err := c.setupDirectoryWatcher(gkePodNetworkDir); err != nil {
+			glog.Errorf("setupDirectoryWatcher returned error: %v", err)
+			return nil
+		}
 	}
 	ch <- prometheus.MustNewConstMetric(usedIpv4AddrCountDesc, prometheus.GaugeValue, float64(c.usedIpv4AddrCount))
 	ch <- prometheus.MustNewConstMetric(usedIpv6AddrCountDesc, prometheus.GaugeValue, float64(c.usedIpv6AddrCount))

@@ -9,6 +9,9 @@ github.com/containernetworking/plugins/pkg/utils/sysctl
 github.com/coreos/go-iptables/iptables
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
+# github.com/fsnotify/fsnotify v1.5.1
+## explicit
+github.com/fsnotify/fsnotify
 # github.com/go-logr/logr v0.2.0
 github.com/go-logr/logr
 # github.com/gogo/protobuf v1.3.1
@@ -76,6 +79,7 @@ github.com/vishvananda/netlink/nl
 ## explicit
 github.com/vishvananda/netns
 # golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
+## explicit
 golang.org/x/crypto/ssh/terminal
 # golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
 golang.org/x/net/context
@@ -87,7 +91,7 @@ golang.org/x/net/idna
 # golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sys v0.0.0-20210616094352-59db8d763f22
+# golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c
 ## explicit
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix

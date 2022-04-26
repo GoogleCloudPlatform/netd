@@ -42,7 +42,7 @@ SRC_DIRS := cmd pkg # directories which hold app source (not vendored)
 
 ALL_ARCH := amd64 arm arm64 ppc64le
 
-BASE_IMAGE ?= k8s.gcr.io/build-image/debian-iptables-$(ARCH):buster-v1.8.0
+BASE_IMAGE ?= k8s.gcr.io/build-image/debian-iptables-$(ARCH):bullseye-v1.3.0
 
 MANIFEST_IMAGE := $(REGISTRY)/$(BIN)
 IMAGE := $(REGISTRY)/$(BIN)-$(ARCH)

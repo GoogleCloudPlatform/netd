@@ -16,6 +16,14 @@ FROM {ARG_FROM}
 
 MAINTAINER Jingyuan Liang <jingyuanliang@google.com>
 
+RUN apt-get -y update
+
+# Necessary to install iproute2
+# https://github.com/GoogleCloudPlatform/netd/issues/125
+RUN apt-mark unhold libcap2
+
+RUN apt-get -y install curl jq bash iproute2
+
 # Add the platform-specific binary.
 COPY bin/{ARG_OS}_{ARG_ARCH}/{ARG_BIN} /{ARG_BIN}
 

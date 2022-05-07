@@ -148,9 +148,8 @@ spec:
         effect: "NoSchedule"
       hostNetwork: true
       initContainers:
-      - image: gcr.io/google-containers/netd-amd64:latest
-        name: install-cni
-        command: ["/install-cni.sh"]
+      - image: gcr.io/google-containers/netd-init:latest
+        name: netd-init
         env:
           - name: CNI_SPEC_TEMPLATE
             valueFrom:
@@ -206,7 +205,7 @@ spec:
           name: kubernetes-bin
           readOnly: true
       containers:
-      - image: gcr.io/google-containers/netd-amd64:latest
+      - image: gcr.io/google-containers/netd:latest
         name: netd
         imagePullPolicy: Always
         hostPID: true

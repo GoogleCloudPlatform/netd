@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+BUILD='__BUILD__'
+
+echo "Install-CNI ($0), Build: $BUILD"
+
 # Overide calico network policy config if its cni is not installed as expected.
 # This can happen if the calico daemonset is removed but the master addon still exists.
 #

@@ -12,8 +12,9 @@
 .vscode
 
 # Build files
-.container-*
-.dockerfile*
-.go/
-bin/
-.push-gcr.*
+/bin
+/.go
+/.push-*
+/.container-*
+/.dockerfile-*
+/.licenses

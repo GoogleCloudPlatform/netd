@@ -1,5 +1,8 @@
+//go:build never
+// +build never
+
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,8 +17,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package version
+// Package tools is used to track binary dependencies with go modules
+// https://github.com/golang/go/wiki/Modules#how-can-i-track-tool-dependencies-for-a-module
+package tools
 
-// Version is the app-global version string, which should be substituted with a
-// real value during build.
-var Version = "UNKNOWN"
+import (
+	_ "github.com/estesp/manifest-tool/v2/cmd/manifest-tool"
+	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
+	_ "github.com/google/go-licenses"
+)

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Copyright 2016 The Kubernetes Authors.
+# Copyright 2022 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,26 +18,21 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [ -z "${OS:-}" ]; then
-    echo "OS must be set"
-    exit 1
-fi
-if [ -z "${ARCH:-}" ]; then
-    echo "ARCH must be set"
-    exit 1
-fi
-if [ -z "${VERSION:-}" ]; then
-    echo "VERSION must be set"
-    exit 1
-fi
-
 export CGO_ENABLED=0
-export GOARCH="${ARCH}"
-export GOOS="${OS}"
 export GO111MODULE=on
-export GOFLAGS="${GOFLAGS:-} -mod=${MOD}"
+export GOFLAGS="${GOFLAGS:-}"
 
-go install                                                      \
-    -installsuffix "static"                                     \
-    -ldflags "-X $(go list -m)/pkg/version.Version=${VERSION}"  \
-    "$@"
+cd tools >/dev/null
+go install github.com/golangci/golangci-lint/cmd/golangci-lint
+cd - >/dev/null
+
+echo -n "Running golangci-lint: "
+ERRS=$(golangci-lint run "$@" 2>&1 || true)
+if [ -n "${ERRS}" ]; then
+    echo "FAIL"
+    echo "${ERRS}"
+    echo
+    exit 1
+fi
+echo "PASS"
+echo

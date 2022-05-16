@@ -95,7 +95,6 @@ data:
   enable_masquerade: "true"
   enable_calico_network_policy: "false"
   enable_ipv6: "false"
-  enable_private_ipv6_access: "false"
   enable_bandwidth_plugin: "true"
   enable_cilium_plugin: "true"
   master_ip: "10.0.0.1"
@@ -174,11 +173,6 @@ spec:
               configMapKeyRef:
                 name: netd-config
                 key: enable_ipv6
-          - name: ENABLE_PRIVATE_IPV6_ACCESS
-            valueFrom:
-              configMapKeyRef:
-                name: netd-config
-                key: enable_private_ipv6_access
           - name: ENABLE_MASQUERADE
             valueFrom:
               configMapKeyRef:

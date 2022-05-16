@@ -17,6 +17,11 @@ FROM ARG_FROM
 MAINTAINER Zihong Zheng <zihongz@google.com>
 
 RUN apt-get -y update
+
+# Necessary to install iproute2
+# https://github.com/GoogleCloudPlatform/netd/issues/125
+RUN apt-mark unhold libcap2
+
 RUN apt-get -y install curl jq bash iproute2
 ADD scripts/install-cni.sh /install-cni.sh
 ADD bin/ARG_ARCH/ARG_BIN /ARG_BIN

@@ -94,9 +94,11 @@ data:
   enable_policy_routing: "true"
   enable_masquerade: "true"
   enable_calico_network_policy: "false"
+  enable_ipv6: "false"
   enable_private_ipv6_access: "false"
   enable_bandwidth_plugin: "true"
   enable_cilium_plugin: "true"
+  master_ip: "10.0.0.1"
   reconcile_interval_seconds: "60s"
   enable_pod_watch: "true"
 
@@ -165,6 +167,13 @@ spec:
               configMapKeyRef:
                 name: netd-config
                 key: enable_calico_network_policy
+          - name: WRITE_CALICO_CONFIG_FILE
+            value: "false"
+          - name: ENABLE_IPV6
+            valueFrom:
+              configMapKeyRef:
+                name: netd-config
+                key: enable_ipv6
           - name: ENABLE_PRIVATE_IPV6_ACCESS
             valueFrom:
               configMapKeyRef:
@@ -185,6 +194,11 @@ spec:
               configMapKeyRef:
                 name: netd-config
                 key: enable_cilium_plugin
+          - name: KUBERNETES_SERVICE_HOST
+            valueFrom:
+              configMapKeyRef:
+                name: netd-config
+                key: master_ip
         volumeMounts:
         - mountPath: /host/etc/cni/net.d
           name: cni-net-dir

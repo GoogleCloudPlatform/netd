@@ -138,7 +138,7 @@ if [ "${ENABLE_PRIVATE_IPV6_ACCESS:-}" == "true" ] || [ "$ENABLE_IPV6" == "true"
 
     cni_spec=$(echo ${cni_spec:-} | sed -e \
       "s#@ipv6SubnetOptional#, [{\"subnet\": \"${node_ipv6_addr:-}/112\"}]#g;
-       s#@ipv6RouteOptional#, {\"dst\": \"::/0\"}#g")
+       s#@ipv6RouteOptional#, ${CNI_SPEC_IPV6_ROUTE:-{\"dst\": \"::/0\"\}}#g")
 
     # Ensure the IPv6 firewall rules are as expected.
     # These rules mirror the IPv4 rules installed by kubernetes/cluster/gce/gci/configure-helper.sh

@@ -91,6 +91,7 @@ data:
       ]
     }
   cni_spec_name: "10-gke-ptp.conflist"
+  cni_spec_ipv6_route: "{\"dst\": \"::/0\"}"
   enable_policy_routing: "true"
   enable_masquerade: "true"
   enable_calico_network_policy: "false"
@@ -161,6 +162,11 @@ spec:
               configMapKeyRef:
                 name: netd-config
                 key: cni_spec_name
+          - name: CNI_SPEC_IPV6_ROUTE
+            valueFrom:
+              configMapKeyRef:
+                name: netd-config
+                key: cni_spec_ipv6_route
           - name: ENABLE_CALICO_NETWORK_POLICY
             valueFrom:
               configMapKeyRef:

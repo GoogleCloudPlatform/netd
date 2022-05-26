@@ -19,9 +19,11 @@ package collector
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/golang/glog"
@@ -37,6 +39,11 @@ const (
 
 	gkePodNetworkDir = "/host/var/lib/cni/networks/gke-pod-network"
 	dualStack        = "IPV4_IPV6"
+
+	// To configure the prometheus histogram bucket for ip reuse.
+	bucketStart = 5e3
+	bucketWidth = 5e3
+	bucketCount = 12
 )
 
 var (
@@ -65,6 +72,25 @@ var (
 		"Indicates how many pods had more than one IP per family.",
 		nil, nil,
 	)
+	ipReuseMinDesc = prometheus.NewDesc(
+		"ip_reuse_minimum_time_milliseconds",
+		"Indicates the minimum IP reuse time.",
+		nil, nil,
+	)
+	ipReuseAvgDesc = prometheus.NewDesc(
+		"ip_reuse_average_time_milliseconds",
+		"Indicates the average IP reuse time.",
+		nil, nil,
+	)
+	// We want 60 seconds to be the threshold for watching quick ip reuse cases.
+	// So the histogram will fill the 12 buckets until 60 seconds with size 5 seconds.
+	// Others that are above 60 seconds will go to bucket {le="+Inf"}, which are out-of-concerned.
+	bucketKeys           = prometheus.LinearBuckets(bucketStart, bucketWidth, bucketCount)
+	ipReuseHistogramDesc = prometheus.NewDesc(
+		"ip_reuse_time_duration_milliseconds",
+		"Indicates the IP reuse duration in millisecond for all IPs.",
+		nil, nil,
+	)
 	podIpMetricsWatcherSetup = false
 )
 
@@ -74,6 +100,32 @@ type podIpMetricsCollector struct {
 	dualStackCount      uint64
 	dualStackErrorCount uint64
 	duplicateIpCount    uint64
+	reuseIps            reuseIps
+	reuseMap            map[string]*ipReuse
+	clock               clock
+}
+
+type reuseIps struct {
+	count   uint64
+	sum     float64
+	min     uint64
+	buckets map[float64]uint64
+}
+
+// IpReuse contains values for reuseMap tracking ip reuse status.
+type ipReuse struct {
+	ipReleasedTimestamp time.Time
+	ipReuseInterval     float64
+}
+
+type clock interface {
+	Now() time.Time
+}
+
+type realClock struct{}
+
+func (c *realClock) Now() time.Time {
+	return time.Now()
 }
 
 func (ip ipFamily) String() string {
@@ -87,7 +139,7 @@ func init() {
 // NewPodIpMetricsCollector returns a new Collector exposing pod IP allocation
 // stats.
 func NewPodIpMetricsCollector() (Collector, error) {
-	return &podIpMetricsCollector{}, nil
+	return &podIpMetricsCollector{clock: &realClock{}}, nil
 }
 
 func readLine(path string) (string, error) {
@@ -167,6 +219,53 @@ func (c *podIpMetricsCollector) listIpAddresses(dir string) error {
 	return nil
 }
 
+func getIPv4(s string) (bool, string) {
+	names := strings.Split(s, "/")
+	f := names[len(names)-1]
+	ip := net.ParseIP(f)
+	if ip == nil || ip.To4() == nil {
+		return false, ""
+	}
+	return true, f
+}
+
+// After the ip is removed, it will be put into the reuseMap.
+// After the ip is reused, the reuseMap will update the ip reuse interval.
+// The reuseMap will not record any ip that is being used unless it is reused.
+func (c *podIpMetricsCollector) updateReuseIpStats(e fsnotify.Event, f string) {
+	reuseIp, ok := c.reuseMap[f]
+	switch {
+	case e.Op&fsnotify.Remove == fsnotify.Remove:
+		if !ok {
+			c.reuseMap[f] = &ipReuse{c.clock.Now(), 0}
+		} else {
+			reuseIp.ipReleasedTimestamp = c.clock.Now()
+		}
+	case e.Op&fsnotify.Create == fsnotify.Create:
+		if ok {
+			oldT := reuseIp.ipReleasedTimestamp
+			diff := uint64(c.clock.Now().Sub(oldT).Milliseconds())
+			if diff > 0 {
+				reuseIp.ipReuseInterval = float64(diff)
+				c.reuseIps.count += 1
+				c.reuseIps.sum += float64(diff)
+				if diff < c.reuseIps.min {
+					c.reuseIps.min = diff
+				}
+				c.fillBuckets(diff)
+			}
+		}
+	}
+}
+
+func (c *podIpMetricsCollector) fillBuckets(diff uint64) {
+	for _, bound := range bucketKeys {
+		if float64(diff) < bound {
+			c.reuseIps.buckets[bound]++
+		}
+	}
+}
+
 func (c *podIpMetricsCollector) setupDirectoryWatcher(dir string) error {
 	if err := c.listIpAddresses(dir); err != nil {
 		return err
@@ -177,6 +276,13 @@ func (c *podIpMetricsCollector) setupDirectoryWatcher(dir string) error {
 		return err
 	}
 
+	c.reuseIps.min = uint64(math.Inf(+1))
+	c.reuseIps.buckets = make(map[float64]uint64)
+	for _, bound := range bucketKeys {
+		c.reuseIps.buckets[bound] = 0
+	}
+	c.reuseMap = make(map[string]*ipReuse)
+
 	go func() {
 		defer func() {
 			watcher.Close()
@@ -185,13 +291,18 @@ func (c *podIpMetricsCollector) setupDirectoryWatcher(dir string) error {
 
 		for {
 			select {
-			case _, ok := <-watcher.Events:
+			case e, ok := <-watcher.Events:
 				if !ok {
 					glog.Error("watcher is not ok")
 					return
 				}
 				if err := c.listIpAddresses(dir); err != nil {
 					return
+				}
+				// Only update the ip reuse mininum, average and histogram for IPv4.
+				ok, f := getIPv4(e.Name)
+				if ok {
+					c.updateReuseIpStats(e, f)
 				}
 
 			case err, ok := <-watcher.Errors:
@@ -223,6 +334,10 @@ func (c *podIpMetricsCollector) Update(ch chan<- prometheus.Metric) error {
 	ch <- prometheus.MustNewConstMetric(dualStackCountDesc, prometheus.GaugeValue, float64(c.dualStackCount))
 	ch <- prometheus.MustNewConstMetric(dualStackErrorCountDesc, prometheus.GaugeValue, float64(c.dualStackErrorCount))
 	ch <- prometheus.MustNewConstMetric(duplicateIpCountDesc, prometheus.GaugeValue, float64(c.duplicateIpCount))
+
+	ch <- prometheus.MustNewConstMetric(ipReuseMinDesc, prometheus.GaugeValue, float64(c.reuseIps.min))
+	ch <- prometheus.MustNewConstMetric(ipReuseAvgDesc, prometheus.GaugeValue, float64((c.reuseIps.sum / float64(c.reuseIps.count))))
+	ch <- prometheus.MustNewConstHistogram(ipReuseHistogramDesc, c.reuseIps.count, c.reuseIps.sum, c.reuseIps.buckets)
 
 	return nil
 }

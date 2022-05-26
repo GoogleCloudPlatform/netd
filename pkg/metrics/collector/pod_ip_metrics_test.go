@@ -5,7 +5,22 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
+
+type fakeClock struct {
+	now time.Time
+}
+
+func (c *fakeClock) Now() time.Time {
+	return c.now
+}
+
+func (c *fakeClock) Sleep(d time.Duration) {
+	c.now = c.now.Add(d)
+	return
+}
 
 func mustCreateFile(t *testing.T, dir, name, content string) {
 	path := dir + "/" + name
@@ -149,7 +164,9 @@ func TestSetupDirectoryWatcher(t *testing.T) {
 	stackType = "IPV4_IPV6"
 
 	// Setup directory watcher and verify metrics
-	mc := podIpMetricsCollector{}
+	fakeClock := &fakeClock{}
+	mc := podIpMetricsCollector{clock: fakeClock}
+	bucketKeys := prometheus.LinearBuckets(5e3, 5e3, 12)
 	if err := mc.setupDirectoryWatcher(dir1); err != nil {
 		t.Fatalf("Got error %v while setting up directory watcher", err)
 	}
@@ -167,6 +184,14 @@ func TestSetupDirectoryWatcher(t *testing.T) {
 	}
 	if mc.duplicateIpCount != 0 {
 		t.Errorf("duplicateIpCount. want: 0, got %d", mc.duplicateIpCount)
+	}
+	for _, bound := range bucketKeys {
+		v, ok := mc.reuseIps.buckets[bound]
+		if !ok {
+			t.Errorf("buckets are initialized with 0 values. want: ok, got %v", ok)
+		} else if v != 0 {
+			t.Errorf("no file is deleted. want value to be 0, got %v", v)
+		}
 	}
 	if !podIpMetricsWatcherSetup {
 		t.Fatal("podIpMetricsWatcherSetup: want: true, got: false")
@@ -208,5 +233,35 @@ func TestSetupDirectoryWatcher(t *testing.T) {
 	}
 	if mc.duplicateIpCount != 0 {
 		t.Errorf("duplicateIpCount. want: 0, got %d", mc.duplicateIpCount)
+	}
+
+	// Remove and recreate the file. Verify metrics
+	fakeClock.Sleep(6 * time.Second)
+	mustDeleteFile(t, dir1, "10.0.0.2")
+	mustDeleteFile(t, dir1, "lock")
+	mustDeleteFile(t, dir1, "2600:1900::1")
+	time.Sleep(1 * time.Second)
+
+	mustCreateFile(t, dir1, "10.0.0.3", "hash3")
+	fakeClock.Sleep(5 * time.Second)
+	mustCreateFile(t, dir1, "10.0.0.2", "hash2")
+	mustCreateFile(t, dir1, "lock", "")
+	mustCreateFile(t, dir1, "2600:1900::1", "hash1")
+	time.Sleep(1 * time.Second)
+
+	for _, bound := range bucketKeys {
+		v, ok := mc.reuseIps.buckets[bound]
+		if !ok {
+			t.Errorf("reused ip: buckets are initialized with 0 values. want: ok, got %v", ok)
+		} else if bound == 5e3 && v != 0 {
+			t.Errorf("reused ip: bucket with le==5. want: 0, got %d", v)
+		} else if bound == 10e3 && v != 1 {
+			// 10.0.0.3 is reused in 6 seconds
+			t.Errorf("reused ip: bucket with le==10. want: 1, got %d", v)
+		} else if bound >= 15e3 && v != 2 {
+			// 10.0.0.2 is reused in 11 seconds, so included 10.0.0.3 for buckets: (10, 15] and (15, +Inf), sizes are 2
+			// file "2600:1900::1" and "lock" are not counted in the bucket
+			t.Errorf("reused ip: bucket with le>=15. want: 2, got %d", v)
+		}
 	}
 }

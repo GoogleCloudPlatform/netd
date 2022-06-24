@@ -68,6 +68,20 @@ else
   cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniBandwidthPlugin##g")
 fi
 
+token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+node_url="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/nodes/${HOSTNAME}"
+response=$(curl -k -s -H "Authorization: Bearer $token" $node_url)
+
+if [ "${MIGRATE_TO_DPV2:-}" == "true" ]
+then
+  DPV2_MIGRATION_READY=$(printf '%s' "$response" | jq '.metadata.labels."cloud.google.com/gke-dpv2-migration-ready"')
+  echo "Migration to DPv2 in progress; node ready: '${DPV2_MIGRATION_READY}'"
+  if [ "${DPV2_MIGRATION_READY}" != '"true"' ] # DPV2_MIGRATION_READY is a JSON string thus double quotes
+  then
+    ENABLE_CILIUM_PLUGIN=false
+  fi
+fi
+
 if [ "${ENABLE_CILIUM_PLUGIN}" == "true" ]
 then
   echo "Adding Cilium plug-in to the CNI config."
@@ -85,9 +99,6 @@ else
 fi
 
 # Fill CNI spec template.
-token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-node_url="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/nodes/${HOSTNAME}"
-response=$(curl -k -s -H "Authorization: Bearer $token" $node_url)
 ipv4_subnet=$(echo $response | jq '.spec.podCIDR')
 
 if expr "${ipv4_subnet:-}" : '"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/[0-9][0-9]*"' >/dev/null; then

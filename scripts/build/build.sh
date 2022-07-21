@@ -37,5 +37,6 @@ SRC=install-cni.sh
 DST=${HOME}/go/bin/netd-init
 
 rm -rf "${DST}"
+mkdir -p "$(dirname "${DST}")"
 sed -e "s/__BUILD__/${BUILD}/; w${DST}" -n "${SRC}"
 chmod a+x "${DST}"

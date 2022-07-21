@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Copyright 2018 The Kubernetes Authors.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,10 +19,9 @@ set -o nounset
 set -o pipefail
 
 export CGO_ENABLED=0
-
-TARGETS=$(for d in "$@"; do echo ./$d/...; done)
+export GO111MODULE=on
+export GOFLAGS="${GOFLAGS:-} -mod=${MOD}"
 
 echo "Running tests:"
-go test -i -installsuffix "static" ${TARGETS}
-go test -installsuffix "static" ${TARGETS}
+go test -installsuffix "static" "$@"
 echo

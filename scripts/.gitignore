@@ -1,0 +1,6 @@
+/bin
+/.go
+/.push-*
+/.container-*
+/.dockerfile-*
+/.licenses

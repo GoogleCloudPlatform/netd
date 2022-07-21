@@ -38,7 +38,7 @@ func main() {
 	config.AddFlags(pflag.CommandLine)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
-	glog.Infof("netd version: %v", version.VERSION)
+	glog.Infof("netd version: %v", version.Version)
 	glog.Infof("netd args: %v", strings.Join(os.Args, " "))
 
 	nc := netconf.NewNetworkConfigController(config.EnablePolicyRouting, config.EnableMasquerade,

@@ -34,7 +34,7 @@ fi
 BUILD="${VERSION}-${OS}-${ARCH}"
 
 SRC=install-cni.sh
-DST=${HOME}/go/bin/netd-init
+DST=${GOPATH}/bin/netd-init
 
 rm -rf "${DST}"
 mkdir -p "$(dirname "${DST}")"

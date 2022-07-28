@@ -12,13 +12,58 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM {ARG_FROM}
+FROM alpine:3.16 AS curl
+
+ADD curl.tar.gz /
+
+COPY third_party/static-curl/mykey.asc /mykey.asc
+COPY third_party/static-curl/build.sh /build.sh
+
+RUN /build.sh
+
+
+FROM alpine:3.16 AS jq
+
+ADD jq.tar.gz /
+
+COPY build-jq.sh /build-jq.sh
+
+RUN /build-jq.sh
+
+
+FROM debian:11.4 AS bash
+
+RUN apt-get update
+RUN apt-get install -y --no-install-recommends --no-install-suggests bash-static
+
+
+FROM {ARG_FROM} AS intermediate
+
+COPY --from=curl /tmp/release/curl /usr/bin/curl
+COPY --from=jq /tmp/release/jq /usr/bin/jq
+COPY --from=bash /bin/bash-static /bin/bash
+COPY toybox-{ARG_ARCH}.bin /bin/toybox
+
+COPY install-toybox.sh /install-toybox.sh
+
+RUN /install-toybox.sh
+
+
+FROM intermediate AS test
+
+COPY shell-test.sh /shell-test.sh
+
+RUN /shell-test.sh
+
+
+FROM scratch
 
 MAINTAINER Jingyuan Liang <jingyuanliang@google.com>
 
-RUN apt-get -y update
+COPY --from=intermediate / /
 
-RUN apt-get -y install curl jq bash net-tools
+# This file is not being used. Include it to trigger the test run and allow manual testing.
+COPY --from=test /shell-test.sh /shell-test.sh
 
 # Add the platform-specific binary.
 COPY bin/{ARG_OS}_{ARG_ARCH}/{ARG_BIN} /{ARG_BIN}

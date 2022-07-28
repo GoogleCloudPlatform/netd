@@ -58,11 +58,17 @@ HTTPS_PROXY ?=
 OS := $(if $(GOOS),$(GOOS),$(shell go env GOOS))
 ARCH := $(if $(GOARCH),$(GOARCH),$(shell go env GOARCH))
 
-BASEIMAGE ?= k8s.gcr.io/build-image/debian-iptables:bullseye-v1.5.0
+BASEIMAGE ?= k8s.gcr.io/build-image/distroless-iptables:v0.1.1
 
 TAG := $(VERSION)__$(OS)_$(ARCH)
 
 BUILD_IMAGE ?= golang:1.17-alpine
+
+CURL_VERSION ?= 7.84.0
+
+JQ_VERSION ?= 1.6
+
+TOYBOX_VERSION ?= 0.8.8
 
 BIN_EXTENSION :=
 ifeq ($(OS), windows)
@@ -208,6 +214,21 @@ $(LICENSES): | $(BUILD_DIRS)
 buildx-setup:
 	docker buildx inspect img-builder > /dev/null || docker buildx create --name img-builder --use
 
+curl.tar.gz:
+	wget https://github.com/curl/curl/releases/download/curl-$(subst .,_,$(CURL_VERSION))/curl-$(CURL_VERSION).tar.gz -O $@
+
+jq.tar.gz:
+	wget https://github.com/stedolan/jq/releases/download/jq-$(JQ_VERSION)/jq-$(JQ_VERSION).tar.gz -O $@
+
+TOYBOX_amd64 := toybox-x86_64
+TOYBOX_arm := toybox-armv7l
+TOYBOX_arm64 := toybox-aarch64
+TOYBOX_ppc64le := toybox-powerpc64le
+TOYBOX_s390x := toybox-s390x
+
+toybox-$(ARCH).bin:
+	wget http://landley.net/toybox/downloads/binaries/$(TOYBOX_VERSION)/$(TOYBOX_$(ARCH)) -O $@
+
 CONTAINER_DOTFILES = $(foreach bin,$(BINS),.container-$(subst /,_,$(REGISTRY)/$(bin))-$(TAG))
 
 # We print the container names here, rather than in CONTAINER_DOTFILES so
@@ -229,7 +250,7 @@ $(foreach bin,$(BINS),$(eval                                         \
 ))
 # This is the target definition for all container-dotfiles.
 # These are used to track build state in hidden files.
-$(CONTAINER_DOTFILES): buildx-setup
+$(CONTAINER_DOTFILES): buildx-setup curl.tar.gz jq.tar.gz toybox-$(ARCH).bin
 	echo
 	sed                                            \
 	    -e 's|{ARG_BIN}|$(BIN)$(BIN_EXTENSION)|g'  \

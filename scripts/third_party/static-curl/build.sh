@@ -5,31 +5,9 @@
 # docker run --rm -v $(pwd):/tmp -w /tmp -e ARCH=aarch64 multiarch/alpine:aarch64-latest-stable /tmp/build.sh
 # docker run --rm -v $(pwd):/tmp -w /tmp -e ARCH=ARCH_HERE ALPINE_IMAGE_HERE /tmp/build.sh
 
-CURL_VERSION='7.84.0'
-
-[ "$1" != "" ] && CURL_VERSION="$1"
-
 set -exu
 
-if [ ! -f curl-${CURL_VERSION}.tar.gz ]
-then
-
-    # for gpg verification of the curl download below
-    apk add gnupg
-
-    wget https://curl.haxx.se/download/curl-${CURL_VERSION}.tar.gz https://curl.haxx.se/download/curl-${CURL_VERSION}.tar.gz.asc
-
-    # convert mykey.asc to a .pgp file to use in verification
-    gpg --no-default-keyring --yes -o ./curl.gpg --dearmor mykey.asc
-    # this has a non-zero exit code if it fails, which will halt the script
-    gpg --no-default-keyring --keyring ./curl.gpg --verify curl-${CURL_VERSION}.tar.gz.asc
-
-fi
-
-rm -rf "curl-${CURL_VERSION}/"
-tar xzf curl-${CURL_VERSION}.tar.gz
-
-cd curl-${CURL_VERSION}/
+cd /curl-*/
 
 # dependencies to build curl
 apk add build-base clang openssl-dev nghttp2-dev nghttp2-static libssh2-dev libssh2-static
@@ -68,6 +46,4 @@ ldd src/curl && exit 1 || true
 
 # we only want to save curl here
 mkdir -p /tmp/release/
-mv src/curl "/tmp/release/curl-$ARCH"
-cd ..
-rm -rf "curl-${CURL_VERSION}/"
+mv src/curl "/tmp/release/curl"

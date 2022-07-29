@@ -178,7 +178,7 @@ if [ "${ENABLE_PRIVATE_IPV6_ACCESS:-}" == "true" ] || [ "$ENABLE_IPV6" == "true"
 
     if [ "${ENABLE_CALICO_NETWORK_POLICY}" == "true" ]; then
       echo "Enabling IPv6 forwarding..."
-      sysctl -w net.ipv6.conf.all.forwarding=1
+      echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
     fi
   else
     echo "No IPv6 address found for nic0. Clearing IPv6 subnet and route..."

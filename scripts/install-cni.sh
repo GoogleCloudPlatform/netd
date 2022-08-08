@@ -191,8 +191,18 @@ else
     sed -e "s#@ipv6SubnetOptional##g; s#@ipv6RouteOptional##g")
 fi
 
+# Format of `route` output:
+# Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+# 0.0.0.0         192.168.0.1     0.0.0.0         UG    100    0        0 ens4
+# 192.168.0.1     0.0.0.0         255.255.255.255 UH    100    0        0 ens4
+
+# The first grep extracts the default line, and the second grep extracts the
+# last field, which is the interface name. We stick to using grep to avoid
+# introducing too many new dependencies.
+
+default_nic=$(route -n | grep -E '^0\.0\.0\.0\s+\S+\s+0\.0\.0\.0' | grep -oE '\S+$')
+
 # Set mtu
-default_nic=$(ip route get 8.8.8.8 | sed -nr "s/.*dev ([^\ ]+).*/\1/p")
 if [ -f "/sys/class/net/$default_nic/mtu" ]; then
   MTU=$(cat /sys/class/net/$default_nic/mtu)
   cni_spec=$(echo ${cni_spec:-} | sed -e "s#@mtu#$MTU#g")

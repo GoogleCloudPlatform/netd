@@ -105,7 +105,7 @@ fi
 # Fill CNI spec template.
 ipv4_subnet=$(echo $response | jq '.spec.podCIDR')
 
-if expr "${ipv4_subnet:-}" : '"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/[0-9][0-9]*"' >/dev/null; then
+if [[ "${ipv4_subnet:-}" =~ ^\"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/[0-9][0-9]*\"$ ]]; then
   echo "PodCIDR validation succeeded: ${ipv4_subnet:-}"
 else
   echo "Response from $node_url"

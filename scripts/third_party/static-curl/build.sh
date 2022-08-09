@@ -10,10 +10,21 @@ set -exu
 cd /curl-*/
 
 # dependencies to build curl
-apk add build-base clang openssl-dev nghttp2-dev nghttp2-static libssh2-dev libssh2-static
+apk add build-base clang openssl-dev
+
+mkdir -p /tmp/lib/apk/db
+
+{
+  echo P:musl
+  grep '^P:musl$' -A 2147483647 /lib/apk/db/installed | grep '^V:' | head -n 1
+  echo
+  echo P:openssl-dev
+  grep '^P:openssl-dev$' -A 2147483647 /lib/apk/db/installed | grep '^V:' | head -n 1
+  echo
+} >> /tmp/lib/apk/db/installed
 
 # these are missing on at least armhf
-apk add openssl-libs-static zlib-static || true
+apk add openssl-libs-static || true
 
 # gcc is apparantly incapable of building a static binary, even gcc -static helloworld.c ends up linked to libc, instead of solving, use clang
 export CC=clang
@@ -27,7 +38,7 @@ export CC=clang
 # set up any required curl options here
 #LDFLAGS="-static" PKG_CONFIG="pkg-config --static" ./configure --disable-shared --enable-static --disable-libcurl-option --without-brotli --disable-manual --disable-unix-sockets --disable-dict --disable-file --disable-gopher --disable-imap --disable-smtp --disable-rtsp --disable-telnet --disable-tftp --disable-pop3 --without-zlib --disable-threaded-resolver --disable-ipv6 --disable-smb --disable-ntlm-wb --disable-tls-srp --disable-crypto-auth --without-ngtcp2 --without-nghttp2 --disable-ftp --disable-mqtt --disable-alt-svc --without-ssl
 
-LDFLAGS="-static" PKG_CONFIG="pkg-config --static" ./configure --disable-shared --enable-static --disable-ldap --enable-ipv6 --enable-unix-sockets --with-ssl --with-libssh2
+LDFLAGS="-static" PKG_CONFIG="pkg-config --static" ./configure --disable-shared --enable-static --disable-ldap --enable-ipv6 --enable-unix-sockets --with-ssl --without-libssh2 --without-nghttp2 --without-zlib
 
 make -j4 V=1 LDFLAGS="-static -all-static"
 

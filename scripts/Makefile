@@ -70,6 +70,8 @@ JQ_VERSION ?= 1.6
 
 TOYBOX_VERSION ?= 0.8.8
 
+UC = $(shell echo '$*' | tr '[:lower:]' '[:upper:]')
+
 BIN_EXTENSION :=
 ifeq ($(OS), windows)
   BIN_EXTENSION := .exe
@@ -229,6 +231,11 @@ TOYBOX_s390x := toybox-s390x
 toybox-$(ARCH).bin:
 	wget http://landley.net/toybox/downloads/binaries/$(TOYBOX_VERSION)/$(TOYBOX_$(ARCH)) -O $@
 
+status.d/%:
+	mkdir -p status.d
+	echo Package: $* > $@
+	echo Version: $($(UC)_VERSION) >> $@
+
 CONTAINER_DOTFILES = $(foreach bin,$(BINS),.container-$(subst /,_,$(REGISTRY)/$(bin))-$(TAG))
 
 # We print the container names here, rather than in CONTAINER_DOTFILES so
@@ -250,7 +257,7 @@ $(foreach bin,$(BINS),$(eval                                         \
 ))
 # This is the target definition for all container-dotfiles.
 # These are used to track build state in hidden files.
-$(CONTAINER_DOTFILES): buildx-setup curl.tar.gz jq.tar.gz toybox-$(ARCH).bin
+$(CONTAINER_DOTFILES): buildx-setup curl.tar.gz status.d/curl jq.tar.gz status.d/jq toybox-$(ARCH).bin status.d/toybox
 	echo
 	sed                                            \
 	    -e 's|{ARG_BIN}|$(BIN)$(BIN_EXTENSION)|g'  \

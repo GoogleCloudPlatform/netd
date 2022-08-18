@@ -145,7 +145,10 @@ if [ "$ENABLE_MASQUERADE" == "true" ]; then
   fi
 fi
 
-if [ "${ENABLE_PRIVATE_IPV6_ACCESS:-}" == "true" ] || [ "$ENABLE_IPV6" == "true" ]; then
+STACK_TYPE=$(printf '%s' "$response" | jq '.metadata.labels."cloud.google.com/gke-stack-type"')
+echo "Node stack type label: '${STACK_TYPE:-}'"
+
+if [ "${ENABLE_PRIVATE_IPV6_ACCESS:-}" == "true" ] || [ "$ENABLE_IPV6" == "true" ] || [ "${STACK_TYPE:-}" == '"IPV4_IPV6"' ]; then
   node_ipv6_addr=$(curl -s -k --fail "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/?recursive=true" -H "Metadata-Flavor: Google" | jq -r '.ipv6s[0]' ) ||:
 
   if [ -n "${node_ipv6_addr:-}" ] && [ "${node_ipv6_addr}" != "null" ]; then

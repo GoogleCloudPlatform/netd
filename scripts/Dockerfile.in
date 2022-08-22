@@ -31,6 +31,15 @@ COPY build-jq.sh /build-jq.sh
 RUN /build-jq.sh
 
 
+FROM alpine:3.16 AS toybox
+
+ADD toybox.tar.gz /
+
+COPY build-toybox.sh /build-toybox.sh
+
+RUN /build-toybox.sh
+
+
 FROM debian:11.4 AS bash
 
 RUN apt-get update
@@ -48,15 +57,13 @@ COPY --from=jq /tmp/release/jq /usr/bin/jq
 # jq doesn't have any dependency other than libc, which was covered by curl
 COPY status.d/jq /var/lib/dpkg/status.d/jq
 
-COPY --from=bash /bin/bash-static /bin/bash
-COPY --from=bash /tmp/status_bash-static /var/lib/dpkg/status.d/bash-static
-
-COPY toybox-{ARG_ARCH}.bin /bin/toybox
+# Both toybox binary and symlinks
+COPY --from=toybox /tmp/release/ /bin/
+# toybox doesn't have any dependency other than libc, which was covered by curl
 COPY status.d/toybox /var/lib/dpkg/status.d/toybox
 
-COPY install-toybox.sh /install-toybox.sh
-
-RUN /install-toybox.sh
+COPY --from=bash /bin/bash-static /bin/bash
+COPY --from=bash /tmp/status_bash-static /var/lib/dpkg/status.d/bash-static
 
 
 FROM intermediate AS test
@@ -66,11 +73,9 @@ COPY shell-test.sh /shell-test.sh
 RUN /shell-test.sh
 
 
-FROM scratch
+FROM intermediate
 
 MAINTAINER Jingyuan Liang <jingyuanliang@google.com>
-
-COPY --from=intermediate / /
 
 # This file is not being used. Include it to trigger the test run and allow manual testing.
 COPY --from=test /shell-test.sh /shell-test.sh

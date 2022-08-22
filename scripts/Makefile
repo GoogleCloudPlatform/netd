@@ -205,12 +205,12 @@ shell: | $(BUILD_DIRS)
 
 LICENSES = .licenses
 
-$(LICENSES): curl.tar.gz jq.tar.gz | $(BUILD_DIRS)
+$(LICENSES): curl.tar.gz jq.tar.gz toybox.tar.gz | $(BUILD_DIRS)
 	rm -rf $(LICENSES)
 	mkdir -p $(LICENSES)
 	tar xzf curl.tar.gz -C $(LICENSES) curl-$(CURL_VERSION)/COPYING
 	tar xzf jq.tar.gz -C $(LICENSES) jq-$(JQ_VERSION)/COPYING
-	wget https://raw.githubusercontent.com/landley/toybox/$(TOYBOX_VERSION)/LICENSE -O $(LICENSES)/LICENSE.toybox-$(TOYBOX_VERSION)
+	tar xzf toybox.tar.gz -C $(LICENSES) toybox-$(TOYBOX_VERSION)/LICENSE
 	chmod -R a+rx $(LICENSES)
 
 # Create a buildx builder which will create cross platform builds.
@@ -225,14 +225,8 @@ curl.tar.gz:
 jq.tar.gz:
 	wget https://github.com/stedolan/jq/releases/download/jq-$(JQ_VERSION)/jq-$(JQ_VERSION).tar.gz -O $@
 
-TOYBOX_amd64 := toybox-x86_64
-TOYBOX_arm := toybox-armv7l
-TOYBOX_arm64 := toybox-aarch64
-TOYBOX_ppc64le := toybox-powerpc64le
-TOYBOX_s390x := toybox-s390x
-
-toybox-$(ARCH).bin:
-	wget http://landley.net/toybox/downloads/binaries/$(TOYBOX_VERSION)/$(TOYBOX_$(ARCH)) -O $@
+toybox.tar.gz:
+	wget https://github.com/landley/toybox/archive/refs/tags/$(TOYBOX_VERSION).tar.gz -O $@
 
 status.d/%:
 	mkdir -p status.d
@@ -260,7 +254,7 @@ $(foreach bin,$(BINS),$(eval                                         \
 ))
 # This is the target definition for all container-dotfiles.
 # These are used to track build state in hidden files.
-$(CONTAINER_DOTFILES): buildx-setup curl.tar.gz status.d/curl jq.tar.gz status.d/jq toybox-$(ARCH).bin status.d/toybox
+$(CONTAINER_DOTFILES): buildx-setup curl.tar.gz status.d/curl jq.tar.gz status.d/jq toybox.tar.gz status.d/toybox
 	echo
 	sed                                            \
 	    -e 's|{ARG_BIN}|$(BIN)$(BIN_EXTENSION)|g'  \

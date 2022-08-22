@@ -205,9 +205,12 @@ shell: | $(BUILD_DIRS)
 
 LICENSES = .licenses
 
-$(LICENSES): | $(BUILD_DIRS)
+$(LICENSES): curl.tar.gz jq.tar.gz | $(BUILD_DIRS)
 	rm -rf $(LICENSES)
 	mkdir -p $(LICENSES)
+	tar xzf curl.tar.gz -C $(LICENSES) curl-$(CURL_VERSION)/COPYING
+	tar xzf jq.tar.gz -C $(LICENSES) jq-$(JQ_VERSION)/COPYING
+	wget https://raw.githubusercontent.com/landley/toybox/$(TOYBOX_VERSION)/LICENSE -O $(LICENSES)/LICENSE.toybox-$(TOYBOX_VERSION)
 	chmod -R a+rx $(LICENSES)
 
 # Create a buildx builder which will create cross platform builds.

@@ -40,6 +40,14 @@ COPY build-toybox.sh /build-toybox.sh
 RUN /build-toybox.sh
 
 
+FROM alpine:3.16 AS extras
+
+COPY alpine-extractor.sh /alpine-extractor.sh
+
+# All dependencies used in build scripts above should be listed.
+RUN /alpine-extractor.sh musl openssl-dev openssl-libs-static linux-headers
+
+
 FROM debian:11.4 AS bash
 
 RUN apt-get update
@@ -50,17 +58,17 @@ RUN dpkg -s bash-static > /tmp/status_bash-static
 FROM {ARG_FROM} AS intermediate
 
 COPY --from=curl /tmp/release/curl /usr/bin/curl
-COPY --from=curl /tmp/lib /lib
 COPY status.d/curl /var/lib/dpkg/status.d/curl
 
 COPY --from=jq /tmp/release/jq /usr/bin/jq
-# jq doesn't have any dependency other than libc, which was covered by curl
 COPY status.d/jq /var/lib/dpkg/status.d/jq
 
 # Both toybox binary and symlinks
 COPY --from=toybox /tmp/release/ /bin/
-# toybox doesn't have any dependency other than libc, which was covered by curl
 COPY status.d/toybox /var/lib/dpkg/status.d/toybox
+
+# Licenses and package info
+COPY --from=extras /tmp/extras/ /
 
 COPY --from=bash /bin/bash-static /bin/bash
 COPY --from=bash /tmp/status_bash-static /var/lib/dpkg/status.d/bash-static

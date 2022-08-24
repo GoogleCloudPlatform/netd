@@ -12,17 +12,6 @@ cd /curl-*/
 # dependencies to build curl
 apk add build-base clang openssl-dev
 
-mkdir -p /tmp/lib/apk/db
-
-{
-  echo P:musl
-  grep '^P:musl$' -A 2147483647 /lib/apk/db/installed | grep '^V:' | head -n 1
-  echo
-  echo P:openssl-dev
-  grep '^P:openssl-dev$' -A 2147483647 /lib/apk/db/installed | grep '^V:' | head -n 1
-  echo
-} >> /tmp/lib/apk/db/installed
-
 # these are missing on at least armhf
 apk add openssl-libs-static || true
 

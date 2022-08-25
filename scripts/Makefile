@@ -72,6 +72,8 @@ TOYBOX_VERSION ?= 0.8.8
 
 SPDX_LICENSE_VERSION ?= 3.18
 
+THIRD_PARTY_SOURCE_FILES = curl.tar.gz status.d/curl jq.tar.gz status.d/jq toybox.tar.gz status.d/toybox spdx-license.tar.gz
+
 UC = $(shell echo '$*' | tr '[:lower:]' '[:upper:]')
 
 BIN_EXTENSION :=
@@ -97,7 +99,7 @@ build-%:
 	    GOOS=$(firstword $(subst _, ,$*)) \
 	    GOARCH=$(lastword $(subst _, ,$*))
 
-container-%:
+container-%: $(THIRD_PARTY_SOURCE_FILES)
 	$(MAKE) container                     \
 	    --no-print-directory              \
 	    GOOS=$(firstword $(subst _, ,$*)) \
@@ -259,7 +261,7 @@ $(foreach bin,$(BINS),$(eval                                         \
 ))
 # This is the target definition for all container-dotfiles.
 # These are used to track build state in hidden files.
-$(CONTAINER_DOTFILES): buildx-setup curl.tar.gz status.d/curl jq.tar.gz status.d/jq toybox.tar.gz status.d/toybox spdx-license.tar.gz
+$(CONTAINER_DOTFILES): buildx-setup $(THIRD_PARTY_SOURCE_FILES)
 	echo
 	sed                                            \
 	    -e 's|{ARG_BIN}|$(BIN)$(BIN_EXTENSION)|g'  \
@@ -309,7 +311,7 @@ $(BUILD_DIRS):
 	mkdir -p $@
 
 clean: # @HELP removes built binaries and temporary files
-clean: container-clean bin-clean
+clean: container-clean bin-clean third-party-source-clean
 
 container-clean:
 	rm -rf .container-* .dockerfile-* .push-* $(LICENSES)
@@ -317,6 +319,9 @@ container-clean:
 bin-clean:
 	test -d .go && chmod -R u+w .go || true
 	rm -rf .go bin
+
+third-party-source-clean:
+	rm -rf $(THIRD_PARTY_SOURCE_FILES)
 
 help: # @HELP prints this message
 help:

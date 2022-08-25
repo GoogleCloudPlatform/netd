@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+## The curl, jq and toybox containers build the corresponding binaries.
+
 FROM alpine:3.16 AS curl
 
 ADD curl.tar.gz /
@@ -40,6 +43,8 @@ COPY build-toybox.sh /build-toybox.sh
 RUN /build-toybox.sh
 
 
+## The extras container extracts licenses and package data from Alpine packages.
+
 FROM alpine:3.16 AS extras
 
 COPY alpine-extractor.sh /alpine-extractor.sh
@@ -48,12 +53,16 @@ COPY alpine-extractor.sh /alpine-extractor.sh
 RUN /alpine-extractor.sh musl openssl-dev openssl-libs-static linux-headers
 
 
+## The bash container fetches bash-static (to be used as bash) from Debian repo.
+
 FROM debian:11.4 AS bash
 
 RUN apt-get update
 RUN apt-get install -y --no-install-recommends --no-install-suggests bash-static
 RUN dpkg -s bash-static > /tmp/status_bash-static
 
+
+## This intermediate container pulls all pieces together from containers above.
 
 FROM {ARG_FROM} AS intermediate
 
@@ -74,12 +83,16 @@ COPY --from=bash /bin/bash-static /bin/bash
 COPY --from=bash /tmp/status_bash-static /var/lib/dpkg/status.d/bash-static
 
 
+## Run shell-test.sh in a standalone container. The outcome is discarded.
+
 FROM intermediate AS test
 
 COPY shell-test.sh /shell-test.sh
 
 RUN /shell-test.sh
 
+
+## Continue from the intermediate container (before running shell-test.sh) and complete the final image.
 
 FROM intermediate
 

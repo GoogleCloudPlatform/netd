@@ -58,11 +58,19 @@ HTTPS_PROXY ?=
 OS := $(if $(GOOS),$(GOOS),$(shell go env GOOS))
 ARCH := $(if $(GOARCH),$(GOARCH),$(shell go env GOARCH))
 
-BASEIMAGE ?= k8s.gcr.io/build-image/debian-iptables:bullseye-v1.5.0
+BASEIMAGE ?= k8s.gcr.io/build-image/distroless-iptables:v0.1.1
 
 TAG := $(VERSION)__$(OS)_$(ARCH)
 
 BUILD_IMAGE ?= golang:1.17-alpine
+
+CURL_VERSION ?= 7.84.0
+
+JQ_VERSION ?= 1.6
+
+TOYBOX_VERSION ?= 0.8.8
+
+UC = $(shell echo '$*' | tr '[:lower:]' '[:upper:]')
 
 BIN_EXTENSION :=
 ifeq ($(OS), windows)
@@ -197,9 +205,12 @@ shell: | $(BUILD_DIRS)
 
 LICENSES = .licenses
 
-$(LICENSES): | $(BUILD_DIRS)
+$(LICENSES): curl.tar.gz jq.tar.gz toybox.tar.gz | $(BUILD_DIRS)
 	rm -rf $(LICENSES)
 	mkdir -p $(LICENSES)
+	tar xzf curl.tar.gz -C $(LICENSES) curl-$(CURL_VERSION)/COPYING
+	tar xzf jq.tar.gz -C $(LICENSES) jq-$(JQ_VERSION)/COPYING
+	tar xzf toybox.tar.gz -C $(LICENSES) toybox-$(TOYBOX_VERSION)/LICENSE
 	chmod -R a+rx $(LICENSES)
 
 # Create a buildx builder which will create cross platform builds.
@@ -207,6 +218,20 @@ $(LICENSES): | $(BUILD_DIRS)
 .PHONY: buildx-setup
 buildx-setup:
 	docker buildx inspect img-builder > /dev/null || docker buildx create --name img-builder --use
+
+curl.tar.gz:
+	wget https://github.com/curl/curl/releases/download/curl-$(subst .,_,$(CURL_VERSION))/curl-$(CURL_VERSION).tar.gz -O $@
+
+jq.tar.gz:
+	wget https://github.com/stedolan/jq/releases/download/jq-$(JQ_VERSION)/jq-$(JQ_VERSION).tar.gz -O $@
+
+toybox.tar.gz:
+	wget https://github.com/landley/toybox/archive/refs/tags/$(TOYBOX_VERSION).tar.gz -O $@
+
+status.d/%:
+	mkdir -p status.d
+	echo Package: $* > $@
+	echo Version: $($(UC)_VERSION) >> $@
 
 CONTAINER_DOTFILES = $(foreach bin,$(BINS),.container-$(subst /,_,$(REGISTRY)/$(bin))-$(TAG))
 
@@ -229,7 +254,7 @@ $(foreach bin,$(BINS),$(eval                                         \
 ))
 # This is the target definition for all container-dotfiles.
 # These are used to track build state in hidden files.
-$(CONTAINER_DOTFILES): buildx-setup
+$(CONTAINER_DOTFILES): buildx-setup curl.tar.gz status.d/curl jq.tar.gz status.d/jq toybox.tar.gz status.d/toybox
 	echo
 	sed                                            \
 	    -e 's|{ARG_BIN}|$(BIN)$(BIN_EXTENSION)|g'  \

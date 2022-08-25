@@ -12,19 +12,88 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM {ARG_FROM}
+FROM alpine:3.16 AS curl
+
+ADD curl.tar.gz /
+
+COPY third_party/static-curl/mykey.asc /mykey.asc
+COPY third_party/static-curl/build.sh /build.sh
+
+RUN /build.sh
+
+
+FROM alpine:3.16 AS jq
+
+ADD jq.tar.gz /
+
+COPY build-jq.sh /build-jq.sh
+
+RUN /build-jq.sh
+
+
+FROM alpine:3.16 AS toybox
+
+ADD toybox.tar.gz /
+
+COPY build-toybox.sh /build-toybox.sh
+
+RUN /build-toybox.sh
+
+
+FROM alpine:3.16 AS extras
+
+COPY alpine-extractor.sh /alpine-extractor.sh
+
+# All dependencies used in build scripts above should be listed.
+RUN /alpine-extractor.sh musl openssl-dev openssl-libs-static linux-headers
+
+
+FROM debian:11.4 AS bash
+
+RUN apt-get update
+RUN apt-get install -y --no-install-recommends --no-install-suggests bash-static
+RUN dpkg -s bash-static > /tmp/status_bash-static
+
+
+FROM {ARG_FROM} AS intermediate
+
+COPY --from=curl /tmp/release/curl /usr/bin/curl
+COPY status.d/curl /var/lib/dpkg/status.d/curl
+
+COPY --from=jq /tmp/release/jq /usr/bin/jq
+COPY status.d/jq /var/lib/dpkg/status.d/jq
+
+# Both toybox binary and symlinks
+COPY --from=toybox /tmp/release/ /bin/
+COPY status.d/toybox /var/lib/dpkg/status.d/toybox
+
+# Licenses and package info
+COPY --from=extras /tmp/extras/ /
+
+COPY --from=bash /bin/bash-static /bin/bash
+COPY --from=bash /tmp/status_bash-static /var/lib/dpkg/status.d/bash-static
+
+
+FROM intermediate AS test
+
+COPY shell-test.sh /shell-test.sh
+
+RUN /shell-test.sh
+
+
+FROM intermediate
 
 MAINTAINER Jingyuan Liang <jingyuanliang@google.com>
 
-RUN apt-get -y update
-
-RUN apt-get -y install curl jq bash net-tools
+# This file is not being used. Include it to trigger the test run and allow manual testing.
+COPY --from=test /shell-test.sh /shell-test.sh
 
 # Add the platform-specific binary.
 COPY bin/{ARG_OS}_{ARG_ARCH}/{ARG_BIN} /{ARG_BIN}
 
 # Add third-party licenses.
 COPY .licenses/ /LICENSES/
+COPY --from=bash /usr/share/doc/bash-static/copyright /LICENSES/copyright.bash-static
 
 ENV HOME /
 

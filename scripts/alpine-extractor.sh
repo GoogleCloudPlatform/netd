@@ -17,5 +17,5 @@ do
 
   # Package license for compliance
   license=$(grep "^P:$pkg$" -A 2147483647 /lib/apk/db/installed | grep '^L:' | head -n 1 | cut -d: -f2-)
-  wget "https://raw.githubusercontent.com/spdx/license-list-data/master/text/$license.txt" -O "/tmp/extras/LICENSES.alpine/$pkg"
+  cp /license-list-data-*/text/"$license.txt" "/tmp/extras/LICENSES.alpine/$pkg"
 done

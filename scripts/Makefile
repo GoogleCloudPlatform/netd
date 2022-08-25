@@ -70,6 +70,8 @@ JQ_VERSION ?= 1.6
 
 TOYBOX_VERSION ?= 0.8.8
 
+SPDX_LICENSE_VERSION ?= 3.18
+
 UC = $(shell echo '$*' | tr '[:lower:]' '[:upper:]')
 
 BIN_EXTENSION :=
@@ -228,6 +230,9 @@ jq.tar.gz:
 toybox.tar.gz:
 	wget https://github.com/landley/toybox/archive/refs/tags/$(TOYBOX_VERSION).tar.gz -O $@
 
+spdx-license.tar.gz:
+	wget https://github.com/spdx/license-list-data/archive/refs/tags/v$(SPDX_LICENSE_VERSION).tar.gz -O $@
+
 status.d/%:
 	mkdir -p status.d
 	echo Package: $* > $@
@@ -254,7 +259,7 @@ $(foreach bin,$(BINS),$(eval                                         \
 ))
 # This is the target definition for all container-dotfiles.
 # These are used to track build state in hidden files.
-$(CONTAINER_DOTFILES): buildx-setup curl.tar.gz status.d/curl jq.tar.gz status.d/jq toybox.tar.gz status.d/toybox
+$(CONTAINER_DOTFILES): buildx-setup curl.tar.gz status.d/curl jq.tar.gz status.d/jq toybox.tar.gz status.d/toybox spdx-license.tar.gz
 	echo
 	sed                                            \
 	    -e 's|{ARG_BIN}|$(BIN)$(BIN_EXTENSION)|g'  \

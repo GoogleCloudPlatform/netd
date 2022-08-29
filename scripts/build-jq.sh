@@ -9,8 +9,8 @@ apk add build-base clang
 # gcc doesn't work for some reason: `configure: error: C compiler cannot create executables`
 export CC=clang
 
-# Disable regular expression support
-./configure --without-oniguruma
+# Disable regular expression support and avoid using flex or bison
+./configure --without-oniguruma --disable-maintainer-mode
 
 make -j8 LDFLAGS=-all-static
 

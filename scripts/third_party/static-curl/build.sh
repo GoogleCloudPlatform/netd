@@ -10,7 +10,7 @@ set -exu
 cd /curl-*/
 
 # dependencies to build curl
-apk add build-base clang openssl-dev
+apk add build-base clang openssl-dev groff perl
 
 # these are missing on at least armhf
 apk add openssl-libs-static || true

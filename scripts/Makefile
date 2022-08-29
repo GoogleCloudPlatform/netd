@@ -72,7 +72,7 @@ TOYBOX_VERSION ?= 0.8.8
 
 SPDX_LICENSE_VERSION ?= 3.18
 
-THIRD_PARTY_SOURCE_FILES = curl.tar.gz status.d/curl jq.tar.gz status.d/jq toybox.tar.gz status.d/toybox spdx-license.tar.gz
+THIRD_PARTY_SOURCE_FILES = third_party/curl status.d/curl third_party/jq status.d/jq third_party/toybox status.d/toybox third_party/license-list-data
 
 UC = $(shell echo '$*' | tr '[:lower:]' '[:upper:]')
 
@@ -212,25 +212,31 @@ shell: | $(BUILD_DIRS)
 
 LICENSES = .licenses
 
-$(LICENSES): curl.tar.gz jq.tar.gz toybox.tar.gz | $(BUILD_DIRS)
+$(LICENSES): third_party/curl third_party/jq third_party/toybox | $(BUILD_DIRS)
 	rm -rf $(LICENSES)
 	mkdir -p $(LICENSES)
-	tar xzf curl.tar.gz -C $(LICENSES) curl-$(CURL_VERSION)/COPYING
-	tar xzf jq.tar.gz -C $(LICENSES) jq-$(JQ_VERSION)/COPYING
-	tar xzf toybox.tar.gz -C $(LICENSES) toybox-$(TOYBOX_VERSION)/LICENSE
+	cp third_party/curl/COPYING $(LICENSES)/curl-COPYING
+	cp third_party/jq/COPYING $(LICENSES)/jq-COPYING
+	cp third_party/toybox/LICENSE $(LICENSES)/toybox-LICENSE
 	chmod -R a+rx $(LICENSES)
 
-curl.tar.gz:
-	wget https://github.com/curl/curl/releases/download/curl-$(subst .,_,$(CURL_VERSION))/curl-$(CURL_VERSION).tar.gz -O $@
+GIT_BASE ?= https://github.com
 
-jq.tar.gz:
-	wget https://github.com/stedolan/jq/releases/download/jq-$(JQ_VERSION)/jq-$(JQ_VERSION).tar.gz -O $@
+third_party/curl:
+	git clone $(GIT_BASE)/curl/curl $@
+	pushd $@; git checkout curl-$(subst .,_,$(CURL_VERSION)); autoreconf -fi; popd
 
-toybox.tar.gz:
-	wget https://github.com/landley/toybox/archive/refs/tags/$(TOYBOX_VERSION).tar.gz -O $@
+third_party/jq:
+	git clone $(GIT_BASE)/stedolan/jq $@
+	pushd $@; git checkout jq-$(JQ_VERSION); autoreconf -fi; popd
 
-spdx-license.tar.gz:
-	wget https://github.com/spdx/license-list-data/archive/refs/tags/v$(SPDX_LICENSE_VERSION).tar.gz -O $@
+third_party/toybox:
+	git clone $(GIT_BASE)/landley/toybox $@
+	pushd $@; git checkout $(TOYBOX_VERSION); popd
+
+third_party/license-list-data:
+	git clone https://github.com/spdx/license-list-data $@
+	pushd $@; git checkout v$(SPDX_LICENSE_VERSION); popd
 
 status.d/%:
 	mkdir -p status.d

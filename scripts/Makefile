@@ -102,7 +102,7 @@ build-%:
 	    GOOS=$(firstword $(subst _, ,$*)) \
 	    GOARCH=$(lastword $(subst _, ,$*))
 
-container-%: $(THIRD_PARTY_SOURCE_FILES)
+container-%:
 	$(MAKE) container                     \
 	    --no-print-directory              \
 	    GOOS=$(firstword $(subst _, ,$*)) \

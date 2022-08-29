@@ -84,6 +84,9 @@ endif
 # It's necessary to set this because some environments don't link sh -> bash.
 SHELL := /usr/bin/env bash -o errexit -o pipefail -o nounset
 
+# This is used in docker buildx commands
+BUILDX_NAME := $(shell basename $$(pwd))
+
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-container' rule.
 # If you want to build AND push all containers, see the 'all-push' rule.
@@ -217,12 +220,6 @@ $(LICENSES): curl.tar.gz jq.tar.gz toybox.tar.gz | $(BUILD_DIRS)
 	tar xzf toybox.tar.gz -C $(LICENSES) toybox-$(TOYBOX_VERSION)/LICENSE
 	chmod -R a+rx $(LICENSES)
 
-# Create a buildx builder which will create cross platform builds.
-# The default builder does not support multi-arch.
-.PHONY: buildx-setup
-buildx-setup:
-	docker buildx inspect img-builder > /dev/null || docker buildx create --name img-builder --use
-
 curl.tar.gz:
 	wget https://github.com/curl/curl/releases/download/curl-$(subst .,_,$(CURL_VERSION))/curl-$(CURL_VERSION).tar.gz -O $@
 
@@ -261,7 +258,7 @@ $(foreach bin,$(BINS),$(eval                                         \
 ))
 # This is the target definition for all container-dotfiles.
 # These are used to track build state in hidden files.
-$(CONTAINER_DOTFILES): buildx-setup $(THIRD_PARTY_SOURCE_FILES)
+$(CONTAINER_DOTFILES): .buildx-initialized $(THIRD_PARTY_SOURCE_FILES)
 	echo
 	sed                                            \
 	    -e 's|{ARG_BIN}|$(BIN)$(BIN_EXTENSION)|g'  \
@@ -270,6 +267,7 @@ $(CONTAINER_DOTFILES): buildx-setup $(THIRD_PARTY_SOURCE_FILES)
 	    -e 's|{ARG_FROM}|$(BASEIMAGE)|g'           \
 	    Dockerfile.in > .dockerfile-$(BIN)-$(OS)_$(ARCH)
 	docker buildx build                      \
+	    --builder "$(BUILDX_NAME)"           \
 	    --no-cache                           \
 	    --load --platform $(OS)/$(ARCH)      \
 	    -t $(REGISTRY)/$(BIN):$(TAG)         \
@@ -314,7 +312,7 @@ clean: # @HELP removes built binaries and temporary files
 clean: container-clean bin-clean third-party-source-clean
 
 container-clean:
-	rm -rf .container-* .dockerfile-* .push-* $(LICENSES)
+	rm -rf .container-* .dockerfile-* .push-* .buildx-initialized $(LICENSES)
 
 bin-clean:
 	test -d .go && chmod -R u+w .go || true
@@ -339,3 +337,12 @@ help:
 	        BEGIN {FS = ": *# *@HELP"};           \
 	        { printf "  %-30s %s\n", $$1, $$2 };  \
 	    '
+
+# Help set up multi-arch build tools.  This assumes you have the tools
+# installed.  If you already have a buildx builder available, you don't need
+# this.  See https://medium.com/@artur.klauser/building-multi-architecture-docker-images-with-buildx-27d80f7e2408
+# for great context.
+.buildx-initialized:
+	docker buildx create --name "$(BUILDX_NAME)" --node "$(BUILDX_NAME)-0" >/dev/null
+	docker run --rm --privileged multiarch/qemu-user-static --reset -p yes >/dev/null
+	date > $@

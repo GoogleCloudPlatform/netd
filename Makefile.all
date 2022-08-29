@@ -12,17 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Cross build with compilation is super slow. Parallelize to speed up.
-# At least -j6 matching the number of builds (archs) + one controlling target.
-ifeq ($(DBG_MAKEFILE),1)
-	MAKE_SCRIPTS_JOBS := 1
-else
-	MAKE_SCRIPTS_JOBS := 8
-endif
-
 define delegate
 	$(MAKE) $@ $(foreach target,$^,-o $(target))
-	$(MAKE) -j $(MAKE_SCRIPTS_JOBS) -C scripts $@ $(foreach target,$^,-o $(target))
+	$(MAKE) -C scripts $@ $(foreach target,$^,-o $(target))
 endef
 
 # This catches `make` without target requested.

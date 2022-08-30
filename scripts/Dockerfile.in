@@ -17,9 +17,8 @@
 
 FROM alpine:3.16 AS curl
 
-ADD curl.tar.gz /
+COPY third_party/curl /curl-src
 
-COPY third_party/static-curl/mykey.asc /mykey.asc
 COPY third_party/static-curl/build.sh /build.sh
 
 RUN /build.sh
@@ -27,7 +26,7 @@ RUN /build.sh
 
 FROM alpine:3.16 AS jq
 
-ADD jq.tar.gz /
+COPY third_party/jq /jq-src
 
 COPY build-jq.sh /build-jq.sh
 
@@ -36,7 +35,7 @@ RUN /build-jq.sh
 
 FROM alpine:3.16 AS toybox
 
-ADD toybox.tar.gz /
+COPY third_party/toybox /toybox-src
 
 COPY build-toybox.sh /build-toybox.sh
 
@@ -47,7 +46,7 @@ RUN /build-toybox.sh
 
 FROM alpine:3.16 AS extras
 
-ADD spdx-license.tar.gz /
+COPY third_party/license-list-data /license-list-data-src
 
 COPY alpine-extractor.sh /alpine-extractor.sh
 

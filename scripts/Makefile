@@ -212,9 +212,10 @@ shell: | $(BUILD_DIRS)
 
 LICENSES = .licenses
 
-$(LICENSES): third_party/curl third_party/jq third_party/toybox | $(BUILD_DIRS)
+$(LICENSES): ../LICENSE third_party/curl third_party/jq third_party/toybox | $(BUILD_DIRS)
 	rm -rf $(LICENSES)
 	mkdir -p $(LICENSES)
+	cp ../LICENSE $(LICENSES)/netd-LICENSE
 	cp third_party/curl/COPYING $(LICENSES)/curl-COPYING
 	cp third_party/jq/COPYING $(LICENSES)/jq-COPYING
 	cp third_party/toybox/LICENSE $(LICENSES)/toybox-LICENSE

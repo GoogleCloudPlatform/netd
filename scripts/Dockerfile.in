@@ -19,7 +19,6 @@ FROM alpine:3.16 AS curl
 
 COPY third_party/curl /curl-src
 
-COPY third_party/static-curl/mykey.asc /mykey.asc
 COPY third_party/static-curl/build.sh /build.sh
 
 RUN /build.sh

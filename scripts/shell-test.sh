@@ -34,20 +34,28 @@ run_test curl_cmd
 run_test ipv4_subnet
 [[ '"10.0.0.0/8"' =~ ^\"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/[0-9][0-9]*\"$ ]] && pass || fail
 
-run_test iptables_cmd
+run_test iptables_cmd_exists
 # Cannot simply run iptables when the platform doesn't match (QEMU used):
 # iptables/1.8.7 Failed to initialize nft: Protocol not supported
-#iptables -V >/dev/null && pass || fail
 [[ -x /usr/sbin/iptables ]] && pass || fail
 
-run_test ip6tables_cmd
+run_test ip6tables_cmd_exists
 # Cannot simply run ip6tables when the platform doesn't match (QEMU used):
 # ip6tables/1.8.7 Failed to initialize nft: Protocol not supported
-#ip6tables -V >/dev/null && pass || fail
 [[ -x /usr/sbin/ip6tables ]] && pass || fail
 
 run_test grep_cmd
 (echo netd-test | grep test >/dev/null) && pass || fail
+
+if ! grep -q qemu /proc/1/cmdline; then
+  # If not running inside QEMU:
+
+  run_test iptables_cmd
+  iptables -V >/dev/null && pass || fail
+
+  run_test ip6tables_cmd
+  ip6tables -V >/dev/null && pass || fail
+fi
 
 run_test jq_cmd
 [[ "$(echo '{"test":"value"}' | jq .test)" == '"value"' ]] && pass || fail

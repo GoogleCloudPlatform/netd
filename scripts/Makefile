@@ -236,7 +236,7 @@ third_party/toybox:
 	pushd $@; git checkout $(TOYBOX_VERSION); popd
 
 third_party/license-list-data:
-	git clone https://github.com/spdx/license-list-data $@
+	git clone $(GIT_BASE)/spdx/license-list-data $@
 	pushd $@; git checkout v$(SPDX_LICENSE_VERSION); popd
 
 status.d/%:

@@ -63,9 +63,11 @@ RUN apt-get install -y --no-install-recommends --no-install-suggests bash-static
 RUN dpkg -s bash-static > /tmp/status_bash-static
 
 
-## This intermediate container pulls all pieces together from containers above.
+## The stuff container pulls all pieces together from containers above.
+## We use this and copy all of them as a whole to reduce the number of layers in the final image.
+## The base image is delibrately made separated so it can be shared with other images.
 
-FROM {ARG_FROM} AS intermediate
+FROM scratch AS stuff
 
 COPY --from=curl /tmp/release/curl /usr/bin/curl
 COPY status.d/curl /var/lib/dpkg/status.d/curl
@@ -82,6 +84,20 @@ COPY --from=extras /tmp/extras/ /
 
 COPY --from=bash /bin/bash-static /bin/bash
 COPY --from=bash /tmp/status_bash-static /var/lib/dpkg/status.d/bash-static
+
+# Add the platform-specific binary.
+COPY bin/{ARG_OS}_{ARG_ARCH}/{ARG_BIN} /{ARG_BIN}
+
+# Add third-party licenses.
+COPY .licenses/ /LICENSES/
+COPY --from=bash /usr/share/doc/bash-static/copyright /LICENSES/copyright.bash-static
+
+
+## Start building the final image. Using an intermediate so we can stop in the middle and run the tests.
+
+FROM {ARG_FROM} AS intermediate
+
+COPY --from=stuff / /
 
 
 ## Run shell-test.sh in a standalone container. The outcome is discarded.
@@ -101,13 +117,6 @@ MAINTAINER Jingyuan Liang <jingyuanliang@google.com>
 
 # This file is not being used. Include it to trigger the test run and allow manual testing.
 COPY --from=test /shell-test.sh /shell-test.sh
-
-# Add the platform-specific binary.
-COPY bin/{ARG_OS}_{ARG_ARCH}/{ARG_BIN} /{ARG_BIN}
-
-# Add third-party licenses.
-COPY .licenses/ /LICENSES/
-COPY --from=bash /usr/share/doc/bash-static/copyright /LICENSES/copyright.bash-static
 
 ENV HOME /
 

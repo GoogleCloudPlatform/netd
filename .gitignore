@@ -18,3 +18,4 @@
 /.container-*
 /.dockerfile-*
 /.licenses
+/.buildx-initialized

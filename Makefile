@@ -21,17 +21,16 @@ else
     MAKEFLAGS += -s
 endif
 
-# We don't need make's built-in rules.
-MAKEFLAGS += --no-builtin-rules
-# Be pedantic about undefined variables.
-MAKEFLAGS += --warn-undefined-variables
-.SUFFIXES:
-
 # The binaries to build (just the basenames)
-BINS := netd
+BINS ?= netd
 
-# The platforms we support.
-ALL_PLATFORMS := linux/amd64 linux/arm linux/arm64 linux/ppc64le linux/s390x
+# The platforms we support.  In theory this can be used for Windows platforms,
+# too, but they require specific base images, which we do not have.
+ALL_PLATFORMS ?= linux/amd64 linux/arm linux/arm64 linux/ppc64le linux/s390x
+
+# The "FROM" part of the Dockerfile.  This should be a manifest-list which
+# supports all of the platforms listed in ALL_PLATFORMS.
+BASE_IMAGE ?= k8s.gcr.io/build-image/distroless-iptables:v0.1.1
 
 # Where to push the docker images.
 REGISTRY ?= gcr.io/gke-release-staging
@@ -42,27 +41,27 @@ VERSION ?= $(shell git describe --tags --always --dirty)
 # This version-strategy uses a manual value to set the version string
 #VERSION ?= 1.2.3
 
-# Which Go modules mode to use ("mod" or "vendor")
-MOD ?= mod
-
-# Satisfy --warn-undefined-variables.
-GOFLAGS ?=
-HTTP_PROXY ?=
-HTTPS_PROXY ?=
+# Set this to 1 to build a debugger-friendly binaries.
+DBG ?=
 
 ###
 ### These variables should not need tweaking.
 ###
 
+# We don't need make's built-in rules.
+MAKEFLAGS += --no-builtin-rules
+# Be pedantic about undefined variables.
+MAKEFLAGS += --warn-undefined-variables
+.SUFFIXES:
+
 # Used internally.  Users should pass GOOS and/or GOARCH.
 OS := $(if $(GOOS),$(GOOS),$(shell go env GOOS))
 ARCH := $(if $(GOARCH),$(GOARCH),$(shell go env GOARCH))
 
-BASEIMAGE ?= k8s.gcr.io/build-image/distroless-iptables:v0.1.1
-
 TAG := $(VERSION)__$(OS)_$(ARCH)
 
-BUILD_IMAGE ?= golang:1.17-alpine
+GO_VERSION := 1.19
+BUILD_IMAGE := golang:$(GO_VERSION)-alpine
 
 BIN_EXTENSION :=
 ifeq ($(OS), windows)
@@ -71,6 +70,14 @@ endif
 
 # It's necessary to set this because some environments don't link sh -> bash.
 SHELL := /usr/bin/env bash -o errexit -o pipefail -o nounset
+
+# This is used in docker buildx commands
+BUILDX_NAME := $(shell basename $$(pwd))
+
+# Satisfy --warn-undefined-variables.
+GOFLAGS ?=
+HTTP_PROXY ?=
+HTTPS_PROXY ?=
 
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-container' rule.
@@ -164,17 +171,15 @@ go-build: | $(BUILD_DIRS)
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin/$(OS)_$(ARCH)  \
 	    -v $$(pwd)/.go/cache:/.cache                            \
 	    -v $$(pwd)/.go/pkg:/go/pkg                              \
-	    --env HTTP_PROXY=$(HTTP_PROXY)                          \
-	    --env HTTPS_PROXY=$(HTTPS_PROXY)                        \
+	    --env ARCH="$(ARCH)"                                    \
+	    --env OS="$(OS)"                                        \
+	    --env VERSION="$(VERSION)"                              \
+	    --env DEBUG="$(DBG)"                                    \
+	    --env GOFLAGS="$(GOFLAGS)"                              \
+	    --env HTTP_PROXY="$(HTTP_PROXY)"                        \
+	    --env HTTPS_PROXY="$(HTTPS_PROXY)"                      \
 	    $(BUILD_IMAGE)                                          \
-	    /bin/sh -c "                                            \
-	        ARCH=$(ARCH)                                        \
-	        OS=$(OS)                                            \
-	        VERSION=$(VERSION)                                  \
-	        MOD=$(MOD)                                          \
-	        GOFLAGS=$(GOFLAGS)                                  \
-	        ./build/build.sh ./...                              \
-	    "
+	    ./build/build.sh ./...
 
 # Example: make shell CMD="-c 'date > datefile'"
 shell: # @HELP launches a shell in the containerized build environment
@@ -190,8 +195,13 @@ shell: | $(BUILD_DIRS)
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin/$(OS)_$(ARCH)  \
 	    -v $$(pwd)/.go/cache:/.cache                            \
 	    -v $$(pwd)/.go/pkg:/go/pkg                              \
-	    --env HTTP_PROXY=$(HTTP_PROXY)                          \
-	    --env HTTPS_PROXY=$(HTTPS_PROXY)                        \
+	    --env ARCH="$(ARCH)"                                    \
+	    --env OS="$(OS)"                                        \
+	    --env VERSION="$(VERSION)"                              \
+	    --env DEBUG="$(DBG)"                                    \
+	    --env GOFLAGS="$(GOFLAGS)"                              \
+	    --env HTTP_PROXY="$(HTTP_PROXY)"                        \
+	    --env HTTPS_PROXY="$(HTTPS_PROXY)"                      \
 	    $(BUILD_IMAGE)                                          \
 	    /bin/sh $(CMD)
 
@@ -206,12 +216,6 @@ $(LICENSES): | $(BUILD_DIRS)
 	rm -rf $(LICENSES)
 	./bin/tools/go-licenses save ./... --save_path=$(LICENSES)
 	chmod -R a+rx $(LICENSES)
-
-# Create a buildx builder which will create cross platform builds.
-# The default builder does not support multi-arch.
-.PHONY: buildx-setup
-buildx-setup:
-	docker buildx inspect img-builder > /dev/null || docker buildx create --name img-builder --use
 
 CONTAINER_DOTFILES = $(foreach bin,$(BINS),.container-$(subst /,_,$(REGISTRY)/$(bin))-$(TAG))
 
@@ -234,19 +238,31 @@ $(foreach bin,$(BINS),$(eval                                         \
 ))
 # This is the target definition for all container-dotfiles.
 # These are used to track build state in hidden files.
-$(CONTAINER_DOTFILES): buildx-setup
+$(CONTAINER_DOTFILES): .buildx-initialized
 	echo
 	sed                                            \
 	    -e 's|{ARG_BIN}|$(BIN)$(BIN_EXTENSION)|g'  \
 	    -e 's|{ARG_ARCH}|$(ARCH)|g'                \
 	    -e 's|{ARG_OS}|$(OS)|g'                    \
-	    -e 's|{ARG_FROM}|$(BASEIMAGE)|g'           \
+	    -e 's|{ARG_FROM}|$(BASE_IMAGE)|g'          \
 	    Dockerfile.in > .dockerfile-$(BIN)-$(OS)_$(ARCH)
-	docker buildx build                      \
-	    --no-cache                           \
-	    --load --platform $(OS)/$(ARCH)      \
-	    -t $(REGISTRY)/$(BIN):$(TAG)         \
-	    -f .dockerfile-$(BIN)-$(OS)_$(ARCH)  \
+	HASH_LICENSES=$$(find $(LICENSES) -type f                       \
+		    | xargs md5sum | md5sum | cut -f1 -d' ');           \
+	HASH_BINARY=$$(md5sum bin/$(OS)_$(ARCH)/$(BIN)$(BIN_EXTENSION)  \
+		    | cut -f1 -d' ');                                   \
+	FORCE=0;                                                        \
+	docker buildx build                                             \
+	    --builder "$(BUILDX_NAME)"                                  \
+	    --build-arg FORCE_REBUILD="$$FORCE"                         \
+	    --build-arg HASH_LICENSES="$$HASH_LICENSES"                 \
+	    --build-arg HASH_BINARY="$$HASH_BINARY"                     \
+	    --progress=plain                                            \
+	    --load                                                      \
+	    --platform "$(OS)/$(ARCH)"                                  \
+	    --build-arg HTTP_PROXY="$(HTTP_PROXY)"                      \
+	    --build-arg HTTPS_PROXY="$(HTTPS_PROXY)"                    \
+	    -t $(REGISTRY)/$(BIN):$(TAG)                                \
+	    -f .dockerfile-$(BIN)-$(OS)_$(ARCH)                         \
 	    .
 	docker images -q $(REGISTRY)/$(BIN):$(TAG) > $@
 	echo
@@ -292,17 +308,15 @@ test: | $(BUILD_DIRS)
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin/$(OS)_$(ARCH)  \
 	    -v $$(pwd)/.go/cache:/.cache                            \
 	    -v $$(pwd)/.go/pkg:/go/pkg                              \
-	    --env HTTP_PROXY=$(HTTP_PROXY)                          \
-	    --env HTTPS_PROXY=$(HTTPS_PROXY)                        \
+	    --env ARCH="$(ARCH)"                                    \
+	    --env OS="$(OS)"                                        \
+	    --env VERSION="$(VERSION)"                              \
+	    --env DEBUG="$(DBG)"                                    \
+	    --env GOFLAGS="$(GOFLAGS)"                              \
+	    --env HTTP_PROXY="$(HTTP_PROXY)"                        \
+	    --env HTTPS_PROXY="$(HTTPS_PROXY)"                      \
 	    $(BUILD_IMAGE)                                          \
-	    /bin/sh -c "                                            \
-	        ARCH=$(ARCH)                                        \
-	        OS=$(OS)                                            \
-	        VERSION=$(VERSION)                                  \
-	        MOD=$(MOD)                                          \
-	        GOFLAGS=$(GOFLAGS)                                  \
-	        ./build/test.sh ./...                               \
-	    "
+	    ./build/test.sh ./...
 
 lint: # @HELP runs golangci-lint
 lint: | $(BUILD_DIRS)
@@ -316,12 +330,15 @@ lint: | $(BUILD_DIRS)
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin/$(OS)_$(ARCH)  \
 	    -v $$(pwd)/.go/cache:/.cache                            \
 	    -v $$(pwd)/.go/pkg:/go/pkg                              \
-	    --env HTTP_PROXY=$(HTTP_PROXY)                          \
-	    --env HTTPS_PROXY=$(HTTPS_PROXY)                        \
+	    --env ARCH="$(ARCH)"                                    \
+	    --env OS="$(OS)"                                        \
+	    --env VERSION="$(VERSION)"                              \
+	    --env DEBUG="$(DBG)"                                    \
+	    --env GOFLAGS="$(GOFLAGS)"                              \
+	    --env HTTP_PROXY="$(HTTP_PROXY)"                        \
+	    --env HTTPS_PROXY="$(HTTPS_PROXY)"                      \
 	    $(BUILD_IMAGE)                                          \
-	    /bin/sh -c "                                            \
-	        ./build/lint.sh ./...                               \
-	    "
+	    ./build/lint.sh ./...
 
 $(BUILD_DIRS):
 	mkdir -p $@
@@ -330,7 +347,7 @@ clean: # @HELP removes built binaries and temporary files
 clean: container-clean bin-clean
 
 container-clean:
-	rm -rf .container-* .dockerfile-* .push-* $(LICENSES)
+	rm -rf .container-* .dockerfile-* .push-* .buildx-initialized $(LICENSES)
 
 bin-clean:
 	test -d .go && chmod -R u+w .go || true
@@ -342,7 +359,7 @@ help:
 	echo "  BINS = $(BINS)"
 	echo "  OS = $(OS)"
 	echo "  ARCH = $(ARCH)"
-	echo "  MOD = $(MOD)"
+	echo "  DBG = $(DBG)"
 	echo "  GOFLAGS = $(GOFLAGS)"
 	echo "  REGISTRY = $(REGISTRY)"
 	echo
@@ -352,3 +369,12 @@ help:
 	        BEGIN {FS = ": *# *@HELP"};           \
 	        { printf "  %-30s %s\n", $$1, $$2 };  \
 	    '
+
+# Help set up multi-arch build tools.  This assumes you have the tools
+# installed.  If you already have a buildx builder available, you don't need
+# this.  See https://medium.com/@artur.klauser/building-multi-architecture-docker-images-with-buildx-27d80f7e2408
+# for great context.
+.buildx-initialized:
+	docker buildx create --name "$(BUILDX_NAME)" --node "$(BUILDX_NAME)-0" >/dev/null
+	docker run --rm --privileged multiarch/qemu-user-static --reset -p yes >/dev/null
+	date > $@

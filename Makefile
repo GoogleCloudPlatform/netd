@@ -222,10 +222,25 @@ $(LICENSES): | $(BUILD_DIRS)
 	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
 	    $(BUILD_IMAGE)                      \
 	    go install github.com/google/go-licenses
-	rm -rf $(LICENSES)
-	# Work-around for https://github.com/google/go-licenses/issues/149.
-	GOROOT="$(shell go env GOROOT)" \
-	    bin/tools/go-licenses save ./... --save_path=$(LICENSES)
+	rm -rf $(LICENSES) $(LICENSES).dir
+	mkdir $(LICENSES).dir
+	docker run                              \
+	    -i                                  \
+	    --rm                                \
+	    -u $$(id -u):$$(id -g)              \
+	    -v $$(pwd)/$(LICENSES).dir:/output  \
+	    -v $$(pwd):/src                     \
+	    -w /src                             \
+	    -v $$(pwd)/bin/tools:/go/bin        \
+	    -v $$(pwd)/.go/cache:/.cache        \
+	    -v $$(pwd)/.go/pkg:/go/pkg          \
+	    --env CGO_ENABLED=0                 \
+	    --env HTTP_PROXY="$(HTTP_PROXY)"    \
+	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
+	    $(BUILD_IMAGE)                      \
+	    /go/bin/go-licenses save ./... --save_path=/output/licenses
+	mv $(LICENSES).dir/licenses $(LICENSES)
+	rmdir $(LICENSES).dir
 	chmod -R a+rx $(LICENSES)
 
 CONTAINER_DOTFILES = $(foreach bin,$(BINS),.container-$(subst /,_,$(REGISTRY)/$(bin))-$(TAG))

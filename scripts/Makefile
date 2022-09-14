@@ -309,10 +309,20 @@ push: container
 # This depends on github.com/estesp/manifest-tool.
 manifest-list: # @HELP builds a manifest list of containers for all platforms
 manifest-list: all-push
-	pushd tools >/dev/null;                                             \
-	  export GOBIN=$$(pwd)/../bin/tools;                                \
-	  go install github.com/estesp/manifest-tool/v2/cmd/manifest-tool;  \
-	  popd >/dev/null
+	docker run                              \
+	    -i                                  \
+	    --rm                                \
+	    -u $$(id -u):$$(id -g)              \
+	    -v $$(pwd)/tools:/src               \
+	    -w /src                             \
+	    -v $$(pwd)/bin/tools:/go/bin        \
+	    -v $$(pwd)/.go/cache:/.cache        \
+	    -v $$(pwd)/.go/pkg:/go/pkg          \
+	    --env CGO_ENABLED=0                 \
+	    --env HTTP_PROXY="$(HTTP_PROXY)"    \
+	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
+	    $(BUILD_IMAGE)                      \
+	    go install github.com/estesp/manifest-tool/v2/cmd/manifest-tool
 	for bin in $(BINS); do                                    \
 	    platforms=$$(echo $(ALL_PLATFORMS) | sed 's/ /,/g');  \
 	    bin/tools/manifest-tool                               \

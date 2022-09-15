@@ -238,7 +238,7 @@ $(LICENSES): | $(BUILD_DIRS)
 	    --env HTTP_PROXY="$(HTTP_PROXY)"    \
 	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
 	    $(BUILD_IMAGE)                      \
-	    /go/bin/go-licenses save ./... --save_path=/output/licenses
+	    go-licenses save ./... --save_path=/output/licenses
 	mv $(LICENSES).dir/licenses $(LICENSES)
 	rmdir $(LICENSES).dir
 	chmod -R a+rx $(LICENSES)

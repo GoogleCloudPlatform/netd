@@ -30,7 +30,7 @@ ALL_PLATFORMS ?= linux/amd64 linux/arm linux/arm64 linux/ppc64le linux/s390x
 
 # The "FROM" part of the Dockerfile.  This should be a manifest-list which
 # supports all of the platforms listed in ALL_PLATFORMS.
-BASE_IMAGE ?= k8s.gcr.io/build-image/distroless-iptables:v0.1.1
+BASE_IMAGE ?= k8s.gcr.io/build-image/distroless-iptables:v0.1.2
 
 # Where to push the docker images.
 REGISTRY ?= gcr.io/gke-release-staging

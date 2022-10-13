@@ -25,9 +25,6 @@ run_test ls_cmd
 run_test sleep_cmd
 sleep 1 && pass || fail
 
-run_test sed_cmd
-[[ "$(echo "cfg1:@val,cfg2:ok" | sed -e "s#@val#test#g")" == "cfg1:test,cfg2:ok" ]] && pass || fail
-
 run_test curl_cmd
 [[ "$(curl -s -k -H "Header: netd-test" https://httpbin.org/headers)" =~ netd-test ]] && pass || fail
 

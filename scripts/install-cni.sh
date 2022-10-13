@@ -60,16 +60,16 @@ fi
 
 if [ -f "/host/home/kubernetes/bin/gke" ]
 then
-  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniType#gke#g")
+  cni_spec=${cni_spec//@cniType/gke}
 else
-  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniType#ptp#g")
+  cni_spec=${cni_spec//@cniType/ptp}
 fi
 
 if [ "${ENABLE_BANDWIDTH_PLUGIN}" == "true" ] && [ -f "/host/home/kubernetes/bin/bandwidth" ]
 then
-  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniBandwidthPlugin#,{\"type\": \"bandwidth\",\"capabilities\": {\"bandwidth\": true}}#g")
+  cni_spec=${cni_spec//@cniBandwidthPlugin/, {\"type\": \"bandwidth\",\"capabilities\": {\"bandwidth\": true\}\}}
 else
-  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniBandwidthPlugin##g")
+  cni_spec=${cni_spec//@cniBandwidthPlugin/}
 fi
 
 token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
@@ -89,7 +89,7 @@ fi
 if [ "${ENABLE_CILIUM_PLUGIN}" == "true" ]
 then
   echo "Adding Cilium plug-in to the CNI config."
-  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniCiliumPlugin#,{\"type\": \"cilium-cni\"}#g")
+  cni_spec=${cni_spec//@cniCiliumPlugin/, {\"type\": \"cilium-cni\"\}}
   cilium_bin="/host/home/kubernetes/bin/cilium-cni"
   while [ ! -f "$cilium_bin" ]
   do
@@ -99,7 +99,7 @@ then
   echo "$cilium_bin found."
 else
   echo "Not using Cilium plug-in."
-  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniCiliumPlugin##g")
+  cni_spec=${cni_spec//@cniCiliumPlugin/}
 fi
 
 # Fill CNI spec template.
@@ -115,7 +115,7 @@ else
 fi
 
 echo "Filling IPv4 subnet ${ipv4_subnet:-}"
-cni_spec=$(echo ${cni_spec:-} | sed -e "s#@ipv4Subnet#[{\"subnet\": ${ipv4_subnet:-}}]#g")
+cni_spec=${cni_spec//@ipv4Subnet/[{\"subnet\": ${ipv4_subnet:-}\}]}
 
 if [ "$ENABLE_MASQUERADE" == "true" ]; then
   echo "Config MASQUERADE rule"
@@ -154,9 +154,8 @@ if [ "${ENABLE_PRIVATE_IPV6_ACCESS:-}" == "true" ] || [ "$ENABLE_IPV6" == "true"
   if [ -n "${node_ipv6_addr:-}" ] && [ "${node_ipv6_addr}" != "null" ]; then
     echo "Found nic0 IPv6 address ${node_ipv6_addr:-}. Filling IPv6 subnet and route..."
 
-    cni_spec=$(echo ${cni_spec:-} | sed -e \
-      "s#@ipv6SubnetOptional#, [{\"subnet\": \"${node_ipv6_addr:-}/112\"}]#g;
-       s#@ipv6RouteOptional#, ${CNI_SPEC_IPV6_ROUTE:-{\"dst\": \"::/0\"\}}#g")
+    cni_spec=${cni_spec//@ipv6SubnetOptional/, [{\"subnet\": \"${node_ipv6_addr:-}/112\"\}]}
+    cni_spec=${cni_spec//@ipv6RouteOptional/, ${CNI_SPEC_IPV6_ROUTE:-{\"dst\": \"::/0\"\}}}
 
     # Ensure the IPv6 firewall rules are as expected.
     # These rules mirror the IPv4 rules installed by kubernetes/cluster/gce/gci/configure-helper.sh
@@ -185,13 +184,13 @@ if [ "${ENABLE_PRIVATE_IPV6_ACCESS:-}" == "true" ] || [ "$ENABLE_IPV6" == "true"
     fi
   else
     echo "No IPv6 address found for nic0. Clearing IPv6 subnet and route..."
-    cni_spec=$(echo ${cni_spec:-} | \
-      sed -e "s#@ipv6SubnetOptional##g; s#@ipv6RouteOptional##g")
+    cni_spec=${cni_spec//@ipv6SubnetOptional/}
+    cni_spec=${cni_spec//@ipv6RouteOptional/}
   fi
 else
   echo "Clearing IPv6 subnet and route given private IPv6 access is disabled..."
-  cni_spec=$(echo ${cni_spec:-} | \
-    sed -e "s#@ipv6SubnetOptional##g; s#@ipv6RouteOptional##g")
+  cni_spec=${cni_spec//@ipv6SubnetOptional/}
+  cni_spec=${cni_spec//@ipv6RouteOptional/}
 fi
 
 # Format of `route` output:
@@ -208,10 +207,10 @@ default_nic=$(route -n | grep -E '^0\.0\.0\.0\s+\S+\s+0\.0\.0\.0' | grep -oE '\S
 # Set mtu
 if [ -f "/sys/class/net/$default_nic/mtu" ]; then
   MTU=$(cat /sys/class/net/$default_nic/mtu)
-  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@mtu#$MTU#g")
+  cni_spec=${cni_spec//@mtu/$MTU}
   echo "Set the default mtu to $MTU, inherited from dev $default_nic"
 else
-  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@mtu#1460#g")
+  cni_spec=${cni_spec//@mtu/1460}
   echo "Failed to read mtu from dev $default_nic, set the default mtu to 1460"
 fi
 

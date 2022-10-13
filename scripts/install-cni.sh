@@ -194,16 +194,19 @@ else
     sed -e "s#@ipv6SubnetOptional##g; s#@ipv6RouteOptional##g")
 fi
 
-# Format of `route` output:
-# Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
-# 0.0.0.0         192.168.0.1     0.0.0.0         UG    100    0        0 ens4
-# 192.168.0.1     0.0.0.0         255.255.255.255 UH    100    0        0 ens4
+# Format of /proc/net/route:
+# Iface	Destination	Gateway 	Flags	RefCnt	Use	Metric	Mask		MTU	Window	IRTT
+# ens4	00000000	0100A8C0	0003	0	0	100	00000000	0	0	0
+# ens4	0100A8C0	00000000	0005	0	0	100	FFFFFFFF	0	0	0
+
+# Note that Destination and Mask are IP represented in hexadecimal in
+# little-endian. Regardless of endianness, 00000000 is always 0.0.0.0.
 
 # The first grep extracts the default line, and the second grep extracts the
-# last field, which is the interface name. We stick to using grep to avoid
+# first field, which is the interface name. We stick to using grep to avoid
 # introducing too many new dependencies.
 
-default_nic=$(route -n | grep -E '^0\.0\.0\.0\s+\S+\s+0\.0\.0\.0' | grep -oE '\S+$')
+default_nic=$(grep -E '^\S+\s+00000000\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+00000000\s+' /proc/net/route | grep -oE '^\S+')
 
 # Set mtu
 if [ -f "/sys/class/net/$default_nic/mtu" ]; then

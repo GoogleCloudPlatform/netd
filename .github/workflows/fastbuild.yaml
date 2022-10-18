@@ -1,0 +1,12 @@
+name: Build for architectures being used
+
+on: [ push, pull_request ]
+
+jobs:
+  fastbuild:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    - name: Build containers
+      run: make -f Makefile.all all-container ALL_PLATFORMS='linux/amd64 linux/arm64'

@@ -1,6 +1,6 @@
 name: Build for all architectures
 
-on: [ push, pull_request ]
+on: [ push ]
 
 jobs:
   build:

@@ -4,9 +4,13 @@ on: [ push, pull_request ]
 
 jobs:
   nativebuild:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: [ "1.18", "1.19" ]
+        platform: [ "ubuntu-latest" ]
+    runs-on: ${{ matrix.platform }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
     - name: Build containers
-      run: make -f Makefile.all container
+      run: make -f Makefile.all container GO_VERSION=${{ matrix.go-version }}

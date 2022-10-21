@@ -44,11 +44,9 @@ RUN /build-toybox.sh
 
 FROM alpine:3.16 AS inotify
 
-COPY inotify.c /inotify.c
+COPY inotify /inotify
 
-COPY build-inotify.sh /build-inotify.sh
-
-RUN /build-inotify.sh
+RUN /inotify/build.sh
 
 
 ## The extras container extracts licenses and package data from Alpine packages.

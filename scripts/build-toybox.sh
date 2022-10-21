@@ -5,7 +5,7 @@ set -exu
 # Toybox route is "pending" but the TODOs are in add/del;
 # we're using it for display only so we should be good.
 # Toybox sh has more TODOs in multiple areas so don't use it.
-toys="ls mktemp mv route sed"
+toys="mktemp mv route sed timeout"
 
 cd /toybox-*/
 
@@ -31,7 +31,7 @@ file toybox
 ldd toybox && exit 1 || true
 
 ./toybox
-./toybox ls
+./toybox timeout 1s ./toybox
 
 mkdir -p /tmp/release/
 mv toybox /tmp/release/toybox

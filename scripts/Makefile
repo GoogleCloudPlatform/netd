@@ -238,7 +238,13 @@ third_party/jq:
 
 third_party/toybox:
 	git clone $(GIT_BASE)/landley/toybox $@
-	pushd $@; git checkout $(TOYBOX_VERSION); popd
+	# https://github.com/landley/toybox/issues/389
+	pushd $@; git checkout $(TOYBOX_VERSION); git cherry-pick -n \
+		6b78f8de9edab04b520e6c6ed39bf7b36021d146 \
+		e4103b8183cfb9992badd3fbc9827e9bc4a74c38 \
+		a83d1d59bf40ce9282bc347ddcd3cec585c3d254 \
+		61daed9c2e1f6e305893fac894c2831803658ddb \
+	; popd
 
 third_party/license-list-data:
 	git clone $(GIT_BASE)/spdx/license-list-data $@

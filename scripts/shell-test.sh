@@ -19,9 +19,6 @@ fail() {
 run_test test_cmd
 [ -d / ] && pass || fail
 
-run_test ls_cmd
-[[ -n "$(ls /)" ]] && pass || fail
-
 run_test sleep_cmd
 sleep 1 && pass || fail
 
@@ -60,6 +57,9 @@ fi
 run_test jq_cmd
 [[ "$(echo '{"test":"value"}' | jq .test)" == '"value"' ]] && pass || fail
 
+run_test inotify_cmd
+inotify / '' /bin/cat /dev/null >/dev/null && pass || fail
+
 run_test default_nic_mtu
 [[ -f "/sys/class/net/$(route -n | grep -E '^0\.0\.0\.0\s+\S+\s+0\.0\.0\.0' | grep -oE '\S+$')/mtu" ]] && pass || fail
 
@@ -71,5 +71,8 @@ echo >/netd-test && mv /netd-test /netd-test-moved && [[ -f /netd-test-moved ]] 
 
 run_test rm_cmd
 echo >/netd-test && rm /netd-test && [[ ! -f /netd-test ]] && pass || fail
+
+run_test timeout_cmd
+timeout 2s sleep 1s && pass || fail
 
 exit $FAIL_COUNT

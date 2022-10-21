@@ -42,6 +42,13 @@ COPY build-toybox.sh /build-toybox.sh
 RUN /build-toybox.sh
 
 
+FROM alpine:3.16 AS inotify
+
+COPY inotify /inotify
+
+RUN /inotify/build.sh
+
+
 ## The extras container extracts licenses and package data from Alpine packages.
 
 FROM alpine:3.16 AS extras
@@ -78,6 +85,8 @@ COPY status.d/jq /var/lib/dpkg/status.d/jq
 # Both toybox binary and symlinks
 COPY --from=toybox /tmp/release/ /bin/
 COPY status.d/toybox /var/lib/dpkg/status.d/toybox
+
+COPY --from=inotify /tmp/release/inotify /usr/bin/inotify
 
 # Licenses and package info
 COPY --from=extras /tmp/extras/ /

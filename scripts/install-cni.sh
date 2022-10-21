@@ -14,6 +14,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+calico_ready() {
+  echo "Listing items matching /host/etc/cni/net.d/*calico*.conflist"
+  echo "(this action repeats during bootstrap until a match is found)"
+  # The command producing exit status must be the last command here.
+  compgen -G "/host/etc/cni/net.d/*calico*.conflist"
+}
+
+cilium_ready() {
+  echo "Running /host/home/kubernetes/bin/cilium-cni with CNI_COMMAND=VERSION"
+  # It's necessary to try running the it instead of just checking existence because
+  # Cilium's CNI installer doesn't do atomic write (write to temporary file then move).
+  echo "(errors are expected during bootstrap; will retry until success)"
+  # The command producing exit status must be the last command here.
+  CNI_COMMAND=VERSION /host/home/kubernetes/bin/cilium-cni
+}
+
+# inotify callback
+if [ -n "$1" ]; then
+  # We run into this branch at callback from inotify. In this case, call the
+  # specified function then exit. The return value from that function (exit
+  # status of the last command in the function) is used as the exit status.
+  "$@"
+  exit
+fi
+
 BUILD='__BUILD__'
 
 echo "Install-CNI ($0), Build: $BUILD"
@@ -23,20 +48,21 @@ echo "Install-CNI ($0), Build: $BUILD"
 #
 # If this script is being run in order to generate the Calico config file, then skip this
 # check.
-echo "Calico network policy config: " $ENABLE_CALICO_NETWORK_POLICY
-if [[ ${ENABLE_CALICO_NETWORK_POLICY} == "true" ]] && [[ ${WRITE_CALICO_CONFIG_FILE} != "true" ]]; then
-  cni_file=`ls /host/etc/cni/net.d/*calico*.conflist 2> /dev/null`
-  WAITED=0
-  while [ -z "${cni_file}" ]  && [ ${WAITED} -lt 120 ]
-  do
-      echo "calico cni file not found ($WAITED)..."
-      WAITED=$((WAITED+2))
-      sleep 2
-      cni_file=`ls /host/etc/cni/net.d/*calico*.conflist 2> /dev/null`
-  done
-  if [ -z "${cni_file}" ]; then
+echo "Calico network policy config: ${ENABLE_CALICO_NETWORK_POLICY}"
+if [ "${ENABLE_CALICO_NETWORK_POLICY}" == "true" ] && [ "${WRITE_CALICO_CONFIG_FILE}" != "true" ]; then
+  # inotify calls back to the beginning of this script.
+  # `timeout` exits failure when it's exiting due to time out, but this is an
+  # expected situation when Calico is being disabled (see below).
+  timeout 120s inotify /host/etc/cni/net.d '' "$0" calico_ready \
+    || echo "inotify for Calico CNI configuration files failed or timed out (status: $?)."
+  # Might be possible to just use the exit status from `timeout` as the
+  # condition of the if-statement below, once we have more confidence in the
+  # implementations of `timeout` and `inotify`, then `set -e` can be moved to
+  # the top, right after inotify callbacks.
+  if ! calico_ready; then
+    # This handles the disabling process: https://github.com/GoogleCloudPlatform/netd/issues/91
     ENABLE_CALICO_NETWORK_POLICY=false
-    echo "Update calico network policy config to " $ENABLE_CALICO_NETWORK_POLICY
+    echo "Update calico network policy config to ${ENABLE_CALICO_NETWORK_POLICY}"
   fi
 fi
 
@@ -90,13 +116,9 @@ if [ "${ENABLE_CILIUM_PLUGIN}" == "true" ]
 then
   echo "Adding Cilium plug-in to the CNI config."
   cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniCiliumPlugin#,{\"type\": \"cilium-cni\"}#g")
-  cilium_bin="/host/home/kubernetes/bin/cilium-cni"
-  while [ ! -f "$cilium_bin" ]
-  do
-    echo "Waiting for $cilium_bin to be ready..."
-    sleep 2
-  done
-  echo "$cilium_bin found."
+  # inotify calls back to the beginning of this script.
+  inotify /host/home/kubernetes/bin cilium-cni "$0" cilium_ready
+  echo "Cilium plug-in now confirmed as ready."
 else
   echo "Not using Cilium plug-in."
   cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniCiliumPlugin##g")

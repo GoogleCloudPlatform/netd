@@ -32,7 +32,7 @@ var mcfg struct {
 	enabledCollectors string
 	listenAddress     string
 	procPath          string
-	stackType					string
+	stackType         string
 }
 
 func init() {

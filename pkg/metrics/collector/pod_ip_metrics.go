@@ -47,12 +47,12 @@ const (
 )
 
 var (
-	usedIpv4AddrCountDesc = prometheus.NewDesc(
+	usedIPv4AddrCountDesc = prometheus.NewDesc(
 		"used_ipv4_addr_count",
 		"Indicates how many IPv4 addresses are in use.",
 		nil, nil,
 	)
-	usedIpv6AddrCountDesc = prometheus.NewDesc(
+	usedIPv6AddrCountDesc = prometheus.NewDesc(
 		"used_ipv6_addr_count",
 		"Indicates how many IPv6 addresses are in use.",
 		nil, nil,
@@ -67,7 +67,7 @@ var (
 		"Indicates how many pods did not get dual stack IPs erroneously.",
 		nil, nil,
 	)
-	duplicateIpCountDesc = prometheus.NewDesc(
+	duplicateIPCountDesc = prometheus.NewDesc(
 		"duplicate_ip_count",
 		"Indicates how many pods had more than one IP per family.",
 		nil, nil,
@@ -91,21 +91,21 @@ var (
 		"Indicates the IP reuse duration in millisecond for all IPs.",
 		nil, nil,
 	)
-	podIpMetricsWatcherSetup = false
+	podIPMetricsWatcherSetup = false
 )
 
-type podIpMetricsCollector struct {
-	usedIpv4AddrCount   uint64
-	usedIpv6AddrCount   uint64
+type podIPMetricsCollector struct {
+	usedIPv4AddrCount   uint64
+	usedIPv6AddrCount   uint64
 	dualStackCount      uint64
 	dualStackErrorCount uint64
-	duplicateIpCount    uint64
-	reuseIps            reuseIps
+	duplicateIPCount    uint64
+	reuseIPs            reuseIPs
 	reuseMap            map[string]*ipReuse
 	clock               clock
 }
 
-type reuseIps struct {
+type reuseIPs struct {
 	count   uint64
 	sum     float64
 	min     uint64
@@ -133,13 +133,13 @@ func (ip ipFamily) String() string {
 }
 
 func init() {
-	registerCollector("pod_ip_metrics", NewPodIpMetricsCollector)
+	registerCollector("pod_ip_metrics", NewPodIPMetricsCollector)
 }
 
 // NewPodIpMetricsCollector returns a new Collector exposing pod IP allocation
 // stats.
-func NewPodIpMetricsCollector() (Collector, error) {
-	return &podIpMetricsCollector{clock: &realClock{}}, nil
+func NewPodIPMetricsCollector() (Collector, error) {
+	return &podIPMetricsCollector{clock: &realClock{}}, nil
 }
 
 func readLine(path string) (string, error) {
@@ -159,7 +159,7 @@ func readLine(path string) (string, error) {
 	return s.Text(), s.Err()
 }
 
-func (c *podIpMetricsCollector) listIpAddresses(dir string) error {
+func (c *podIPMetricsCollector) listIPAddresses(dir string) error {
 	f, err := os.Open(dir)
 	if err != nil {
 		glog.Errorf("Error opening directory %s, %v", dir, err)
@@ -172,7 +172,7 @@ func (c *podIpMetricsCollector) listIpAddresses(dir string) error {
 	}
 
 	podMap := make(map[string]ipFamily)
-	var ipv4Count, ipv6Count, dupIpCount, dualCount, dualErrCount uint64
+	var ipv4Count, ipv6Count, dupIPCount, dualCount, dualErrCount uint64
 	for _, v := range files {
 		if ip := net.ParseIP(v.Name()); ip == nil {
 			// This isn't an IP address file
@@ -188,18 +188,18 @@ func (c *podIpMetricsCollector) listIpAddresses(dir string) error {
 		}
 		// Update the map and track IP families only for dual stack clusters
 		fileName := fmt.Sprintf("%s/%s", dir, v.Name())
-		podId, err := readLine(fileName)
+		podID, err := readLine(fileName)
 		if err != nil {
 			glog.Errorf("Error reading file %s: %v", fileName, err)
 			continue
 		}
-		f, ok := podMap[podId]
+		f, ok := podMap[podID]
 		if !ok {
-			podMap[podId] = family
+			podMap[podID] = family
 		} else if (f == ipv4 && family == ipv6) || (f == ipv6 && family == ipv4) {
-			podMap[podId] = dual
+			podMap[podID] = dual
 		} else {
-			dupIpCount++
+			dupIPCount++
 		}
 	}
 	if stackType == dualStack {
@@ -211,11 +211,11 @@ func (c *podIpMetricsCollector) listIpAddresses(dir string) error {
 			}
 		}
 	}
-	c.usedIpv4AddrCount = ipv4Count
-	c.usedIpv6AddrCount = ipv6Count
+	c.usedIPv4AddrCount = ipv4Count
+	c.usedIPv6AddrCount = ipv6Count
 	c.dualStackCount = dualCount
 	c.dualStackErrorCount = dualErrCount
-	c.duplicateIpCount = dupIpCount
+	c.duplicateIPCount = dupIPCount
 	return nil
 }
 
@@ -232,25 +232,25 @@ func getIPv4(s string) (bool, string) {
 // After the ip is removed, it will be put into the reuseMap.
 // After the ip is reused, the reuseMap will update the ip reuse interval.
 // The reuseMap will not record any ip that is being used unless it is reused.
-func (c *podIpMetricsCollector) updateReuseIpStats(e fsnotify.Event, f string) {
-	reuseIp, ok := c.reuseMap[f]
+func (c *podIPMetricsCollector) updateReuseIPStats(e fsnotify.Event, f string) {
+	reuseIP, ok := c.reuseMap[f]
 	switch {
 	case e.Op&fsnotify.Remove == fsnotify.Remove:
 		if !ok {
 			c.reuseMap[f] = &ipReuse{c.clock.Now(), 0}
 		} else {
-			reuseIp.ipReleasedTimestamp = c.clock.Now()
+			reuseIP.ipReleasedTimestamp = c.clock.Now()
 		}
 	case e.Op&fsnotify.Create == fsnotify.Create:
 		if ok {
-			oldT := reuseIp.ipReleasedTimestamp
+			oldT := reuseIP.ipReleasedTimestamp
 			diff := uint64(c.clock.Now().Sub(oldT).Milliseconds())
 			if diff > 0 {
-				reuseIp.ipReuseInterval = float64(diff)
-				c.reuseIps.count += 1
-				c.reuseIps.sum += float64(diff)
-				if diff < c.reuseIps.min {
-					c.reuseIps.min = diff
+				reuseIP.ipReuseInterval = float64(diff)
+				c.reuseIPs.count++
+				c.reuseIPs.sum += float64(diff)
+				if diff < c.reuseIPs.min {
+					c.reuseIPs.min = diff
 				}
 				c.fillBuckets(diff)
 			}
@@ -258,16 +258,16 @@ func (c *podIpMetricsCollector) updateReuseIpStats(e fsnotify.Event, f string) {
 	}
 }
 
-func (c *podIpMetricsCollector) fillBuckets(diff uint64) {
+func (c *podIPMetricsCollector) fillBuckets(diff uint64) {
 	for _, bound := range bucketKeys {
 		if float64(diff) < bound {
-			c.reuseIps.buckets[bound]++
+			c.reuseIPs.buckets[bound]++
 		}
 	}
 }
 
-func (c *podIpMetricsCollector) setupDirectoryWatcher(dir string) error {
-	if err := c.listIpAddresses(dir); err != nil {
+func (c *podIPMetricsCollector) setupDirectoryWatcher(dir string) error {
+	if err := c.listIPAddresses(dir); err != nil {
 		return err
 	}
 	watcher, err := fsnotify.NewWatcher()
@@ -276,17 +276,17 @@ func (c *podIpMetricsCollector) setupDirectoryWatcher(dir string) error {
 		return err
 	}
 
-	c.reuseIps.min = uint64(math.Inf(+1))
-	c.reuseIps.buckets = make(map[float64]uint64)
+	c.reuseIPs.min = uint64(math.Inf(+1))
+	c.reuseIPs.buckets = make(map[float64]uint64)
 	for _, bound := range bucketKeys {
-		c.reuseIps.buckets[bound] = 0
+		c.reuseIPs.buckets[bound] = 0
 	}
 	c.reuseMap = make(map[string]*ipReuse)
 
 	go func() {
 		defer func() {
 			watcher.Close()
-			podIpMetricsWatcherSetup = false
+			podIPMetricsWatcherSetup = false
 		}()
 
 		for {
@@ -296,13 +296,13 @@ func (c *podIpMetricsCollector) setupDirectoryWatcher(dir string) error {
 					glog.Error("watcher is not ok")
 					return
 				}
-				if err := c.listIpAddresses(dir); err != nil {
+				if err := c.listIPAddresses(dir); err != nil {
 					return
 				}
 				// Only update the ip reuse mininum, average and histogram for IPv4.
 				ok, f := getIPv4(e.Name)
 				if ok {
-					c.updateReuseIpStats(e, f)
+					c.updateReuseIPStats(e, f)
 				}
 
 			case err, ok := <-watcher.Errors:
@@ -318,26 +318,26 @@ func (c *podIpMetricsCollector) setupDirectoryWatcher(dir string) error {
 	if err != nil {
 		glog.Errorf("Failed to add watcher for directory %s: %v", dir, err)
 	}
-	podIpMetricsWatcherSetup = true
+	podIPMetricsWatcherSetup = true
 	return nil
 }
 
-func (c *podIpMetricsCollector) Update(ch chan<- prometheus.Metric) error {
-	if !podIpMetricsWatcherSetup {
+func (c *podIPMetricsCollector) Update(ch chan<- prometheus.Metric) error {
+	if !podIPMetricsWatcherSetup {
 		if err := c.setupDirectoryWatcher(gkePodNetworkDir); err != nil {
 			glog.Errorf("setupDirectoryWatcher returned error: %v", err)
 			return nil
 		}
 	}
-	ch <- prometheus.MustNewConstMetric(usedIpv4AddrCountDesc, prometheus.GaugeValue, float64(c.usedIpv4AddrCount))
-	ch <- prometheus.MustNewConstMetric(usedIpv6AddrCountDesc, prometheus.GaugeValue, float64(c.usedIpv6AddrCount))
+	ch <- prometheus.MustNewConstMetric(usedIPv4AddrCountDesc, prometheus.GaugeValue, float64(c.usedIPv4AddrCount))
+	ch <- prometheus.MustNewConstMetric(usedIPv6AddrCountDesc, prometheus.GaugeValue, float64(c.usedIPv6AddrCount))
 	ch <- prometheus.MustNewConstMetric(dualStackCountDesc, prometheus.GaugeValue, float64(c.dualStackCount))
 	ch <- prometheus.MustNewConstMetric(dualStackErrorCountDesc, prometheus.GaugeValue, float64(c.dualStackErrorCount))
-	ch <- prometheus.MustNewConstMetric(duplicateIpCountDesc, prometheus.GaugeValue, float64(c.duplicateIpCount))
+	ch <- prometheus.MustNewConstMetric(duplicateIPCountDesc, prometheus.GaugeValue, float64(c.duplicateIPCount))
 
-	ch <- prometheus.MustNewConstMetric(ipReuseMinDesc, prometheus.GaugeValue, float64(c.reuseIps.min))
-	ch <- prometheus.MustNewConstMetric(ipReuseAvgDesc, prometheus.GaugeValue, float64((c.reuseIps.sum / float64(c.reuseIps.count))))
-	ch <- prometheus.MustNewConstHistogram(ipReuseHistogramDesc, c.reuseIps.count, c.reuseIps.sum, c.reuseIps.buckets)
+	ch <- prometheus.MustNewConstMetric(ipReuseMinDesc, prometheus.GaugeValue, float64(c.reuseIPs.min))
+	ch <- prometheus.MustNewConstMetric(ipReuseAvgDesc, prometheus.GaugeValue, c.reuseIPs.sum/float64(c.reuseIPs.count))
+	ch <- prometheus.MustNewConstHistogram(ipReuseHistogramDesc, c.reuseIPs.count, c.reuseIPs.sum, c.reuseIPs.buckets)
 
 	return nil
 }

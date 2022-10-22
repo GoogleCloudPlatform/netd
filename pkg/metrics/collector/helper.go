@@ -17,7 +17,7 @@ limitations under the License.
 package collector
 
 import (
-	"io/ioutil"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -29,7 +29,7 @@ var stackType string
 // readUintFromFile reads a uint from file given by path. The file is supposed to only contain a single uint
 // in base 10. Otherwise, an error will be returned.
 func readUintFromFile(path string) (uint64, error) {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return 0, err
 	}

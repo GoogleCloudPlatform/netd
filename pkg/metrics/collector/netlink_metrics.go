@@ -18,7 +18,6 @@ package collector
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"sync"
@@ -235,7 +234,7 @@ func NewNetlinkCollector() (Collector, error) {
 }
 
 func getNamespaces() ([]netns.NsHandle, error) {
-	files, err := ioutil.ReadDir("/proc")
+	files, err := os.ReadDir("/proc")
 	if err != nil {
 		return nil, err
 	}

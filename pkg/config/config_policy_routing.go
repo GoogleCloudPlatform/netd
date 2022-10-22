@@ -62,7 +62,6 @@ var (
 	defaultGateway   net.IP
 	defaultLinkIndex int
 	defaultNetdev    string
-	localLinkIndex   int
 	localNetdev      string
 )
 
@@ -91,7 +90,7 @@ func init() {
 		return
 	}
 	defaultLinkIndex, defaultNetdev, defaultGateway = f(net.IPv4(8, 8, 8, 8))
-	localLinkIndex, localNetdev, _ = f(net.IPv4(127, 0, 0, 1))
+	_, localNetdev, _ = f(net.IPv4(127, 0, 0, 1))
 
 	sysctlReversePathFilter := fmt.Sprintf("net.ipv4.conf.%s.rp_filter", defaultNetdev)
 	hairpinMaskStr := fmt.Sprintf("0x%x", hairpinMask)

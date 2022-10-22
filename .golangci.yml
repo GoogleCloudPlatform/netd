@@ -59,24 +59,22 @@ output:
 linters:
   disable-all: true
   enable:
-  - deadcode
   - errcheck
   - gocritic
   - gofmt
   - goimports
-  - golint
   - gosimple
   - govet
   - ineffassign
   - lll
   - misspell
+  - revive
   - staticcheck
-  - structcheck
   - stylecheck
   - typecheck
   - unconvert
   - unparam
-  - varcheck
+  - unused
   fast: false
 
 linters-settings:

@@ -344,6 +344,51 @@ version: # @HELP outputs the version string
 version:
 	echo $(VERSION)
 
+test: # @HELP runs tests
+test: container
+	echo "Building and testing inotify"
+	docker run                              \
+	    -i                                  \
+	    --rm                                \
+	    -v $$(pwd)/inotify:/src             \
+	    --env HTTP_PROXY="$(HTTP_PROXY)"    \
+	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
+	    alpine:3.16                         \
+	    sh -c 'cp -a /src /inotify && cd /inotify && ./build.sh && ./test.sh'
+	echo "Running shell-test.sh"
+	docker run                              \
+	    -i                                  \
+	    --rm                                \
+	    -v $$(pwd)/shell-test.sh:/test.sh   \
+	    --env HTTP_PROXY="$(HTTP_PROXY)"    \
+	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
+	    $(REGISTRY)/$(BINS):$(TAG)          \
+	    /test.sh
+
+lint: # @HELP runs lint
+lint:
+	echo "Linting inotify"
+	docker run                              \
+	    -i                                  \
+	    --rm                                \
+	    -v $$(pwd)/inotify:/src             \
+	    -w /src                             \
+	    --env HTTP_PROXY="$(HTTP_PROXY)"    \
+	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
+	    python:3-alpine                     \
+	    sh -c 'pip install cpplint && cpplint --recursive .'
+	echo "Linting install-cni.sh"
+	docker run                              \
+	    -i                                  \
+	    --rm                                \
+	    -u $$(id -u):$$(id -g)              \
+	    -v $$(pwd):/src                     \
+	    -w /src                             \
+	    --env HTTP_PROXY="$(HTTP_PROXY)"    \
+	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
+	    koalaman/shellcheck                 \
+	    install-cni.sh
+
 $(BUILD_DIRS):
 	mkdir -p $@
 

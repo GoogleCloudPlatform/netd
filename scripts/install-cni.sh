@@ -86,21 +86,25 @@ fi
 
 if [ -f "/host/home/kubernetes/bin/gke" ]
 then
+  # shellcheck disable=SC2001,SC2086
   cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniType#gke#g")
 else
+  # shellcheck disable=SC2001,SC2086
   cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniType#ptp#g")
 fi
 
 if [ "${ENABLE_BANDWIDTH_PLUGIN}" == "true" ] && [ -f "/host/home/kubernetes/bin/bandwidth" ]
 then
+  # shellcheck disable=SC2001,SC2086
   cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniBandwidthPlugin#,{\"type\": \"bandwidth\",\"capabilities\": {\"bandwidth\": true}}#g")
 else
+  # shellcheck disable=SC2001,SC2086
   cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniBandwidthPlugin##g")
 fi
 
 token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
 node_url="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/nodes/${HOSTNAME}"
-response=$(curl -k -s -H "Authorization: Bearer $token" $node_url)
+response=$(curl -k -s -H "Authorization: Bearer $token" "$node_url")
 
 if [ "${MIGRATE_TO_DPV2:-}" == "true" ]
 then
@@ -115,16 +119,19 @@ fi
 if [ "${ENABLE_CILIUM_PLUGIN}" == "true" ]
 then
   echo "Adding Cilium plug-in to the CNI config."
+  # shellcheck disable=SC2001,SC2086
   cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniCiliumPlugin#,{\"type\": \"cilium-cni\"}#g")
   # inotify calls back to the beginning of this script.
   inotify /host/home/kubernetes/bin cilium-cni "$0" cilium_ready
   echo "Cilium plug-in now confirmed as ready."
 else
   echo "Not using Cilium plug-in."
+  # shellcheck disable=SC2001,SC2086
   cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniCiliumPlugin##g")
 fi
 
 # Fill CNI spec template.
+# shellcheck disable=SC2086
 ipv4_subnet=$(echo $response | jq '.spec.podCIDR')
 
 if [[ "${ipv4_subnet:-}" =~ ^\"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/[0-9][0-9]*\"$ ]]; then
@@ -137,6 +144,7 @@ else
 fi
 
 echo "Filling IPv4 subnet ${ipv4_subnet:-}"
+# shellcheck disable=SC2001,SC2086
 cni_spec=$(echo ${cni_spec:-} | sed -e "s#@ipv4Subnet#[{\"subnet\": ${ipv4_subnet:-}}]#g")
 
 if [ "$ENABLE_MASQUERADE" == "true" ]; then
@@ -176,6 +184,7 @@ if [ "${ENABLE_PRIVATE_IPV6_ACCESS:-}" == "true" ] || [ "$ENABLE_IPV6" == "true"
   if [ -n "${node_ipv6_addr:-}" ] && [ "${node_ipv6_addr}" != "null" ]; then
     echo "Found nic0 IPv6 address ${node_ipv6_addr:-}. Filling IPv6 subnet and route..."
 
+    # shellcheck disable=SC2001,SC2086
     cni_spec=$(echo ${cni_spec:-} | sed -e \
       "s#@ipv6SubnetOptional#, [{\"subnet\": \"${node_ipv6_addr:-}/112\"}]#g;
        s#@ipv6RouteOptional#, ${CNI_SPEC_IPV6_ROUTE:-{\"dst\": \"::/0\"\}}#g")
@@ -207,11 +216,13 @@ if [ "${ENABLE_PRIVATE_IPV6_ACCESS:-}" == "true" ] || [ "$ENABLE_IPV6" == "true"
     fi
   else
     echo "No IPv6 address found for nic0. Clearing IPv6 subnet and route..."
+    # shellcheck disable=SC2001,SC2086
     cni_spec=$(echo ${cni_spec:-} | \
       sed -e "s#@ipv6SubnetOptional##g; s#@ipv6RouteOptional##g")
   fi
 else
   echo "Clearing IPv6 subnet and route given private IPv6 access is disabled..."
+  # shellcheck disable=SC2001,SC2086
   cni_spec=$(echo ${cni_spec:-} | \
     sed -e "s#@ipv6SubnetOptional##g; s#@ipv6RouteOptional##g")
 fi
@@ -229,10 +240,12 @@ default_nic=$(route -n | grep -E '^0\.0\.0\.0\s+\S+\s+0\.0\.0\.0' | grep -oE '\S
 
 # Set mtu
 if [ -f "/sys/class/net/$default_nic/mtu" ]; then
-  MTU=$(cat /sys/class/net/$default_nic/mtu)
+  MTU=$(cat "/sys/class/net/$default_nic/mtu")
+  # shellcheck disable=SC2001,SC2086
   cni_spec=$(echo ${cni_spec:-} | sed -e "s#@mtu#$MTU#g")
   echo "Set the default mtu to $MTU, inherited from dev $default_nic"
 else
+  # shellcheck disable=SC2001,SC2086
   cni_spec=$(echo ${cni_spec:-} | sed -e "s#@mtu#1460#g")
   echo "Failed to read mtu from dev $default_nic, set the default mtu to 1460"
 fi
@@ -248,13 +261,14 @@ else
 fi
 
 # Atomically write CNI spec
-temp_file=$(mktemp ${output_file}.tmp.XXXXXX)
+temp_file=$(mktemp "${output_file}.tmp.XXXXXX")
+# shellcheck disable=SC2181
 if [ $? -ne 0 ]; then
   echo "Failed to create temp file, Exiting (1)..."
   exit 1
 fi
-trap "rm -f ${temp_file}" EXIT
-cat > ${temp_file} <<EOF
+trap 'rm -f "${temp_file}"' EXIT
+cat > "${temp_file}" <<EOF
 ${cni_spec:-}
 EOF
-mv ${temp_file} ${output_file}
+mv "${temp_file}" "${output_file}"

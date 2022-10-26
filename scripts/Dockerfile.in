@@ -114,30 +114,13 @@ ARG HASH_BINARY=0
 COPY bin/{ARG_OS}_{ARG_ARCH}/{ARG_BIN} /{ARG_BIN}
 
 
-## Start building the final image. Using an intermediate so we can stop in the middle and run the tests.
+## Start building the final image.
 
-FROM {ARG_FROM} AS intermediate
-
-COPY --from=stuff / /
-
-
-## Run shell-test.sh in a standalone container. The outcome is discarded.
-
-FROM intermediate AS test
-
-COPY shell-test.sh /shell-test.sh
-
-RUN /shell-test.sh
-
-
-## Continue from the intermediate container (before running shell-test.sh) and complete the final image.
-
-FROM intermediate
+FROM {ARG_FROM}
 
 MAINTAINER Jingyuan Liang <jingyuanliang@google.com>
 
-# This file is not being used. Include it to trigger the test run and allow manual testing.
-COPY --from=test /shell-test.sh /shell-test.sh
+COPY --from=stuff / /
 
 ENV HOME /
 

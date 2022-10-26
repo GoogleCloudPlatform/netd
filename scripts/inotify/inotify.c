@@ -1,3 +1,5 @@
+// Copyright 2022 Google LLC
+
 #include <errno.h>
 #include <limits.h>
 #include <poll.h>
@@ -20,12 +22,12 @@ const int kPollTimeout = 2000;
 char buf[1024 * (sizeof(struct inotify_event) + NAME_MAX + 1)];
 
 void run_callback_internal(char** callback) {
-  fflush(stdout); // avoid mixing with callback output.
+  fflush(stdout);  // avoid mixing with callback output.
 
   pid_t pid = fork();
   if (pid == -1) {
     perror("fork");
-    return; // let it retry at the next event or timeout.
+    return;  // let it retry at the next event or timeout.
   }
 
   if (pid == 0) {
@@ -42,14 +44,16 @@ void run_callback_internal(char** callback) {
         continue;
       }
       perror("waitpid");
-      exit(EXIT_FAILURE); // shouldn't happen; exit & don't risk leaking zombies.
+      exit(EXIT_FAILURE);  // shouldn't happen; don't risk leaking zombies.
     }
   } while (!WIFEXITED(status) && !WIFSIGNALED(status));
 
   if (WIFEXITED(status)) {
-    printf("inotify: %s exited with status %d (exit: %d)\n", callback[0], status, WEXITSTATUS(status));
+    printf("inotify: %s exited with status %d (exit: %d)\n",
+           callback[0], status, WEXITSTATUS(status));
   } else if (WIFSIGNALED(status)) {
-    printf("inotify: %s exited with status %d (signal: %d)\n", callback[0], status, WTERMSIG(status));
+    printf("inotify: %s exited with status %d (signal: %d)\n",
+           callback[0], status, WTERMSIG(status));
   } else {
     printf("inotify: %s exited with status %d\n", callback[0], status);
   }
@@ -70,13 +74,14 @@ void run_callback(char** callback, struct timespec *last, bool always) {
       exit(EXIT_FAILURE);
     }
 
-    long diff_milliseconds = (tp.tv_sec - last->tv_sec) * 1000 \
+    int diff_milliseconds = (tp.tv_sec - last->tv_sec) * 1000 \
                    + (tp.tv_nsec - last->tv_nsec) / 1000000;
     if (diff_milliseconds < kPollTimeout) {
       return;
     }
 
-    printf("inotify: calling %s after %ldms since the last run\n", callback[0], diff_milliseconds);
+    printf("inotify: calling %s after %dms since the last run\n",
+           callback[0], diff_milliseconds);
   }
 
   run_callback_internal(callback);
@@ -91,10 +96,14 @@ void run_callback(char** callback, struct timespec *last, bool always) {
 int main(int argc, char* argv[]) {
   if (argc < 4) {
     printf("Usage: %s path file callback [callback-arg]...\n", argv[0]);
-    printf("This utility watches inotify events at 'path', optionally filtered by file name 'file',\n"
-           "and calls 'callback' with 'callback-arg' upon inotify events firing. Additionally,\n"
-           "'callback' is also called at start up or every %d milliseconds if no inotify event fires.\n"
-           "This program exits as success when 'callback' exits as success, or keeps running otherwise.\n",
+    printf("This utility watches inotify events at 'path', "
+           "optionally filtered by file name 'file',\n"
+           "and calls 'callback' with 'callback-arg' "
+           "upon inotify events firing. Additionally,\n"
+           "'callback' is also called at start up or "
+           "every %d milliseconds if no inotify event fires.\n"
+           "This program exits as success when 'callback' "
+           "exits as success, or keeps running otherwise.\n",
            kPollTimeout);
     exit(EXIT_FAILURE);
   }
@@ -174,7 +183,8 @@ int main(int argc, char* argv[]) {
       continue;
     }
 
-    printf("inotify: calling %s for %d matching event(s)\n", callback[0], matches);
+    printf("inotify: calling %s for %d matching event(s)\n",
+           callback[0], matches);
     run_callback(callback, &tp, true);
   }
 }

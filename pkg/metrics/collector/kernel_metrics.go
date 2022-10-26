@@ -18,7 +18,7 @@ package collector
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 
@@ -116,7 +116,7 @@ func parseKeyValueLines(output, label string) (map[string]uint64, error) {
 
 func (c *kernelStatCollector) Update(ch chan<- prometheus.Metric) error {
 	// Get snmp values.
-	data, err := ioutil.ReadFile("/proc/net/snmp")
+	data, err := os.ReadFile("/proc/net/snmp")
 	if err != nil {
 		return fmt.Errorf("could not read proc/net/snmp")
 	}
@@ -136,7 +136,7 @@ func (c *kernelStatCollector) Update(ch chan<- prometheus.Metric) error {
 	}
 
 	// Get netstat values
-	data, err = ioutil.ReadFile("/proc/net/netstat")
+	data, err = os.ReadFile("/proc/net/netstat")
 	if err != nil {
 		return fmt.Errorf("could not read proc/net/netstat")
 	}

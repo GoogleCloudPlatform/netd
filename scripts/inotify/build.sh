@@ -19,7 +19,9 @@ file inotify
 # exit with error code 1 if the executable is dynamic, not static
 ldd inotify && exit 1 || true
 
-./test.sh
+# quick test; full test in ./test.sh
+./inotify / '' /bin/true
 
 mkdir -p /tmp/release/
-mv inotify /tmp/release/inotify
+# cp instead of mv so we can run ./test.sh later
+cp inotify /tmp/release/inotify

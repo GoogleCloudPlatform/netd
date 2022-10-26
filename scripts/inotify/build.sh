@@ -9,7 +9,7 @@ apk add build-base clang
 # gcc doesn't work for some reason: `configure: error: C compiler cannot create executables`
 export CC=clang
 
-${CC} -static inotify.c -o inotify
+${CC} -Wall -Wextra -Werror -O2 -static inotify.c -o inotify
 
 strip inotify
 

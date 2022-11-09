@@ -24,10 +24,11 @@ import (
 
 // NetdConfig defines the netd config
 type NetdConfig struct {
-	EnablePolicyRouting bool
-	ExcludeDNS          bool
-	EnableMasquerade    bool
-	ReconcileInterval   time.Duration
+	EnablePolicyRouting   bool
+	EnableSourceValidMark bool
+	ExcludeDNS            bool
+	EnableMasquerade      bool
+	ReconcileInterval     time.Duration
 }
 
 // NewNetdConfig creates a new netd config
@@ -39,6 +40,8 @@ func NewNetdConfig() *NetdConfig {
 func (nc *NetdConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&nc.EnablePolicyRouting, "enable-policy-routing", false,
 		"Enable policy routing.")
+	fs.BoolVar(&nc.EnableSourceValidMark, "enable-source-valid-mark", true,
+		"Whether to enable the src_valid_mark sysctl bit for policy routing.")
 	fs.BoolVar(&nc.ExcludeDNS, "exclude-dns", false,
 		"Whether to exclude DNS traffic from policy routing.")
 	fs.BoolVar(&nc.EnableMasquerade, "enable-masquerade", true,

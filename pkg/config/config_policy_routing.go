@@ -101,12 +101,6 @@ func init() {
 			DefaultValue: "1",
 			SysctlFunc:   sysctl.Sysctl,
 		},
-		SysctlConfig{
-			Key:          sysctlSrcValidMark,
-			Value:        "1",
-			DefaultValue: "0",
-			SysctlFunc:   sysctl.Sysctl,
-		},
 		IPTablesRuleConfig{
 			IPTablesChainSpec{
 				TableName:      tableMangle,
@@ -220,6 +214,13 @@ func init() {
 			RuleList: netlink.RuleList,
 		},
 	}
+}
+
+var SourceValidMarkConfig = SysctlConfig{
+	Key:          sysctlSrcValidMark,
+	Value:        "1",
+	DefaultValue: "0",
+	SysctlFunc:   sysctl.Sysctl,
 }
 
 var ExcludeDNSIPRuleConfigs = []Config{

@@ -33,13 +33,17 @@ type NetworkConfigController struct {
 }
 
 // NewNetworkConfigController creates a new NetworkConfigController
-func NewNetworkConfigController(enablePolicyRouting, enableMasquerade, excludeDNS bool, reconcileInterval time.Duration) *NetworkConfigController {
+func NewNetworkConfigController(enablePolicyRouting, enableMasquerade, enableSourceValidMark, excludeDNS bool,
+	reconcileInterval time.Duration) *NetworkConfigController {
 	var configSet []*config.Set
 
 	configSet = append(configSet, &config.PolicyRoutingConfigSet)
 
 	if enablePolicyRouting {
 		config.PolicyRoutingConfigSet.Enabled = true
+	}
+	if enableSourceValidMark {
+		configSet[0].Configs = append(configSet[0].Configs, config.SourceValidMarkConfig)
 	}
 	if excludeDNS {
 		configSet[0].Configs = append(configSet[0].Configs, config.ExcludeDNSIPRuleConfigs...)

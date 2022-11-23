@@ -191,6 +191,17 @@ if [ "${ENABLE_PRIVATE_IPV6_ACCESS:-}" == "true" ] || [ "$ENABLE_IPV6" == "true"
 
     # Ensure the IPv6 firewall rules are as expected.
     # These rules mirror the IPv4 rules installed by kubernetes/cluster/gce/gci/configure-helper.sh
+    
+    # We need to add rules to accept all TCP/UDP/ICMP/SCTP packets or HostNetwork pods, NodePort Services
+    # and Healtcheck probes between others will not work.
+    if ip6tables -w -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
+      echo "Add rules to accept all inbound TCP/UDP/ICMP/SCTP IPv6 packets"
+      ip6tables -w -A INPUT -w -p tcp -j ACCEPT
+      ip6tables -w -A INPUT -w -p udp -j ACCEPT
+      ip6tables -w -A INPUT -w -p icmpv6 -j ACCEPT
+      ip6tables -w -A INPUT -w -p sctp -j ACCEPT
+    fi
+  
     if ip6tables -w -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
       echo "Add rules to accept all forwarded TCP/UDP/ICMP/SCTP IPv6 packets"
       ip6tables -A FORWARD -w -p tcp -j ACCEPT

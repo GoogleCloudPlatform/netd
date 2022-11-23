@@ -196,10 +196,10 @@ if [ "${ENABLE_PRIVATE_IPV6_ACCESS:-}" == "true" ] || [ "$ENABLE_IPV6" == "true"
     # and Healtcheck probes between others will not work.
     if ip6tables -w -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
       echo "Add rules to accept all inbound TCP/UDP/ICMP/SCTP IPv6 packets"
-      ip6tables -w -A INPUT -w -p tcp -j ACCEPT
-      ip6tables -w -A INPUT -w -p udp -j ACCEPT
-      ip6tables -w -A INPUT -w -p icmpv6 -j ACCEPT
-      ip6tables -w -A INPUT -w -p sctp -j ACCEPT
+      ip6tables -A INPUT -w -p tcp -j ACCEPT
+      ip6tables -A INPUT -w -p udp -j ACCEPT
+      ip6tables -A INPUT -w -p icmpv6 -j ACCEPT
+      ip6tables -A INPUT -w -p sctp -j ACCEPT
     fi
   
     if ip6tables -w -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
@@ -212,12 +212,7 @@ if [ "${ENABLE_PRIVATE_IPV6_ACCESS:-}" == "true" ] || [ "$ENABLE_IPV6" == "true"
 
     # Ensure the other IPv6 rules we need are also installed, and in before any other node rules.
     # Always allow ICMP
-    ip6tables -I INPUT -p icmpv6 -j ACCEPT -w
     ip6tables -I OUTPUT -p icmpv6 -j ACCEPT -w
-    # Note that this expects dhclient to actually obtain and assign an IPv6 address to eth0.
-    ip6tables -I INPUT -p udp -m udp --dport 546 -j ACCEPT
-    # Accept return traffic inbound
-    ip6tables -I INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT -w
     # Accept new and return traffic outbound
     ip6tables -I OUTPUT -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT -w
 

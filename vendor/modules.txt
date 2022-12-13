@@ -7,11 +7,11 @@ github.com/PuerkitoBio/urlesc
 # github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973
 ## explicit
 github.com/beorn7/perks/quantile
-# github.com/containernetworking/plugins v0.7.3
-## explicit
+# github.com/containernetworking/plugins v1.1.1
+## explicit; go 1.17
 github.com/containernetworking/plugins/pkg/utils/sysctl
-# github.com/coreos/go-iptables v0.4.0
-## explicit
+# github.com/coreos/go-iptables v0.6.0
+## explicit; go 1.16
 github.com/coreos/go-iptables/iptables
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
@@ -111,11 +111,11 @@ github.com/prometheus/procfs/xfs
 # github.com/spf13/pflag v1.0.5
 ## explicit; go 1.12
 github.com/spf13/pflag
-# github.com/vishvananda/netlink v1.1.1-0.20200210145206-a2e8781202af
+# github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
 ## explicit; go 1.12
 github.com/vishvananda/netlink
 github.com/vishvananda/netlink/nl
-# github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df
+# github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f
 ## explicit; go 1.12
 github.com/vishvananda/netns
 # golang.org/x/net v0.0.0-20220722155237-a158d28d115b

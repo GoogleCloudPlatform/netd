@@ -43,12 +43,12 @@ func NewHtbClass(attrs ClassAttrs, cattrs HtbClassAttrs) *HtbClass {
 	if buffer == 0 {
 		buffer = uint32(float64(rate)/Hz() + float64(mtu))
 	}
-	buffer = uint32(Xmittime(rate, buffer))
+	buffer = Xmittime(rate, buffer)
 
 	if cbuffer == 0 {
 		cbuffer = uint32(float64(ceil)/Hz() + float64(mtu))
 	}
-	cbuffer = uint32(Xmittime(ceil, cbuffer))
+	cbuffer = Xmittime(ceil, cbuffer)
 
 	return &HtbClass{
 		ClassAttrs: attrs,
@@ -56,9 +56,9 @@ func NewHtbClass(attrs ClassAttrs, cattrs HtbClassAttrs) *HtbClass {
 		Ceil:       ceil,
 		Buffer:     buffer,
 		Cbuffer:    cbuffer,
-		Quantum:    10,
 		Level:      0,
-		Prio:       0,
+		Prio:       cattrs.Prio,
+		Quantum:    cattrs.Quantum,
 	}
 }
 
@@ -176,6 +176,12 @@ func classPayload(req *nl.NetlinkRequest, class Class) error {
 		options.AddRtAttr(nl.TCA_HTB_PARMS, opt.Serialize())
 		options.AddRtAttr(nl.TCA_HTB_RTAB, SerializeRtab(rtab))
 		options.AddRtAttr(nl.TCA_HTB_CTAB, SerializeRtab(ctab))
+		if htb.Rate >= uint64(1<<32) {
+			options.AddRtAttr(nl.TCA_HTB_RATE64, nl.Uint64Attr(htb.Rate))
+		}
+		if htb.Ceil >= uint64(1<<32) {
+			options.AddRtAttr(nl.TCA_HTB_CEIL64, nl.Uint64Attr(htb.Ceil))
+		}
 	case "hfsc":
 		hfsc := class.(*HfscClass)
 		opt := nl.HfscCopt{}
@@ -306,6 +312,10 @@ func parseHtbClassData(class Class, data []syscall.NetlinkRouteAttr) (bool, erro
 			htb.Quantum = opt.Quantum
 			htb.Level = opt.Level
 			htb.Prio = opt.Prio
+		case nl.TCA_HTB_RATE64:
+			htb.Rate = native.Uint64(datum.Value[0:8])
+		case nl.TCA_HTB_CEIL64:
+			htb.Ceil = native.Uint64(datum.Value[0:8])
 		}
 	}
 	return detailed, nil

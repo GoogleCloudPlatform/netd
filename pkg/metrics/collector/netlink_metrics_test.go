@@ -28,7 +28,7 @@ import (
 )
 
 func TestCreateStatMap(t *testing.T) {
-	myPod := &v1.Pod{metav1.TypeMeta{}, metav1.ObjectMeta{Name: "pod", Namespace: "default"}, v1.PodSpec{}, v1.PodStatus{}}
+	myPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "default"}, Spec: v1.PodSpec{}, Status: v1.PodStatus{}}
 	ipMap.ipMap = map[string]*v1.Pod{"my-ip": myPod}
 
 	tcpInfo := tcp.LinuxTCPInfo{Retrans: 4}
@@ -48,7 +48,7 @@ func TestCreateStatMap(t *testing.T) {
 }
 
 func TestSafeIPAdd(t *testing.T) {
-	myPod := &v1.Pod{metav1.TypeMeta{}, metav1.ObjectMeta{Name: "pod", Namespace: "default"}, v1.PodSpec{}, v1.PodStatus{}}
+	myPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "default"}, Spec: v1.PodSpec{}, Status: v1.PodStatus{}}
 	ipMap.safeIPWrite("my-ip", myPod)
 	if ipMap.ipMap["my-ip"] != myPod {
 		t.Fatalf("Fatal, got %+q, wanted %+q", ipMap.ipMap["my-ip"], myPod)
@@ -56,7 +56,7 @@ func TestSafeIPAdd(t *testing.T) {
 }
 
 func TestSafeIPDelete(t *testing.T) {
-	myPod := &v1.Pod{metav1.TypeMeta{}, metav1.ObjectMeta{Name: "pod", Namespace: "default"}, v1.PodSpec{}, v1.PodStatus{}}
+	myPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "default"}, Spec: v1.PodSpec{}, Status: v1.PodStatus{}}
 
 	ipMap.safeIPWrite("my-ip", myPod)
 	ipMap.safeIPDelete("my-ip")
@@ -66,7 +66,7 @@ func TestSafeIPDelete(t *testing.T) {
 }
 
 func TestSafeIPRead(t *testing.T) {
-	myPod := &v1.Pod{metav1.TypeMeta{}, metav1.ObjectMeta{Name: "pod", Namespace: "default"}, v1.PodSpec{}, v1.PodStatus{}}
+	myPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "default"}, Spec: v1.PodSpec{}, Status: v1.PodStatus{}}
 
 	ipMap.safeIPWrite("my-ip", myPod)
 	got, ok := ipMap.safeIPRead("my-ip")

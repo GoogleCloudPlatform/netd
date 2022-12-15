@@ -79,6 +79,7 @@ func NewNodeCollector(enabledCollectors []string, proc string, stack string) (*N
 		} else {
 			return nil, nil, err
 		}
+		glog.Infof("Intializing metrics: %v", name)
 	}
 	return &NodeCollector{Collectors: collectors, startTime: time.Now().Unix()},
 		[]prometheus.Collector{scrapeDurationHist, scrapeFailureCount},

@@ -85,7 +85,6 @@ var (
 
 func init() {
 	flag.BoolVar(&enablePodWatch, "enable-pod-watch", false, "Enable pod watch on netlink_metrics")
-	glog.Infof("Initializing netlink metrics")
 	registerCollector("netlink_metrics", NewNetlinkCollector)
 }
 

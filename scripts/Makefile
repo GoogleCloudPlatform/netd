@@ -45,9 +45,9 @@ VERSION ?= $(shell git describe --tags --always --dirty)
 DBG ?=
 
 # Third party binary dependencies.
-CURL_VERSION ?= 7.84.0
+CURL_VERSION ?= 7.87.0
 JQ_VERSION ?= 1.6
-TOYBOX_VERSION ?= 0.8.8
+TOYBOX_VERSION ?= 0.8.9
 SPDX_LICENSE_VERSION ?= 3.18
 
 THIRD_PARTY_SOURCE_FILES = third_party/curl status.d/curl third_party/jq status.d/jq third_party/toybox status.d/toybox third_party/license-list-data
@@ -238,13 +238,7 @@ third_party/jq:
 
 third_party/toybox:
 	git clone $(GIT_BASE)/landley/toybox $@
-	# https://github.com/landley/toybox/issues/389
-	pushd $@; git checkout $(TOYBOX_VERSION); git cherry-pick -n \
-		6b78f8de9edab04b520e6c6ed39bf7b36021d146 \
-		e4103b8183cfb9992badd3fbc9827e9bc4a74c38 \
-		a83d1d59bf40ce9282bc347ddcd3cec585c3d254 \
-		61daed9c2e1f6e305893fac894c2831803658ddb \
-	; popd
+	pushd $@; git checkout $(TOYBOX_VERSION); popd
 
 third_party/license-list-data:
 	git clone $(GIT_BASE)/spdx/license-list-data $@

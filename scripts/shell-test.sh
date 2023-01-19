@@ -1,5 +1,5 @@
 #!/bin/bash
-#
+# shellcheck disable=SC2015
 
 FAIL_COUNT=0
 
@@ -22,13 +22,11 @@ run_test test_cmd
 run_test sleep_cmd
 sleep 1 && pass || fail
 
-run_test sed_cmd
-[[ "$(echo "cfg1:@val,cfg2:ok" | sed -e "s#@val#test#g")" == "cfg1:test,cfg2:ok" ]] && pass || fail
-
 run_test curl_cmd
 [[ "$(curl -s -k -H "Header: netd-test" https://httpbin.org/headers)" =~ netd-test ]] && pass || fail
 
 run_test ipv4_subnet
+# shellcheck disable=SC2050
 [[ '"10.0.0.0/8"' =~ ^\"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/[0-9][0-9]*\"$ ]] && pass || fail
 
 run_test iptables_cmd_exists
@@ -74,5 +72,8 @@ echo >/netd-test && rm /netd-test && [[ ! -f /netd-test ]] && pass || fail
 
 run_test timeout_cmd
 timeout 2s sleep 1s && pass || fail
+
+run_test base64_cmd
+[[ "$(echo -n AAA | base64 -w 0)" == QUFB ]] && pass || fail
 
 exit $FAIL_COUNT

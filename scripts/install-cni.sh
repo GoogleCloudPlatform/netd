@@ -84,31 +84,24 @@ else
   cni_spec=${CNI_SPEC_TEMPLATE}
 fi
 
-if [ -f "/host/home/kubernetes/bin/gke" ]
-then
-  # shellcheck disable=SC2001,SC2086
-  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniType#gke#g")
+if [ -f "/host/home/kubernetes/bin/gke" ]; then
+  cni_spec=${cni_spec//@cniType/gke}
 else
-  # shellcheck disable=SC2001,SC2086
-  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniType#ptp#g")
+  cni_spec=${cni_spec//@cniType/ptp}
 fi
 
-if [ "${ENABLE_BANDWIDTH_PLUGIN}" == "true" ] && [ -f "/host/home/kubernetes/bin/bandwidth" ]
-then
-  # shellcheck disable=SC2001,SC2086
-  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniBandwidthPlugin#,{\"type\": \"bandwidth\",\"capabilities\": {\"bandwidth\": true}}#g")
+if [ "${ENABLE_BANDWIDTH_PLUGIN}" == "true" ] && [ -f "/host/home/kubernetes/bin/bandwidth" ]; then
+  cni_spec=${cni_spec//@cniBandwidthPlugin/, {\"type\": \"bandwidth\", \"capabilities\": {\"bandwidth\": true\}\}}
 else
-  # shellcheck disable=SC2001,SC2086
-  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniBandwidthPlugin##g")
+  cni_spec=${cni_spec//@cniBandwidthPlugin/}
 fi
 
 token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
 node_url="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/nodes/${HOSTNAME}"
 response=$(curl -k -s -H "Authorization: Bearer $token" "$node_url")
 
-if [ "${MIGRATE_TO_DPV2:-}" == "true" ]
-then
-  DPV2_MIGRATION_READY=$(printf '%s' "$response" | jq '.metadata.labels."cloud.google.com/gke-dpv2-migration-ready"')
+if [ "${MIGRATE_TO_DPV2:-}" == "true" ]; then
+  DPV2_MIGRATION_READY=$(jq '.metadata.labels."cloud.google.com/gke-dpv2-migration-ready"' <<<"$response")
   echo "Migration to DPv2 in progress; node ready: '${DPV2_MIGRATION_READY}'"
   if [ "${DPV2_MIGRATION_READY}" != '"true"' ] # DPV2_MIGRATION_READY is a JSON string thus double quotes
   then
@@ -116,23 +109,19 @@ then
   fi
 fi
 
-if [ "${ENABLE_CILIUM_PLUGIN}" == "true" ]
-then
+if [ "${ENABLE_CILIUM_PLUGIN}" == "true" ]; then
   echo "Adding Cilium plug-in to the CNI config."
-  # shellcheck disable=SC2001,SC2086
-  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniCiliumPlugin#,{\"type\": \"cilium-cni\"}#g")
+  cni_spec=${cni_spec//@cniCiliumPlugin/, {\"type\": \"cilium-cni\"\}}
   # inotify calls back to the beginning of this script.
   inotify /host/home/kubernetes/bin cilium-cni "$0" cilium_ready
   echo "Cilium plug-in now confirmed as ready."
 else
   echo "Not using Cilium plug-in."
-  # shellcheck disable=SC2001,SC2086
-  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@cniCiliumPlugin##g")
+  cni_spec=${cni_spec//@cniCiliumPlugin/}
 fi
 
 # Fill CNI spec template.
-# shellcheck disable=SC2086
-ipv4_subnet=$(echo $response | jq '.spec.podCIDR')
+ipv4_subnet=$(jq '.spec.podCIDR' <<<"$response")
 
 if [[ "${ipv4_subnet:-}" =~ ^\"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/[0-9][0-9]*\"$ ]]; then
   echo "PodCIDR validation succeeded: ${ipv4_subnet:-}"
@@ -144,16 +133,12 @@ else
 fi
 
 echo "Filling IPv4 subnet ${ipv4_subnet:-}"
-# shellcheck disable=SC2001,SC2086
-cni_spec=$(echo ${cni_spec:-} | sed -e "s#@ipv4Subnet#[{\"subnet\": ${ipv4_subnet:-}}]#g")
+cni_spec=${cni_spec//@ipv4Subnet/[{\"subnet\": ${ipv4_subnet:-}\}]}
 
 if [ "$ENABLE_MASQUERADE" == "true" ]; then
   echo "Config MASQUERADE rule"
 
-  rule_exist=0
-  iptables -t nat -n --list IP-MASQ >/dev/null 2>&1 || rule_exist=$? 
-  if [ $rule_exist -eq 0 ]
-  then
+  if iptables -t nat -n --list IP-MASQ >/dev/null 2>&1; then
     echo "IP-MASQ Chain exists, skip creating IP-MASQ Chain and MASQ rules."
   else
     echo "Creating IP-MASQ Chain and MASQ rules."
@@ -175,7 +160,7 @@ if [ "$ENABLE_MASQUERADE" == "true" ]; then
   fi
 fi
 
-STACK_TYPE=$(printf '%s' "$response" | jq '.metadata.labels."cloud.google.com/gke-stack-type"')
+STACK_TYPE=$(jq '.metadata.labels."cloud.google.com/gke-stack-type"' <<<"$response")
 echo "Node stack type label: '${STACK_TYPE:-}'"
 
 if [ "${ENABLE_PRIVATE_IPV6_ACCESS:-}" == "true" ] || [ "$ENABLE_IPV6" == "true" ] || [ "${STACK_TYPE:-}" == '"IPV4_IPV6"' ]; then
@@ -184,14 +169,12 @@ if [ "${ENABLE_PRIVATE_IPV6_ACCESS:-}" == "true" ] || [ "$ENABLE_IPV6" == "true"
   if [ -n "${node_ipv6_addr:-}" ] && [ "${node_ipv6_addr}" != "null" ]; then
     echo "Found nic0 IPv6 address ${node_ipv6_addr:-}. Filling IPv6 subnet and route..."
 
-    # shellcheck disable=SC2001,SC2086
-    cni_spec=$(echo ${cni_spec:-} | sed -e \
-      "s#@ipv6SubnetOptional#, [{\"subnet\": \"${node_ipv6_addr:-}/112\"}]#g;
-       s#@ipv6RouteOptional#, ${CNI_SPEC_IPV6_ROUTE:-{\"dst\": \"::/0\"\}}#g")
+    cni_spec=${cni_spec//@ipv6SubnetOptional/, [{\"subnet\": \"${node_ipv6_addr:-}/112\"\}]}
+    cni_spec=${cni_spec//@ipv6RouteOptional/, ${CNI_SPEC_IPV6_ROUTE:-{\"dst\": \"::/0\"\}}}
 
     # Ensure the IPv6 firewall rules are as expected.
     # These rules mirror the IPv4 rules installed by kubernetes/cluster/gce/gci/configure-helper.sh
-    
+
     if ip6tables -w -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
       echo "Add rules to accept all inbound TCP/UDP/ICMP/SCTP IPv6 packets"
       ip6tables -A INPUT -w -p tcp -j ACCEPT
@@ -199,7 +182,7 @@ if [ "${ENABLE_PRIVATE_IPV6_ACCESS:-}" == "true" ] || [ "$ENABLE_IPV6" == "true"
       ip6tables -A INPUT -w -p icmpv6 -j ACCEPT
       ip6tables -A INPUT -w -p sctp -j ACCEPT
     fi
-  
+
     if ip6tables -w -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
       echo "Add rules to accept all forwarded TCP/UDP/ICMP/SCTP IPv6 packets"
       ip6tables -A FORWARD -w -p tcp -j ACCEPT
@@ -220,15 +203,13 @@ if [ "${ENABLE_PRIVATE_IPV6_ACCESS:-}" == "true" ] || [ "$ENABLE_IPV6" == "true"
     fi
   else
     echo "No IPv6 address found for nic0. Clearing IPv6 subnet and route..."
-    # shellcheck disable=SC2001,SC2086
-    cni_spec=$(echo ${cni_spec:-} | \
-      sed -e "s#@ipv6SubnetOptional##g; s#@ipv6RouteOptional##g")
+    cni_spec=${cni_spec//@ipv6SubnetOptional/}
+    cni_spec=${cni_spec//@ipv6RouteOptional/}
   fi
 else
   echo "Clearing IPv6 subnet and route given private IPv6 access is disabled..."
-  # shellcheck disable=SC2001,SC2086
-  cni_spec=$(echo ${cni_spec:-} | \
-    sed -e "s#@ipv6SubnetOptional##g; s#@ipv6RouteOptional##g")
+  cni_spec=${cni_spec//@ipv6SubnetOptional/}
+  cni_spec=${cni_spec//@ipv6RouteOptional/}
 fi
 
 # Format of `route` output:
@@ -245,12 +226,10 @@ default_nic=$(route -n | grep -E '^0\.0\.0\.0\s+\S+\s+0\.0\.0\.0' | grep -oE '\S
 # Set mtu
 if [ -f "/sys/class/net/$default_nic/mtu" ]; then
   MTU=$(cat "/sys/class/net/$default_nic/mtu")
-  # shellcheck disable=SC2001,SC2086
-  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@mtu#$MTU#g")
+  cni_spec=${cni_spec//@mtu/$MTU}
   echo "Set the default mtu to $MTU, inherited from dev $default_nic"
 else
-  # shellcheck disable=SC2001,SC2086
-  cni_spec=$(echo ${cni_spec:-} | sed -e "s#@mtu#1460#g")
+  cni_spec=${cni_spec//@mtu/1460}
   echo "Failed to read mtu from dev $default_nic, set the default mtu to 1460"
 fi
 
@@ -265,14 +244,14 @@ else
 fi
 
 # Atomically write CNI spec
-temp_file=$(mktemp "${output_file}.tmp.XXXXXX")
-# shellcheck disable=SC2181
-if [ $? -ne 0 ]; then
+if ! temp_file=$(mktemp -- "${output_file}.tmp.XXXXXX"); then
   echo "Failed to create temp file, Exiting (1)..."
   exit 1
 fi
-trap 'rm -f "${temp_file}"' EXIT
-cat > "${temp_file}" <<EOF
-${cni_spec:-}
-EOF
-mv "${temp_file}" "${output_file}"
+trap 'rm -f -- "${temp_file}"' EXIT
+cat <<<"${cni_spec:-}" >"${temp_file}"
+mv -- "${temp_file}" "${output_file}"
+
+# Log the CNI spec written above in log
+echo "CNI spec at ${output_file}, compact: $(jq -c . -- "${output_file}")"
+echo "CNI spec at ${output_file}, base64: $(base64 -w 0 -- "${output_file}")"

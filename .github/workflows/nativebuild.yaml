@@ -6,7 +6,7 @@ jobs:
   nativebuild:
     strategy:
       matrix:
-        go-version: [ "1.18", "1.19" ]
+        go-version: [ "1.18", "1.19", "1.20" ]
         platform: [ "ubuntu-latest" ]
     runs-on: ${{ matrix.platform }}
     steps:

@@ -30,7 +30,7 @@ ALL_PLATFORMS ?= linux/amd64 linux/arm linux/arm64 linux/ppc64le linux/s390x
 
 # The "FROM" part of the Dockerfile.  This should be a manifest-list which
 # supports all of the platforms listed in ALL_PLATFORMS.
-BASE_IMAGE ?= k8s.gcr.io/build-image/distroless-iptables:v0.1.2
+BASE_IMAGE ?= registry.k8s.io/build-image/distroless-iptables:v0.2.0
 
 # Where to push the docker images.
 REGISTRY ?= gcr.io/gke-release-staging
@@ -60,7 +60,7 @@ ARCH := $(if $(GOARCH),$(GOARCH),$(shell go env GOARCH))
 
 TAG := $(VERSION)__$(OS)_$(ARCH)
 
-GO_VERSION := 1.19
+GO_VERSION := 1.20
 BUILD_IMAGE := golang:$(GO_VERSION)-alpine
 
 BIN_EXTENSION :=
@@ -78,6 +78,9 @@ BUILDX_NAME := $(shell basename $$(pwd))
 GOFLAGS ?=
 HTTP_PROXY ?=
 HTTPS_PROXY ?=
+
+# Because we store the module cache locally.
+GOFLAGS := $(GOFLAGS) -modcacherw
 
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-container' rule.
@@ -128,8 +131,7 @@ BUILD_DIRS := bin/$(OS)_$(ARCH)                   \
               bin/tools                           \
               .go/bin/$(OS)_$(ARCH)               \
               .go/bin/$(OS)_$(ARCH)/$(OS)_$(ARCH) \
-              .go/cache                           \
-              .go/pkg
+              .go/cache
 
 # Each outbin target is just a facade for the respective stampfile target.
 # This `eval` establishes the dependencies for each.
@@ -170,7 +172,8 @@ go-build: | $(BUILD_DIRS)
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin                \
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin/$(OS)_$(ARCH)  \
 	    -v $$(pwd)/.go/cache:/.cache                            \
-	    -v $$(pwd)/.go/pkg:/go/pkg                              \
+	    --env GOCACHE="/.cache/gocache"                         \
+	    --env GOMODCACHE="/.cache/gomodcache"                   \
 	    --env ARCH="$(ARCH)"                                    \
 	    --env OS="$(OS)"                                        \
 	    --env VERSION="$(VERSION)"                              \
@@ -194,7 +197,8 @@ shell: | $(BUILD_DIRS)
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin                \
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin/$(OS)_$(ARCH)  \
 	    -v $$(pwd)/.go/cache:/.cache                            \
-	    -v $$(pwd)/.go/pkg:/go/pkg                              \
+	    --env GOCACHE="/.cache/gocache"                         \
+	    --env GOMODCACHE="/.cache/gomodcache"                   \
 	    --env ARCH="$(ARCH)"                                    \
 	    --env OS="$(OS)"                                        \
 	    --env VERSION="$(VERSION)"                              \
@@ -208,40 +212,46 @@ shell: | $(BUILD_DIRS)
 LICENSES = .licenses
 
 $(LICENSES): | $(BUILD_DIRS)
-	docker run                              \
-	    -i                                  \
-	    --rm                                \
-	    -u $$(id -u):$$(id -g)              \
-	    -v $$(pwd)/tools:/src               \
-	    -w /src                             \
-	    -v $$(pwd)/bin/tools:/go/bin        \
-	    -v $$(pwd)/.go/cache:/.cache        \
-	    -v $$(pwd)/.go/pkg:/go/pkg          \
-	    --env CGO_ENABLED=0                 \
-	    --env HTTP_PROXY="$(HTTP_PROXY)"    \
-	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
-	    $(BUILD_IMAGE)                      \
+	# Don't assume that `go` is available locally.
+	docker run                                 \
+	    -i                                     \
+	    --rm                                   \
+	    -u $$(id -u):$$(id -g)                 \
+	    -v $$(pwd)/tools:/src                  \
+	    -w /src                                \
+	    -v $$(pwd)/bin/tools:/go/bin           \
+	    -v $$(pwd)/.go/cache:/.cache           \
+	    --env GOCACHE="/.cache/gocache"        \
+	    --env GOMODCACHE="/.cache/gomodcache"  \
+	    --env CGO_ENABLED=0                    \
+	    --env HTTP_PROXY="$(HTTP_PROXY)"       \
+	    --env HTTPS_PROXY="$(HTTPS_PROXY)"     \
+	    $(BUILD_IMAGE)                         \
 	    go install github.com/google/go-licenses
-	rm -rf $(LICENSES) $(LICENSES).dir
-	mkdir $(LICENSES).dir
+	# The tool runs in a container because it execs `go`, which doesn't
+	# play nicely with CI.  The tool also wants its output dir to not
+	# exist, so we can't just volume mount $(LICENSES).
+	rm -rf $(LICENSES).tmp
+	mkdir $(LICENSES).tmp
 	docker run                              \
 	    -i                                  \
 	    --rm                                \
 	    -u $$(id -u):$$(id -g)              \
-	    -v $$(pwd)/$(LICENSES).dir:/output  \
+	    -v $$(pwd)/$(LICENSES).tmp:/output  \
 	    -v $$(pwd):/src                     \
 	    -w /src                             \
 	    -v $$(pwd)/bin/tools:/go/bin        \
 	    -v $$(pwd)/.go/cache:/.cache        \
 	    -v $$(pwd)/.go/pkg:/go/pkg          \
-	    --env CGO_ENABLED=0                 \
 	    --env HTTP_PROXY="$(HTTP_PROXY)"    \
 	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
 	    $(BUILD_IMAGE)                      \
 	    go-licenses save ./... --save_path=/output/licenses
-	mv $(LICENSES).dir/licenses $(LICENSES)
-	rmdir $(LICENSES).dir
-	chmod -R a+rx $(LICENSES)
+	rm -rf $(LICENSES)
+	mv $(LICENSES).tmp/licenses $(LICENSES)
+	rmdir $(LICENSES).tmp
+	find $(LICENSES) -type d | xargs chmod 0755
+	find $(LICENSES) -type f | xargs chmod 0644
 
 CONTAINER_DOTFILES = $(foreach bin,$(BINS),.container-$(subst /,_,$(REGISTRY)/$(bin))-$(TAG))
 
@@ -303,19 +313,21 @@ push: container
 # This depends on github.com/estesp/manifest-tool.
 manifest-list: # @HELP builds a manifest list of containers for all platforms
 manifest-list: all-push
-	docker run                              \
-	    -i                                  \
-	    --rm                                \
-	    -u $$(id -u):$$(id -g)              \
-	    -v $$(pwd)/tools:/src               \
-	    -w /src                             \
-	    -v $$(pwd)/bin/tools:/go/bin        \
-	    -v $$(pwd)/.go/cache:/.cache        \
-	    -v $$(pwd)/.go/pkg:/go/pkg          \
-	    --env CGO_ENABLED=0                 \
-	    --env HTTP_PROXY="$(HTTP_PROXY)"    \
-	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
-	    $(BUILD_IMAGE)                      \
+	# Don't assume that `go` is available locally.
+	docker run                                 \
+	    -i                                     \
+	    --rm                                   \
+	    -u $$(id -u):$$(id -g)                 \
+	    -v $$(pwd)/tools:/src                  \
+	    -w /src                                \
+	    -v $$(pwd)/bin/tools:/go/bin           \
+	    -v $$(pwd)/.go/cache:/.cache           \
+	    --env GOCACHE="/.cache/gocache"        \
+	    --env GOMODCACHE="/.cache/gomodcache"  \
+	    --env CGO_ENABLED=0                    \
+	    --env HTTP_PROXY="$(HTTP_PROXY)"       \
+	    --env HTTPS_PROXY="$(HTTPS_PROXY)"     \
+	    $(BUILD_IMAGE)                         \
 	    go install github.com/estesp/manifest-tool/v2/cmd/manifest-tool
 	for bin in $(BINS); do                                    \
 	    platforms=$$(echo $(ALL_PLATFORMS) | sed 's/ /,/g');  \
@@ -343,7 +355,8 @@ test: | $(BUILD_DIRS)
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin                \
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin/$(OS)_$(ARCH)  \
 	    -v $$(pwd)/.go/cache:/.cache                            \
-	    -v $$(pwd)/.go/pkg:/go/pkg                              \
+	    --env GOCACHE="/.cache/gocache"                         \
+	    --env GOMODCACHE="/.cache/gomodcache"                   \
 	    --env ARCH="$(ARCH)"                                    \
 	    --env OS="$(OS)"                                        \
 	    --env VERSION="$(VERSION)"                              \
@@ -365,7 +378,8 @@ lint: | $(BUILD_DIRS)
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin                \
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin/$(OS)_$(ARCH)  \
 	    -v $$(pwd)/.go/cache:/.cache                            \
-	    -v $$(pwd)/.go/pkg:/go/pkg                              \
+	    --env GOCACHE="/.cache/gocache"                         \
+	    --env GOMODCACHE="/.cache/gomodcache"                   \
 	    --env ARCH="$(ARCH)"                                    \
 	    --env OS="$(OS)"                                        \
 	    --env VERSION="$(VERSION)"                              \

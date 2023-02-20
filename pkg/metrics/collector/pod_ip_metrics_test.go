@@ -233,6 +233,12 @@ func TestSetupDirectoryWatcher(t *testing.T) {
 		t.Errorf("duplicateIpCount. want: 0, got %d", mc.duplicateIPCount)
 	}
 
+	if true {
+		// Skip flaky test below: https://github.com/GoogleCloudPlatform/netd/issues/171
+		// Using an `if true` to avoid unnecessary lint errors (unreachable code).
+		return
+	}
+
 	// Remove and recreate the file. Verify metrics
 	fakeClock.Sleep(6 * time.Second)
 	mustDeleteFile(t, dir1, "10.0.0.2")

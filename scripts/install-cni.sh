@@ -224,7 +224,11 @@ fi
 default_nic=$(route -n | grep -E '^0\.0\.0\.0\s+\S+\s+0\.0\.0\.0' | grep -oE '\S+$')
 
 # Set mtu
-if [ -f "/sys/class/net/$default_nic/mtu" ]; then
+if [ -f "/sys/class/net/cilium_wg0/mtu" ]; then
+  MTU=$(cat "/sys/class/net/cilium_wg0/mtu")
+  cni_spec=${cni_spec//@mtu/$MTU}
+  echo "Set the default mtu to $MTU, inherited from dev cilium_wg0"
+elif [ -f "/sys/class/net/$default_nic/mtu" ]; then
   MTU=$(cat "/sys/class/net/$default_nic/mtu")
   cni_spec=${cni_spec//@mtu/$MTU}
   echo "Set the default mtu to $MTU, inherited from dev $default_nic"

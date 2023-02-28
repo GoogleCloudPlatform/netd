@@ -212,6 +212,11 @@ else
   cni_spec=${cni_spec//@ipv6RouteOptional/}
 fi
 
+# MTU to use if the interface in use can't be detected.
+# Will be replaced with the value of a specific interface if available.
+MTU=1460
+MTU_SOURCE="<default>"
+
 # Format of `route` output:
 # Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
 # 0.0.0.0         192.168.0.1     0.0.0.0         UG    100    0        0 ens4
@@ -223,19 +228,19 @@ fi
 
 default_nic=$(route -n | grep -E '^0\.0\.0\.0\s+\S+\s+0\.0\.0\.0' | grep -oE '\S+$')
 
+# cilium_wg0 is the interface for node-to-node encryption. If it's available /
+# in use, it has a lower MTU than the default NIC (eth0) due to encryption headers.
+for nic in cilium_wg0 "$default_nic"; do
+  if [ -f "/sys/class/net/$nic/mtu" ]; then
+    MTU=$(cat "/sys/class/net/$nic/mtu")
+    MTU_SOURCE=$nic
+    break
+  fi
+done
+
 # Set mtu
-if [ -f "/sys/class/net/cilium_wg0/mtu" ]; then
-  MTU=$(cat "/sys/class/net/cilium_wg0/mtu")
-  cni_spec=${cni_spec//@mtu/$MTU}
-  echo "Set the default mtu to $MTU, inherited from dev cilium_wg0"
-elif [ -f "/sys/class/net/$default_nic/mtu" ]; then
-  MTU=$(cat "/sys/class/net/$default_nic/mtu")
-  cni_spec=${cni_spec//@mtu/$MTU}
-  echo "Set the default mtu to $MTU, inherited from dev $default_nic"
-else
-  cni_spec=${cni_spec//@mtu/1460}
-  echo "Failed to read mtu from dev $default_nic, set the default mtu to 1460"
-fi
+cni_spec=${cni_spec//@mtu/$MTU}
+echo "Set the default mtu to $MTU, inherited from $MTU_SOURCE"
 
 # Output CNI spec (template).
 output_file=""

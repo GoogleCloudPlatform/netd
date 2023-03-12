@@ -163,7 +163,7 @@ fi
 STACK_TYPE=$(jq '.metadata.labels."cloud.google.com/gke-stack-type"' <<<"$response")
 echo "Node stack type label: '${STACK_TYPE:-}'"
 
-if [ "${ENABLE_PRIVATE_IPV6_ACCESS:-}" == "true" ] || [ "$ENABLE_IPV6" == "true" ] || [ "${STACK_TYPE:-}" == '"IPV4_IPV6"' ]; then
+if [ "$ENABLE_IPV6" == "true" ] || [ "${STACK_TYPE:-}" == '"IPV4_IPV6"' ]; then
   node_ipv6_addr=$(curl -s -k --fail "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/?recursive=true" -H "Metadata-Flavor: Google" | jq -r '.ipv6s[0]' ) ||:
 
   if [ -n "${node_ipv6_addr:-}" ] && [ "${node_ipv6_addr}" != "null" ]; then
@@ -207,7 +207,7 @@ if [ "${ENABLE_PRIVATE_IPV6_ACCESS:-}" == "true" ] || [ "$ENABLE_IPV6" == "true"
     cni_spec=${cni_spec//@ipv6RouteOptional/}
   fi
 else
-  echo "Clearing IPv6 subnet and route given private IPv6 access is disabled..."
+  echo "Clearing IPv6 subnet and route given IPv6 access is disabled..."
   cni_spec=${cni_spec//@ipv6SubnetOptional/}
   cni_spec=${cni_spec//@ipv6RouteOptional/}
 fi

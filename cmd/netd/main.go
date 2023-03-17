@@ -20,7 +20,6 @@ import (
 	"flag"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"syscall"
 
@@ -38,8 +37,10 @@ func main() {
 	config.AddFlags(pflag.CommandLine)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
-	glog.Infof("netd version: %v", version.Version)
-	glog.Infof("netd args: %v", strings.Join(os.Args, " "))
+	glog.Infof("netd version: %s", version.Version)
+	pflag.CommandLine.VisitAll(func(f *pflag.Flag) {
+		glog.Infof("FLAG: --%s=%q", f.Name, f.Value)
+	})
 
 	nc := netconf.NewNetworkConfigController(config.EnablePolicyRouting, config.EnableMasquerade,
 		config.EnableSourceValidMark, config.ExcludeDNS, config.ReconcileInterval)

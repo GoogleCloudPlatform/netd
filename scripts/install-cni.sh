@@ -27,7 +27,9 @@ cilium_ready() {
   # Cilium's CNI installer doesn't do atomic write (write to temporary file then move).
   echo "(errors are expected during bootstrap; will retry until success)"
   # The command producing exit status must be the last command here.
-  CNI_COMMAND=VERSION /host/home/kubernetes/bin/cilium-cni
+  # Send errors to stdout since they're "expected" errors.
+  # This redirection doesn't affect exit status after execution.
+  CNI_COMMAND=VERSION /host/home/kubernetes/bin/cilium-cni 2>&1
 }
 
 # inotify callback

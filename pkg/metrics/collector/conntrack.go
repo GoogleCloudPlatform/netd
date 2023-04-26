@@ -58,36 +58,73 @@ func NewConntrackCollector() (Collector, error) {
 }
 
 type conntrackStats struct {
-	insertFailed uint64
-	drop         uint64
+	found         uint64
+	invalid       uint64
+	insert        uint64
+	insertFailed  uint64
+	drop          uint64
+	earlyDrop     uint64
+	searchRestart uint64
 }
 
 func (c *conntrackStats) merge(other *conntrackStats) {
+	c.found += other.found
+	c.invalid += other.invalid
+	c.insert += other.insert
 	c.insertFailed += other.insertFailed
 	c.drop += other.drop
+	c.earlyDrop += other.earlyDrop
+	c.searchRestart += other.searchRestart
+
 }
 
 type conntrackIndices struct {
-	numFields    int
-	insertFailed int
-	drop         int
+	numFields     int
+	found         int
+	invalid       int
+	insert        int
+	insertFailed  int
+	drop          int
+	earlyDrop     int
+	searchRestart int
 }
 
 // parseHeader parses the conntrack header line, returning the
 // indexes of the fields we wish to extract.
 func parseHeader(line string) (*conntrackIndices, error) {
-	indices := &conntrackIndices{insertFailed: -1, drop: -1}
+	indices := &conntrackIndices{
+		found:         -1,
+		invalid:       -1,
+		insert:        -1,
+		insertFailed:  -1,
+		drop:          -1,
+		earlyDrop:     -1,
+		searchRestart: -1,
+	}
 	nameParts := strings.Split(line, " ")
 	indices.numFields = len(nameParts)
 	for i, v := range nameParts {
 		switch v {
+		case "found":
+			indices.found = i
+		case "invalid":
+			indices.invalid = i
+		case "insert":
+			indices.insert = i
 		case "insert_failed":
 			indices.insertFailed = i
 		case "drop":
 			indices.drop = i
+		case "early_drop":
+			indices.earlyDrop = i
+		case "search_restart":
+			indices.searchRestart = i
 		}
 	}
-	if indices.insertFailed == -1 || indices.drop == -1 {
+	if indices.found == -1 || indices.invalid == -1 ||
+		indices.insert == -1 || indices.insertFailed == -1 ||
+		indices.drop == -1 || indices.earlyDrop == -1 ||
+		indices.searchRestart == -1 {
 		return nil, fmt.Errorf("invalid header %q: doesn't have target fields", line)
 	}
 	return indices, nil
@@ -106,8 +143,13 @@ func parseConntrackData(line string, indices *conntrackIndices) (*conntrackStats
 		value *uint64
 		index int
 	}{
+		{"found", &stats.found, indices.found},
+		{"invalid", &stats.invalid, indices.invalid},
+		{"insert", &stats.insert, indices.insert},
 		{"insert_failed", &stats.insertFailed, indices.insertFailed},
 		{"drop", &stats.drop, indices.drop},
+		{"early_drop", &stats.earlyDrop, indices.earlyDrop},
+		{"search_restart", &stats.searchRestart, indices.searchRestart},
 	} {
 		v, err := strconv.ParseUint(valueParts[e.index], 16, 32)
 		if err != nil {
@@ -172,7 +214,12 @@ func (c *conntrackCollector) Update(ch chan<- prometheus.Metric) error {
 	if err != nil {
 		return err
 	}
+	ch <- prometheus.MustNewConstMetric(conntrackErrorCountDesc, prometheus.CounterValue, float64(stats.found), "found")
+	ch <- prometheus.MustNewConstMetric(conntrackErrorCountDesc, prometheus.CounterValue, float64(stats.invalid), "invalid")
+	ch <- prometheus.MustNewConstMetric(conntrackErrorCountDesc, prometheus.CounterValue, float64(stats.insert), "insert")
 	ch <- prometheus.MustNewConstMetric(conntrackErrorCountDesc, prometheus.CounterValue, float64(stats.insertFailed), "insert_failed")
 	ch <- prometheus.MustNewConstMetric(conntrackErrorCountDesc, prometheus.CounterValue, float64(stats.drop), "drop")
+	ch <- prometheus.MustNewConstMetric(conntrackErrorCountDesc, prometheus.CounterValue, float64(stats.earlyDrop), "early_drop")
+	ch <- prometheus.MustNewConstMetric(conntrackErrorCountDesc, prometheus.CounterValue, float64(stats.searchRestart), "search_restart")
 	return nil
 }

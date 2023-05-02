@@ -34,7 +34,7 @@ func TestConntrack(t *testing.T) {
 				"drop early_drop icmp_error  expect_new expect_create expect_delete search_restart\n" +
 				"000005d2  00000000 00000000 00000000 00000002 0047b7ef 00000000 00000000 00000000 " +
 				"00000088 0000015 00000000 00000000  00000000 00000000 00000000 00000255\n",
-			want: conntrackStats{insertFailed: 136, drop: 21},
+			want: conntrackStats{found: 0, invalid: 2, insert: 0, insertFailed: 136, drop: 21, earlyDrop: 0, searchRestart: 597},
 		},
 		{
 			desc: "multiple lines of data",
@@ -48,8 +48,7 @@ func TestConntrack(t *testing.T) {
 				"00000010 00000000 00000000 00000000  00000000 00000000 00000000 00000245\n" +
 				"000005d2  00000000 00000000 00000000 00000000 00403f1b 00000000 00000000 00000000 " +
 				"00000000 00000020 00000000 00000000  00000000 00000000 00000000 0000026d",
-
-			want: conntrackStats{insertFailed: 24, drop: 37},
+			want: conntrackStats{found: 0, invalid: 8, insert: 0, insertFailed: 24, drop: 37, earlyDrop: 0, searchRestart: 2455},
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {

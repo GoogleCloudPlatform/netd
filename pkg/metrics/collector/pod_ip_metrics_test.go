@@ -5,6 +5,10 @@ import (
 	"testing"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -18,6 +22,18 @@ func (c *fakeClock) Now() time.Time {
 
 func (c *fakeClock) Sleep(d time.Duration) {
 	c.now = c.now.Add(d)
+}
+
+func newNodeWithPodCIDRs(podCIDR string, podCIDRs []string) *v1.Node {
+	return &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+		},
+		Spec: v1.NodeSpec{
+			PodCIDR:  podCIDR,
+			PodCIDRs: podCIDRs,
+		},
+	}
 }
 
 func mustCreateFile(t *testing.T, dir, name, content string) {
@@ -134,10 +150,10 @@ func TestListIpAddresses(t *testing.T) {
 				return
 			}
 			if mc.usedIPv4AddrCount != tc.wantUsedIPv4Count {
-				t.Errorf("usedIpv4AddrCount. want: %d, got %d", tc.wantUsedIPv4Count, mc.usedIPv4AddrCount)
+				t.Errorf("usedIPv4AddrCount. want: %d, got %d", tc.wantUsedIPv4Count, mc.usedIPv4AddrCount)
 			}
 			if mc.usedIPv6AddrCount != tc.wantUsedIPv6Count {
-				t.Errorf("usedIpv6AddrCount. want: %d, got %d", tc.wantUsedIPv6Count, mc.usedIPv6AddrCount)
+				t.Errorf("usedIPv6AddrCount. want: %d, got %d", tc.wantUsedIPv6Count, mc.usedIPv6AddrCount)
 			}
 			if mc.dualStackCount != tc.wantDualStackCount {
 				t.Errorf("dualStackCount. want: %d, got %d", tc.wantDualStackCount, mc.dualStackCount)
@@ -191,8 +207,8 @@ func TestSetupDirectoryWatcher(t *testing.T) {
 			t.Errorf("no file is deleted. want value to be 0, got %v", v)
 		}
 	}
-	if !podIPMetricsWatcherSetup {
-		t.Fatal("podIpMetricsWatcherSetup: want: true, got: false")
+	if !mc.podIPMetricsWatcherIsInitialized {
+		t.Fatal("podIPMetricsWatcherIsIntialized: want: true, got: false")
 	}
 
 	//Add a new file to the directory. Verify metrics
@@ -267,5 +283,77 @@ func TestSetupDirectoryWatcher(t *testing.T) {
 			// file "2600:1900::1" and "lock" are not counted in the bucket
 			t.Errorf("reused ip: bucket with le>=15. want: 2, got %d", v)
 		}
+	}
+}
+
+func TestCalculateAssignedIP(t *testing.T) {
+	testCases := []struct {
+		desc                  string
+		podCIDR               string
+		podCIDRs              []string
+		wantAssignedIPv4Count uint64
+		wantAssignedIPv6Count uint64
+		wantErr               bool
+	}{
+		{
+			desc:                  "Invalid podCIDR format",
+			podCIDR:               "10.0.0.0.24",
+			podCIDRs:              []string{"10.0.0.0.24", "2600:1900::/125"},
+			wantAssignedIPv4Count: 0,
+			wantAssignedIPv6Count: 7,
+			wantErr:               true,
+		},
+		{
+			desc:                  "Invalid podCIDRs format",
+			podCIDR:               "10.0.0.0/24",
+			podCIDRs:              []string{"10.0.0.0/24", "2600:1900::125"},
+			wantAssignedIPv4Count: 254,
+			wantAssignedIPv6Count: 0,
+			wantErr:               true,
+		},
+		{
+			desc:                  "Missing podCIDR and podCIDRs",
+			podCIDR:               "",
+			podCIDRs:              []string{},
+			wantAssignedIPv4Count: 0,
+			wantAssignedIPv6Count: 0,
+			wantErr:               true,
+		},
+		{
+			desc:                  "Two same IPv4 addresses and one IPv6 address",
+			podCIDR:               "10.0.0.0/24",
+			podCIDRs:              []string{"10.0.0.0/24", "2600:1900::/125"},
+			wantAssignedIPv4Count: 254,
+			wantAssignedIPv6Count: 7,
+		},
+		{
+			desc:                  "Two same IPv4 addresses and no IPv6 address",
+			podCIDR:               "10.0.0.0/24",
+			podCIDRs:              []string{"10.0.0.0/24"},
+			wantAssignedIPv4Count: 254,
+			wantAssignedIPv6Count: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			node := newNodeWithPodCIDRs(tc.podCIDR, tc.podCIDRs)
+			fakeClient := fake.NewSimpleClientset(node)
+			mc := &podIPMetricsCollector{
+				clientset: fakeClient,
+				nodeName:  "test-node",
+			}
+
+			err := mc.calculateAssignedIP()
+			if gotErr := err != nil; gotErr != tc.wantErr {
+				t.Fatalf("Error calculating assigned IPs: %v", err)
+			}
+			if mc.assignedIPv4AddrCount != tc.wantAssignedIPv4Count {
+				t.Errorf("assignedIPv4AddrCount. want: %d, got %d", tc.wantAssignedIPv4Count, mc.assignedIPv4AddrCount)
+			}
+			if mc.assignedIPv6AddrCount != tc.wantAssignedIPv6Count {
+				t.Errorf("assignedIPv6AddrCount. want: %d, got %d", tc.wantAssignedIPv6Count, mc.assignedIPv6AddrCount)
+			}
+		})
 	}
 }

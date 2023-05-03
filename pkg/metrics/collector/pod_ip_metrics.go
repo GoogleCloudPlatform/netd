@@ -18,12 +18,17 @@ package collector
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"math"
 	"net"
 	"os"
 	"strings"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/golang/glog"
@@ -91,18 +96,32 @@ var (
 		"Indicates the IP reuse duration in millisecond for all IPs.",
 		nil, nil,
 	)
-	podIPMetricsWatcherSetup = false
+	assignedIPv4AddrCountDesc = prometheus.NewDesc(
+		"ipv4_assigned_count",
+		"Indicates the total IPv4 IPs assigned to the subnetwork.",
+		nil, nil,
+	)
+	assignedIPv6AddrCountDesc = prometheus.NewDesc(
+		"ipv6_assigned_count",
+		"Indicates the total IPv6 IPs assigned to the subnetwork.",
+		nil, nil,
+	)
 )
 
 type podIPMetricsCollector struct {
-	usedIPv4AddrCount   uint64
-	usedIPv6AddrCount   uint64
-	dualStackCount      uint64
-	dualStackErrorCount uint64
-	duplicateIPCount    uint64
-	reuseIPs            reuseIPs
-	reuseMap            map[string]*ipReuse
-	clock               clock
+	usedIPv4AddrCount                uint64
+	usedIPv6AddrCount                uint64
+	dualStackCount                   uint64
+	dualStackErrorCount              uint64
+	duplicateIPCount                 uint64
+	reuseIPs                         reuseIPs
+	reuseMap                         map[string]*ipReuse
+	clientset                        kubernetes.Interface
+	nodeName                         string
+	clock                            clock
+	assignedIPv4AddrCount            uint64
+	assignedIPv6AddrCount            uint64
+	podIPMetricsWatcherIsInitialized bool
 }
 
 type reuseIPs struct {
@@ -139,7 +158,26 @@ func init() {
 // NewPodIpMetricsCollector returns a new Collector exposing pod IP allocation
 // stats.
 func NewPodIPMetricsCollector() (Collector, error) {
-	return &podIPMetricsCollector{clock: &realClock{}}, nil
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("error creating in-cluster config: %v", err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating clientset: %v", err)
+	}
+
+	nodeName, err := os.Hostname()
+	if err != nil {
+		return nil, fmt.Errorf("error getting hostname: %v", err)
+	}
+
+	return &podIPMetricsCollector{
+		clientset: clientset,
+		nodeName:  nodeName,
+		clock:     &realClock{},
+	}, nil
 }
 
 func readLine(path string) (string, error) {
@@ -266,6 +304,77 @@ func (c *podIPMetricsCollector) fillBuckets(diff uint64) {
 	}
 }
 
+// countIPsFronRange returns the number of available hosts in a subnet.
+// The max number is limited by the size of an uint64.
+// Number of hosts is calculated with the formula:
+// IPv4: 2^x – 2, not consider network and broadcast address
+// IPv6: 2^x - 1, not consider network address
+// where x is the number of host bits in the subnet.
+func (c *podIPMetricsCollector) countIPsFromRange(subnet *net.IPNet) (uint64, error) {
+	ones, bits := subnet.Mask.Size()
+	if bits <= ones {
+		return 0, fmt.Errorf("invalid subnet mask: %v", subnet.Mask)
+	}
+	// this checks that we are not overflowing an int64
+	if bits-ones >= 64 {
+		return math.MaxUint64, nil
+	}
+	max := uint64(1) << uint(bits-ones)
+	max--
+	if subnet.IP.To4() != nil {
+		// Don't use the IPv4 network's broadcast address
+		if max == 0 {
+			return 0, fmt.Errorf("subnet includes only the network and broadcast addresses")
+		}
+		max--
+	} else if max == 0 {
+		return 0, fmt.Errorf("subnet includes only the network address")
+	}
+	return max, nil
+}
+
+func (c *podIPMetricsCollector) updateAssignedIPs(subnet *net.IPNet, totalIP uint64) {
+	if subnet.IP.To16() != nil && subnet.IP.To4() == nil {
+		c.assignedIPv6AddrCount += totalIP
+	} else if subnet.IP.To4() != nil {
+		c.assignedIPv4AddrCount += totalIP
+	}
+}
+
+func (c *podIPMetricsCollector) calculateAssignedIP() error {
+	node, err := c.clientset.CoreV1().Nodes().Get(context.Background(), c.nodeName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("error getting node %s: %v", c.nodeName, err)
+	}
+
+	podCIDRs := node.Spec.PodCIDRs
+	if len(podCIDRs) == 0 {
+		if node.Spec.PodCIDR == "" {
+			return fmt.Errorf("both podCIDR and podCIDRs are empty")
+		}
+		podCIDRs = []string{node.Spec.PodCIDR}
+	}
+	var firstErr error
+	for _, podCIDR := range podCIDRs {
+		_, subnet, err := net.ParseCIDR(podCIDR)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("error parsing podCIDR %s: %v", podCIDR, err)
+			}
+			continue
+		}
+		totalIP, err := c.countIPsFromRange(subnet)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("error calculating total IPs for subnet %s: %v", subnet.IP, err)
+			}
+			continue
+		}
+		c.updateAssignedIPs(subnet, totalIP)
+	}
+	return firstErr
+}
+
 func (c *podIPMetricsCollector) setupDirectoryWatcher(dir string) error {
 	if err := c.listIPAddresses(dir); err != nil {
 		return err
@@ -286,7 +395,7 @@ func (c *podIPMetricsCollector) setupDirectoryWatcher(dir string) error {
 	go func() {
 		defer func() {
 			watcher.Close()
-			podIPMetricsWatcherSetup = false
+			c.podIPMetricsWatcherIsInitialized = false
 		}()
 
 		for {
@@ -318,26 +427,33 @@ func (c *podIPMetricsCollector) setupDirectoryWatcher(dir string) error {
 	if err != nil {
 		glog.Errorf("Failed to add watcher for directory %s: %v", dir, err)
 	}
-	podIPMetricsWatcherSetup = true
+	c.podIPMetricsWatcherIsInitialized = true
 	return nil
 }
 
 func (c *podIPMetricsCollector) Update(ch chan<- prometheus.Metric) error {
-	if !podIPMetricsWatcherSetup {
+	if !c.podIPMetricsWatcherIsInitialized {
 		if err := c.setupDirectoryWatcher(gkePodNetworkDir); err != nil {
 			glog.Errorf("setupDirectoryWatcher returned error: %v", err)
 			return nil
 		}
+		if err := c.calculateAssignedIP(); err != nil {
+			glog.Errorf("calculateAssignedIP returned error: %v", err)
+		}
 	}
+	c.populateMetrics(ch)
+	return nil
+}
+
+func (c *podIPMetricsCollector) populateMetrics(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(usedIPv4AddrCountDesc, prometheus.GaugeValue, float64(c.usedIPv4AddrCount))
 	ch <- prometheus.MustNewConstMetric(usedIPv6AddrCountDesc, prometheus.GaugeValue, float64(c.usedIPv6AddrCount))
 	ch <- prometheus.MustNewConstMetric(dualStackCountDesc, prometheus.GaugeValue, float64(c.dualStackCount))
 	ch <- prometheus.MustNewConstMetric(dualStackErrorCountDesc, prometheus.GaugeValue, float64(c.dualStackErrorCount))
 	ch <- prometheus.MustNewConstMetric(duplicateIPCountDesc, prometheus.GaugeValue, float64(c.duplicateIPCount))
-
 	ch <- prometheus.MustNewConstMetric(ipReuseMinDesc, prometheus.GaugeValue, float64(c.reuseIPs.min))
 	ch <- prometheus.MustNewConstMetric(ipReuseAvgDesc, prometheus.GaugeValue, c.reuseIPs.sum/float64(c.reuseIPs.count))
 	ch <- prometheus.MustNewConstHistogram(ipReuseHistogramDesc, c.reuseIPs.count, c.reuseIPs.sum, c.reuseIPs.buckets)
-
-	return nil
+	ch <- prometheus.MustNewConstMetric(assignedIPv4AddrCountDesc, prometheus.GaugeValue, float64(c.assignedIPv4AddrCount))
+	ch <- prometheus.MustNewConstMetric(assignedIPv6AddrCountDesc, prometheus.GaugeValue, float64(c.assignedIPv6AddrCount))
 }

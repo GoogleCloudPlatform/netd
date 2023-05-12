@@ -103,23 +103,23 @@ type FakeIPTable struct {
 	iptCache map[string][]string
 }
 
-func (i FakeIPTable) NewChain(table, chain string) error {
+func (i FakeIPTable) NewChain(_, chain string) error {
 	if _, ok := i.iptCache[chain]; !ok {
 		i.iptCache[chain] = make([]string, 0, 5)
 	}
 	return nil
 }
 
-func (i FakeIPTable) ClearChain(table, chain string) error {
+func (i FakeIPTable) ClearChain(_, chain string) error {
 	i.iptCache[chain] = make([]string, 0, 5)
 	return nil
 }
-func (i FakeIPTable) DeleteChain(table, chain string) error {
+func (i FakeIPTable) DeleteChain(_, chain string) error {
 	delete(i.iptCache, chain)
 	return nil
 }
 
-func (i FakeIPTable) AppendUnique(table, chain string, rulespec ...string) error {
+func (i FakeIPTable) AppendUnique(_, chain string, rulespec ...string) error {
 	rule := strings.Join(rulespec, " ")
 	for _, r := range i.iptCache[chain] {
 		if r == rule {
@@ -129,7 +129,7 @@ func (i FakeIPTable) AppendUnique(table, chain string, rulespec ...string) error
 	i.iptCache[chain] = append(i.iptCache[chain], rule)
 	return nil
 }
-func (i FakeIPTable) Delete(table, chain string, rulespec ...string) error {
+func (i FakeIPTable) Delete(_, chain string, rulespec ...string) error {
 	rule := strings.Join(rulespec, " ")
 	for index, r := range i.iptCache[chain] {
 		if r == rule {

@@ -27,7 +27,6 @@ type NetdConfig struct {
 	EnablePolicyRouting   bool
 	EnableSourceValidMark bool
 	ExcludeDNS            bool
-	EnableMasquerade      bool
 	ReconcileInterval     time.Duration
 }
 
@@ -44,8 +43,6 @@ func (nc *NetdConfig) AddFlags(fs *pflag.FlagSet) {
 		"Whether to enable the src_valid_mark sysctl bit for policy routing.")
 	fs.BoolVar(&nc.ExcludeDNS, "exclude-dns", false,
 		"Whether to exclude DNS traffic from policy routing.")
-	fs.BoolVar(&nc.EnableMasquerade, "enable-masquerade", true,
-		"[Deprecated]Enable masquerade.")
 	fs.DurationVar(&nc.ReconcileInterval, "reconcile-interval-seconds", 10*time.Second,
 		"Reconcile interval in seconds.")
 }

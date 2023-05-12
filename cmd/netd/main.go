@@ -42,8 +42,7 @@ func main() {
 		glog.Infof("FLAG: --%s=%q", f.Name, f.Value)
 	})
 
-	nc := netconf.NewNetworkConfigController(config.EnablePolicyRouting, config.EnableMasquerade,
-		config.EnableSourceValidMark, config.ExcludeDNS, config.ReconcileInterval)
+	nc := netconf.NewNetworkConfigController(config.EnablePolicyRouting, config.EnableSourceValidMark, config.ExcludeDNS, config.ReconcileInterval)
 
 	stopCh := make(chan struct{})
 

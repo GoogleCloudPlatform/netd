@@ -113,7 +113,7 @@ fi
 
 if [ "${ENABLE_CILIUM_PLUGIN}" == "true" ]; then
   echo "Adding Cilium plug-in to the CNI config."
-  cni_spec=${cni_spec//@cniCiliumPlugin/, {\"type\": \"cilium-cni\"\}}
+  cni_spec=${cni_spec//@cniCiliumPlugin/, {\"type\": \"cilium-cni\", \"enable-route-mtu\": true\}}
   # inotify calls back to the beginning of this script.
   inotify /host/home/kubernetes/bin cilium-cni "$0" cilium_ready
   echo "Cilium plug-in now confirmed as ready."

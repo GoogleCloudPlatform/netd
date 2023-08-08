@@ -114,20 +114,6 @@ fi
 if [ "${ENABLE_CILIUM_PLUGIN}" == "true" ]; then
   echo "Adding Cilium plug-in to the CNI config."
   cni_spec=${cni_spec//@cniCiliumPlugin/, {\"type\": \"cilium-cni\", \"enable-route-mtu\": true\}}
-  # inotify calls back to the beginning of this script.
-  inotify /host/home/kubernetes/bin cilium-cni "$0" cilium_ready
-
-  HEALTHZ_PORT="${CILIUM_HEALTHZ_PORT:-9879}"
-  # Wait upto 60s for the cilium pod to report healthy.
-  if curl -fsSm 1 --retry 60 --retry-all-errors --retry-max-time 60 --retry-delay 1 \
-      -o /dev/null --stderr - \
-      http://localhost:"${HEALTHZ_PORT}"/healthz; then
-    echo "Cilium healthz reported success."
-  else
-    echo "Cilium not yet ready. Continuing anyway."
-  fi
-
-  echo "Cilium plug-in now confirmed as ready."
 else
   echo "Not using Cilium plug-in."
   cni_spec=${cni_spec//@cniCiliumPlugin/}
@@ -254,6 +240,24 @@ done
 # Set mtu
 cni_spec=${cni_spec//@mtu/$MTU}
 echo "Set the default mtu to $MTU, inherited from $MTU_SOURCE"
+
+if [ "${ENABLE_CILIUM_PLUGIN}" == "true" ]; then
+  echo "Cilium plug-in is in use. Holding CNI configurations until Cilium is ready."
+
+  # inotify calls back to the beginning of this script.
+  inotify /host/home/kubernetes/bin cilium-cni "$0" cilium_ready
+  echo "Cilium plug-in binary is now confirmed as ready."
+
+  HEALTHZ_PORT="${CILIUM_HEALTHZ_PORT:-9879}"
+  # Wait upto 60s for the cilium pod to report healthy.
+  if curl -fsSm 1 --retry 60 --retry-all-errors --retry-max-time 60 --retry-delay 1 \
+      -o /dev/null --stderr - \
+      http://localhost:"${HEALTHZ_PORT}"/healthz; then
+    echo "Cilium healthz reported success."
+  else
+    echo "Cilium not yet ready. Continuing anyway."
+  fi
+fi
 
 # Output CNI spec (template).
 output_file=""

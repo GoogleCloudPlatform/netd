@@ -37,8 +37,8 @@ const (
 	tcpSegsOut     = "OutSegs"     // Total tcp segments out
 	tcpSegsRetrans = "RetransSegs" // Total tcp segments retransmitted
 	// Got from netstat
-	tcpTimeoutRehash   = "TcpTimeoutRehash"      // Total tcp timeout rehash
-	tcpDuplicateRehash = "TcpDupliateDataRehash" // Total tcp duplicates rehashed
+	tcpTimeoutRehash   = "TcpTimeoutRehash"       // Total tcp timeout rehash
+	tcpDuplicateRehash = "TcpDuplicateDataRehash" // Total tcp duplicates rehashed
 )
 
 var (

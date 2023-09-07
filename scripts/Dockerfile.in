@@ -63,7 +63,7 @@ RUN /alpine-extractor.sh musl openssl-dev openssl-libs-static linux-headers
 
 ## The bash container fetches bash-static (to be used as bash) from Debian repo.
 
-FROM debian:11.4 AS bash
+FROM debian:bookworm-slim AS bash
 
 RUN apt-get update
 RUN apt-get install -y --no-install-recommends --no-install-suggests bash-static

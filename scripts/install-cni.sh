@@ -21,15 +21,16 @@ calico_ready() {
   compgen -G "/host/etc/cni/net.d/*calico*.conflist"
 }
 
-cilium_ready() {
-  echo "Running /host/home/kubernetes/bin/cilium-cni with CNI_COMMAND=VERSION"
-  # It's necessary to try running the it instead of just checking existence because
-  # Cilium's CNI installer doesn't do atomic write (write to temporary file then move).
+cni_ready() {
+  local -r cni_bin="$1"
+  echo "Running '/host/home/kubernetes/bin/${cni_bin}' with CNI_COMMAND=VERSION"
+  # It's necessary to try running it instead of just checking existence because
+  # the CNI installer might not do atomic write (write to temporary file then move).
   echo "(errors are expected during bootstrap; will retry until success)"
   # The command producing exit status must be the last command here.
   # Send errors to stdout since they're "expected" errors.
   # This redirection doesn't affect exit status after execution.
-  CNI_COMMAND=VERSION /host/home/kubernetes/bin/cilium-cni 2>&1
+  CNI_COMMAND=VERSION /host/home/kubernetes/bin/"${cni_bin}" 2>&1
 }
 
 # inotify callback
@@ -37,6 +38,7 @@ if [ -n "$1" ]; then
   # We run into this branch at callback from inotify. In this case, call the
   # specified function then exit. The return value from that function (exit
   # status of the last command in the function) is used as the exit status.
+  # "$@" would be like "calico_ready" or "calico_ready" "cilium-cni".
   "$@"
   exit
 fi
@@ -245,7 +247,7 @@ if [ "${ENABLE_CILIUM_PLUGIN}" == "true" ]; then
   echo "Cilium plug-in is in use. Holding CNI configurations until Cilium is ready."
 
   # inotify calls back to the beginning of this script.
-  inotify /host/home/kubernetes/bin cilium-cni "$0" cilium_ready
+  inotify /host/home/kubernetes/bin cilium-cni "$0" cni_ready cilium-cni
   echo "Cilium plug-in binary is now confirmed as ready."
 
   HEALTHZ_PORT="${CILIUM_HEALTHZ_PORT:-9879}"

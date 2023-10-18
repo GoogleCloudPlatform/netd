@@ -1,0 +1,14 @@
+version: 2
+updates:
+- package-ecosystem: docker
+  directory: /scripts
+  schedule:
+    interval: weekly
+- package-ecosystem: gomod 
+  directory: /
+  schedule:
+    interval: weekly
+- package-ecosystem: gomod 
+  directory: /tools
+  schedule:
+    interval: weekly

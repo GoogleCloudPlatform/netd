@@ -121,6 +121,15 @@ else
   cni_spec=${cni_spec//@cniCiliumPlugin/}
 fi
 
+# Add istio plug-in to spec if env var is not empty
+if [[ -n "${ISTIO_CNI_CONFIG:-}" ]]; then
+  echo "Adding Istio plug-in to the CNI config."
+  cni_spec=${cni_spec//@cniIstioPlugin/, ${ISTIO_CNI_CONFIG}}
+else
+  echo "Not using Istio plug-in."
+  cni_spec=${cni_spec//@cniIstioPlugin/}
+fi
+
 # Fill CNI spec template.
 ipv4_subnet=$(jq '.spec.podCIDR' <<<"$response")
 
@@ -259,6 +268,15 @@ if [ "${ENABLE_CILIUM_PLUGIN}" == "true" ]; then
   else
     echo "Cilium not yet ready. Continuing anyway."
   fi
+fi
+
+# Wait for istio plug-in if it is enabled
+if [[ -n "${ISTIO_CNI_CONFIG:-}" ]]; then
+ echo "Istio plug-in is in use. Holding CNI configurations until Istio is ready."
+
+ # inotify calls back to the beginning of this script.
+ inotify /host/home/kubernetes/bin istio-cni "$0" cni_ready istio-cni
+ echo "Istio plug-in binary is now confirmed as ready."
 fi
 
 # Output CNI spec (template).

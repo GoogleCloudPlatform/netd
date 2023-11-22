@@ -87,7 +87,7 @@ data:
           "capabilities": {
             "portMappings": true
           }
-        }@cniBandwidthPlugin@cniCiliumPlugin
+        }@cniBandwidthPlugin@cniCiliumPlugin@cniIstioPlugin
       ]
     }
   cni_spec_name: "10-gke-ptp.conflist"
@@ -193,6 +193,12 @@ spec:
               configMapKeyRef:
                 name: netd-config
                 key: enable_cilium_plugin
+          - name: ISTIO_CNI_CONFIG
+            valueFrom:
+              configMapKeyRef:
+                name: istio-cni-plugin-config
+                key: cni_network_config
+                optional: true
           - name: KUBERNETES_SERVICE_HOST
             valueFrom:
               configMapKeyRef:

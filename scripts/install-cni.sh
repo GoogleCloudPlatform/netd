@@ -260,8 +260,10 @@ if [ "${ENABLE_CILIUM_PLUGIN}" == "true" ]; then
   echo "Cilium plug-in binary is now confirmed as ready."
 
   HEALTHZ_PORT="${CILIUM_HEALTHZ_PORT:-9879}"
-  # Wait upto 60s for the cilium pod to report healthy.
-  if curl -fsSm 1 --retry 60 --retry-all-errors --retry-max-time 60 --retry-delay 1 \
+  RETRY_MAX_TIME="${CILIUM_HEALTH_MAX_WAIT_TIME:-600}"
+  # Wait upto the specified time for the cilium pod to report healthy.
+  if curl -fsSm 1 --retry "${RETRY_MAX_TIME}" --retry-all-errors \
+      --retry-max-time "${RETRY_MAX_TIME}" --retry-delay 1 \
       -o /dev/null --stderr - \
       http://localhost:"${HEALTHZ_PORT}"/healthz; then
     echo "Cilium healthz reported success."

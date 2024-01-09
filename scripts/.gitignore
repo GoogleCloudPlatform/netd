@@ -5,3 +5,5 @@
 /.dockerfile-*
 /.licenses
 /.buildx-initialized
+/test.log
+/test.out

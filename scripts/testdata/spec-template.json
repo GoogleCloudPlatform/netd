@@ -1,0 +1,25 @@
+{
+  "name": "gke-pod-network",
+  "cniVersion": "0.3.1",
+  "plugins": [
+    {
+      "type": "@cniType",
+      "mtu": @mtu,
+      "ipam": {
+          "type": "host-local",
+          "ranges": [
+          @ipv4Subnet@ipv6SubnetOptional
+          ],
+          "routes": [
+            {"dst": "0.0.0.0/0"}@ipv6RouteOptional
+          ]
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {
+        "portMappings": true
+      }
+    }@cniBandwidthPlugin@cniCiliumPlugin@cniIstioPlugin
+  ]
+}

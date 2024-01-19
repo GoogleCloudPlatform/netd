@@ -16,7 +16,6 @@
 
 set -o errexit
 set -o nounset
-set -o pipefail
 
 if [ -z "${OS:-}" ]; then
     echo "OS must be set"

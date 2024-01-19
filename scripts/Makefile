@@ -355,6 +355,18 @@ test: container
 	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
 	    alpine:3.16                         \
 	    sh -c 'cp -a /src /inotify && cd /inotify && ./build.sh && ./test.sh'
+	echo "Testing install-cni.sh"
+	docker run                              \
+	    -i                                  \
+	    --rm                                \
+	    -v $$(pwd)/test.out:/host/etc/cni/net.d \
+	    -v $$(pwd)/testdata/token:/var/run/secrets/kubernetes.io/serviceaccount/token \
+	    -v $$(pwd):/src                     \
+	    --workdir /src                      \
+	    --env HTTP_PROXY="$(HTTP_PROXY)"    \
+	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
+	    $(REGISTRY)/$(BINS):$(TAG)          \
+	    /src/test-install-cni.sh
 	echo "Running shell-test.sh"
 	docker run                              \
 	    -i                                  \
@@ -387,7 +399,9 @@ lint:
 	    --env HTTP_PROXY="$(HTTP_PROXY)"    \
 	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
 	    koalaman/shellcheck                 \
-	    install-cni.sh
+	    -s bash                             \
+	    install-cni.sh                      \
+	    test-install-cni.sh testcase/testcase-*.sh
 
 $(BUILD_DIRS):
 	mkdir -p $@

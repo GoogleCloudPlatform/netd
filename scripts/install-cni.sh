@@ -128,71 +128,191 @@ else
   cni_spec=${cni_spec//@cniIstioPlugin/}
 fi
 
+# ip6tables need to be propagated only if IPv6 is in use in directpath, dual-stack or IPv6 clusters.
+# this flag is raised if at any point IPv6 subnet is configured.
+POPULATE_IP6TABLES="false"
+
 # Fill CNI spec template.
-ipv4_subnet=$(jq '.spec.podCIDR' <<<"$response")
+#######################################
+# Checks if given subnet is valid IPv4 range.
+# Arguments:
+#   Subnet
+# Returns:
+#   0 if valid, 1 on invalid.
+#######################################
+function is_ipv4_range {
+  local IPV4_RANGE_REGEXP='^([0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]{1,2}$'
+  local ip=$1
 
-if [[ "${ipv4_subnet:-}" =~ ^\"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/[0-9][0-9]*\"$ ]]; then
-  echo "PodCIDR validation succeeded: ${ipv4_subnet:-}"
-else
-  echo "Response from $node_url"
-  echo "$response"
-  echo "Failed to fetch/validate PodCIDR from K8s API server, ipv4_subnet=${ipv4_subnet:-}. Exiting (1)..."
-  exit 1
-fi
+  [[ "${ip:-}" =~ ${IPV4_RANGE_REGEXP} ]]
+}
 
-echo "Filling IPv4 subnet ${ipv4_subnet:-}"
-cni_spec=${cni_spec//@ipv4Subnet/[{\"subnet\": ${ipv4_subnet:-}\}]}
+#######################################
+# Checks if given subnet is valid IPv6 range.
+# Arguments:
+#   Subnet
+# Returns:
+#   0 if valid, 1 on invalid.
+#######################################
+function is_ipv6_range {
+  local IPV6_RANGE_REGEXP='^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))\/[0-9]{1,3}$'
+  local ip=$1
 
-STACK_TYPE=$(jq '.metadata.labels."cloud.google.com/gke-stack-type"' <<<"$response")
-echo "Node stack type label: '${STACK_TYPE:-}'"
+  [[ "${ip:-}" =~ ${IPV6_RANGE_REGEXP} ]]
+}
 
-if [ "$ENABLE_IPV6" == "true" ] || [ "${STACK_TYPE:-}" == '"IPV4_IPV6"' ]; then
-  node_ipv6_addr=$(curl -s -k --fail "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/?recursive=true" -H "Metadata-Flavor: Google" | jq -r '.ipv6s[0]' ) ||:
+#######################################
+# Replaces `@subnets` and `@routes` placeholders using `.spec.podCIDRs` from node json.
+# In directpath use case it additionally adds IPv6 subnet derived from node's IPv6 address.
+# Arguments:
+#   node json from kube-apiserver
+#   node_ipv6_addr node's IPv6 address from GCE metadata server
+#######################################
+function fillSubnetsInCniSpecV2Template {
+  local node=$1
+  local node_ipv6_addr=$2
+
+  local SUBNETS_REPLACEMENT=()
+  local ROUTES_REPLACEMENT=()
+
+  local ipv6_subnet_configured="false"
+
+  for subnet in $(jq -r '.spec.podCIDRs[]' <<<"$node") ; do
+    if is_ipv4_range "${subnet}" ; then
+      echo "IPv4 subnet detected in .spec.podCIDRs: '${subnet:-}'"
+      if [ "${ENABLE_CALICO_NETWORK_POLICY}" == "true" ]; then
+        # calico uses special value `usePodCidr` instead of directly providing IP range
+        SUBNETS_REPLACEMENT+=('[{"subnet": "usePodCidr"}]')
+        ROUTES_REPLACEMENT+=('{"dst": "0.0.0.0/0"}')
+      else
+        SUBNETS_REPLACEMENT+=("$(jq -nc --arg subnet "${subnet}" '[{"subnet": $subnet}]')")
+        ROUTES_REPLACEMENT+=('{"dst": "0.0.0.0/0"}')
+      fi
+    elif is_ipv6_range "${subnet}" ; then
+      echo "IPv6 subnet detected in .spec.podCIDRs: '${subnet:-}'"
+      POPULATE_IP6TABLES="true"
+      echo "ip6tables will be populated because IPv6 podCIDR is configured (from .spec.podCIDRs)"
+      ipv6_subnet_configured="true"
+      SUBNETS_REPLACEMENT+=("$(jq -nc --arg subnet "${subnet}" '[{"subnet": $subnet}]')")
+      ROUTES_REPLACEMENT+=('{"dst": "::/0"}')
+    else
+      echo "[ERROR] Subnet detected in .spec.podCIDRs '${subnet}' is not a valid IP range"
+      exit 1
+    fi
+  done
+
+  # Directpath use case
+  if [ "$ipv6_subnet_configured" == "false" ] ; then
+    # Directpath adds IPv6 subnet and route derived from host with fixed range
+    # of /112 even when it is not specified in node's .spec.podCIDRs
+    if [ -n "${node_ipv6_addr:-}" ] && [ "${node_ipv6_addr}" != "null" ]; then
+      POPULATE_IP6TABLES="true"
+      echo "ip6tables will be populated because IPv6 podCIDR is configured (for directpath)"
+      local subnet_from_node_ipv6_addr="${node_ipv6_addr}/112"
+      SUBNETS_REPLACEMENT+=("$(jq -nc --arg subnet "${subnet_from_node_ipv6_addr}" '[{"subnet": $subnet}]')")
+      ROUTES_REPLACEMENT+=("${CNI_SPEC_IPV6_ROUTE:-{\"dst\": \"::/0\"\}}")
+    fi
+  fi
+
+  SUBNETS_REPLACEMENT_CONCATENATED=$(IFS=', ' ; echo "${SUBNETS_REPLACEMENT[*]}")
+  ROUTES_REPLACEMENT_CONCATENATED=$(IFS=', ' ; echo "${ROUTES_REPLACEMENT[*]}")
+
+  cni_spec=${cni_spec//@subnets/$SUBNETS_REPLACEMENT_CONCATENATED}
+  cni_spec=${cni_spec//@routes/$ROUTES_REPLACEMENT_CONCATENATED}
+}
+
+#######################################
+# Replaces `@ipv4Subnet', '@ipv6SubnetOptional` and `@ipv6RouteOptional` placeholders using `.spec.podCIDR` from node json and node's ipv6 from metadata server.
+# Arguments:
+#   node json from kube-apiserver
+#   node_ipv6_addr node's IPv6 address from GCE metadata server
+#######################################
+function fillSubnetsInCniSpecLegacyTemplate {
+  local node=$1
+  local node_ipv6_addr=$2
+
+  local primary_subnet
+  primary_subnet=$(jq -r '.spec.podCIDR' <<<"$node")
+
+  if is_ipv4_range "${primary_subnet:-}" ; then
+    echo "PodCIDR IPv4 detected: '${primary_subnet:-}'"
+    cni_spec=${cni_spec//@ipv4Subnet/[{\"subnet\": \"${primary_subnet:-}\"\}]}
+  elif is_ipv6_range "${primary_subnet:-}" ; then
+    echo "Primary IPv6 pod range detected '${primary_subnet:-}'. It will only work with new spec template."
+    exit 1
+  else
+    echo "Response from $node_url"
+    echo "$node"
+    echo "Failed to fetch PodCIDR from K8s API server, primary_subnet=${primary_subnet:-}. Exiting (1)..."
+    exit 1
+  fi
 
   if [ -n "${node_ipv6_addr:-}" ] && [ "${node_ipv6_addr}" != "null" ]; then
     echo "Found nic0 IPv6 address ${node_ipv6_addr:-}. Filling IPv6 subnet and route..."
+    POPULATE_IP6TABLES="true"
+    echo "ip6tables will be populated because IPv6 podCIDR is configured (from node interface)"
 
     cni_spec=${cni_spec//@ipv6SubnetOptional/, [{\"subnet\": \"${node_ipv6_addr:-}/112\"\}]}
     cni_spec=${cni_spec//@ipv6RouteOptional/, ${CNI_SPEC_IPV6_ROUTE:-{\"dst\": \"::/0\"\}}}
-
-    # Ensure the IPv6 firewall rules are as expected.
-    # These rules mirror the IPv4 rules installed by kubernetes/cluster/gce/gci/configure-helper.sh
-
-    if ip6tables -w -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
-      echo "Add rules to accept all inbound TCP/UDP/ICMP/SCTP IPv6 packets"
-      ip6tables -A INPUT -w -p tcp -j ACCEPT
-      ip6tables -A INPUT -w -p udp -j ACCEPT
-      ip6tables -A INPUT -w -p icmpv6 -j ACCEPT
-      ip6tables -A INPUT -w -p sctp -j ACCEPT
-    fi
-
-    if ip6tables -w -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
-      echo "Add rules to accept all forwarded TCP/UDP/ICMP/SCTP IPv6 packets"
-      ip6tables -A FORWARD -w -p tcp -j ACCEPT
-      ip6tables -A FORWARD -w -p udp -j ACCEPT
-      ip6tables -A FORWARD -w -p icmpv6 -j ACCEPT
-      ip6tables -A FORWARD -w -p sctp -j ACCEPT
-    fi
-
-    # Ensure the other IPv6 rules we need are also installed, and in before any other node rules.
-    # Always allow ICMP
-    ip6tables -I OUTPUT -p icmpv6 -j ACCEPT -w
-    # Accept new and return traffic outbound
-    ip6tables -I OUTPUT -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT -w
-
-    if [ "${ENABLE_CALICO_NETWORK_POLICY}" == "true" ]; then
-      echo "Enabling IPv6 forwarding..."
-      echo 1 > "${IPV6_FORWARDING_CONF:-/proc/sys/net/ipv6/conf/all/forwarding}"
-    fi
   else
     echo "No IPv6 address found for nic0. Clearing IPv6 subnet and route..."
     cni_spec=${cni_spec//@ipv6SubnetOptional/}
     cni_spec=${cni_spec//@ipv6RouteOptional/}
   fi
-else
-  echo "Clearing IPv6 subnet and route given IPv6 access is disabled..."
-  cni_spec=${cni_spec//@ipv6SubnetOptional/}
-  cni_spec=${cni_spec//@ipv6RouteOptional/}
+}
+
+function fillSubnetsInCniSpec {
+  case "${CNI_SPEC_TEMPLATE_VERSION:-}" in
+    2*)
+      fillSubnetsInCniSpecV2Template "$1" "$2"
+      ;;
+    *)
+      fillSubnetsInCniSpecLegacyTemplate "$1" "$2"
+  esac
+}
+
+
+CLUSTER_STACK_TYPE=$(jq -r '.metadata.labels."cloud.google.com/gke-stack-type"' <<<"$response")
+echo "Node's cluster stack type label: '${CLUSTER_STACK_TYPE:-}'"
+
+node_ipv6_addr=''
+if [ "$ENABLE_IPV6" == "true" ] || [ "${CLUSTER_STACK_TYPE:-}" == "IPV4_IPV6" ]; then
+  node_ipv6_addr=$(curl -s -k --fail "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/?recursive=true" -H "Metadata-Flavor: Google" | jq -r '.ipv6s[0]' ) ||:
+fi
+
+fillSubnetsInCniSpec "$response" "$node_ipv6_addr"
+
+if [ "$POPULATE_IP6TABLES" == "true" ] ; then
+  # Ensure the IPv6 firewall rules are as expected.
+  # These rules mirror the IPv4 rules installed by kubernetes/cluster/gce/gci/configure-helper.sh
+  echo "Ensuring IPv6 firewall rules with ip6tables"
+
+  if ip6tables -w -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
+    echo "Add rules to accept all inbound TCP/UDP/ICMP/SCTP IPv6 packets"
+    ip6tables -A INPUT -w -p tcp -j ACCEPT
+    ip6tables -A INPUT -w -p udp -j ACCEPT
+    ip6tables -A INPUT -w -p icmpv6 -j ACCEPT
+    ip6tables -A INPUT -w -p sctp -j ACCEPT
+  fi
+
+  if ip6tables -w -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
+    echo "Add rules to accept all forwarded TCP/UDP/ICMP/SCTP IPv6 packets"
+    ip6tables -A FORWARD -w -p tcp -j ACCEPT
+    ip6tables -A FORWARD -w -p udp -j ACCEPT
+    ip6tables -A FORWARD -w -p icmpv6 -j ACCEPT
+    ip6tables -A FORWARD -w -p sctp -j ACCEPT
+  fi
+
+  # Ensure the other IPv6 rules we need are also installed, and in before any other node rules.
+  # Always allow ICMP
+  ip6tables -I OUTPUT -p icmpv6 -j ACCEPT -w
+  # Accept new and return traffic outbound
+  ip6tables -I OUTPUT -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT -w
+
+  if [ "${ENABLE_CALICO_NETWORK_POLICY}" == "true" ]; then
+    echo "Enabling IPv6 forwarding..."
+    echo 1 > "${IPV6_FORWARDING_CONF:-/proc/sys/net/ipv6/conf/all/forwarding}"
+  fi
 fi
 
 # MTU to use if the interface in use can't be detected.

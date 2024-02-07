@@ -6,9 +6,13 @@ export ENABLE_BANDWIDTH_PLUGIN=false
 export ENABLE_CILIUM_PLUGIN=false
 export ENABLE_MASQUERADE=false
 export ENABLE_IPV6=true
+export CNI_SPEC_IPV6_ROUTE="{\"dst\": \"2600:1900:4000::/42\"}"
 
-CNI_SPEC_TEMPLATE=$(cat testdata/spec-template.json)
+
+CNI_SPEC_TEMPLATE=$(cat testdata/spec-template-v2.json)
 export CNI_SPEC_TEMPLATE
+
+export CNI_SPEC_TEMPLATE_VERSION=2.0
 
 function before_test() {
 
@@ -24,7 +28,6 @@ function before_test() {
         echo '{
                 "metadata": {
                   "labels": {
-                    "cloud.google.com/gke-stack-type": "IPV4_IPV6"
                   },
                   "creationTimestamp": "2024-01-03T11:54:01Z",
                   "name": "gke-my-cluster-default-pool-128bc25d-9c94",
@@ -34,8 +37,7 @@ function before_test() {
                 "spec": {
                   "podCIDR": "10.52.1.0/24",
                   "podCIDRs": [
-                    "10.52.1.0/24",
-                    "2600:1900:4000:318:0:7::/112"
+                    "10.52.1.0/24"
                   ],
                   "providerID": "gce://my-gke-project/us-central1-c/gke-my-cluster-default-pool-128bc25d-9c94"
                 }
@@ -50,12 +52,11 @@ function before_test() {
 
 }
 
-
 function verify() {
   local expected
   local actual
 
-  expected=$(jq -S . <"testdata/expected-dualstack.json")
+  expected=$(jq -S . <"testdata/expected-directpath.json")
   actual=$(jq -S . <"/host/etc/cni/net.d/${CNI_SPEC_NAME}")
 
   if [ "$expected" != "$actual" ] ; then

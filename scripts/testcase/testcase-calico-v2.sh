@@ -1,14 +1,21 @@
 export KUBERNETES_SERVICE_HOST=kubernetes.default.svc
 export KUBERNETES_SERVICE_PORT=443
 
-export ENABLE_CALICO_NETWORK_POLICY=false
+export ENABLE_CALICO_NETWORK_POLICY=true
 export ENABLE_BANDWIDTH_PLUGIN=false
 export ENABLE_CILIUM_PLUGIN=false
 export ENABLE_MASQUERADE=false
 export ENABLE_IPV6=true
+export CNI_SPEC_IPV6_ROUTE="{\"dst\": \"2600:1900:4000::/42\"}"
+export CALICO_CNI_SPEC_TEMPLATE_FILE="/host/etc/cni/net.d/10-calico-v2.conflist.template"
+export CALICO_CNI_SERVICE_ACCOUNT="calico-cni-sa"
+export WRITE_CALICO_CONFIG_FILE=true
+export IPV6_FORWARDING_CONF=/tmp/mock-calico-enable-forwarding
 
-CNI_SPEC_TEMPLATE=$(cat testdata/spec-template.json)
-export CNI_SPEC_TEMPLATE
+CALICO_CNI_SPEC_TEMPLATE=$(cat testdata/calico-spec-template-v2.json)
+export CALICO_CNI_SPEC_TEMPLATE
+
+export CNI_SPEC_TEMPLATE_VERSION=2.0
 
 function before_test() {
 
@@ -16,15 +23,12 @@ function before_test() {
     # shellcheck disable=SC2317
     case "$*" in
       *http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0*)
-        # call to GCE metadata server
         echo '{"ipv6s": ["2600:1900:4000:318:0:7:0:0"]}'
         ;;
       *https://kubernetes.default.svc:443/api/v1/nodes/*)
-        # call to kube-apiserver
         echo '{
                 "metadata": {
                   "labels": {
-                    "cloud.google.com/gke-stack-type": "IPV4_IPV6"
                   },
                   "creationTimestamp": "2024-01-03T11:54:01Z",
                   "name": "gke-my-cluster-default-pool-128bc25d-9c94",
@@ -34,15 +38,14 @@ function before_test() {
                 "spec": {
                   "podCIDR": "10.52.1.0/24",
                   "podCIDRs": [
-                    "10.52.1.0/24",
-                    "2600:1900:4000:318:0:7::/112"
+                    "10.52.1.0/24"
                   ],
                   "providerID": "gce://my-gke-project/us-central1-c/gke-my-cluster-default-pool-128bc25d-9c94"
                 }
               }'
         ;;
       *)
-        # unmatched call
+        #unsupported
         exit 1
     esac
   }
@@ -50,13 +53,12 @@ function before_test() {
 
 }
 
-
 function verify() {
   local expected
   local actual
 
-  expected=$(jq -S . <"testdata/expected-dualstack.json")
-  actual=$(jq -S . <"/host/etc/cni/net.d/${CNI_SPEC_NAME}")
+  expected=$(jq -S . <"testdata/expected-calico.json")
+  actual=$(jq -S . <"/host/etc/cni/net.d/10-calico-v2.conflist.template")
 
   if [ "$expected" != "$actual" ] ; then
     echo "Expected cni_spec value:"

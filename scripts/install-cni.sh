@@ -184,7 +184,7 @@ if [ "$ENABLE_IPV6" == "true" ] || [ "${STACK_TYPE:-}" == '"IPV4_IPV6"' ]; then
 
     if [ "${ENABLE_CALICO_NETWORK_POLICY}" == "true" ]; then
       echo "Enabling IPv6 forwarding..."
-      echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
+      echo 1 > "${IPV6_FORWARDING_CONF:-/proc/sys/net/ipv6/conf/all/forwarding}"
     fi
   else
     echo "No IPv6 address found for nic0. Clearing IPv6 subnet and route..."

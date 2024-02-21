@@ -1,0 +1,39 @@
+{
+  "name": "gke-pod-network",
+  "cniVersion": "0.3.1",
+  "plugins": [
+    {
+      "type": "calico",
+      "mtu": 1460,
+      "log_level": "warning",
+      "log_file_path": "/var/log/calico/cni/cni.log",
+      "datastore_type": "kubernetes",
+      "nodename": "__KUBERNETES_NODE_NAME__",
+      "nodename_file_optional": true,
+      "ipam": {
+        "type": "host-local",
+        "ranges": [
+          [ { "subnet": "usePodCidr" } ]@ipv6SubnetOptional
+        ],
+        "routes": [
+          {"dst": "0.0.0.0/0"}@ipv6RouteOptional
+        ]
+      },
+      "policy": {
+        "type": "k8s"
+      },
+      "kubernetes": {
+        "kubeconfig": "__KUBECONFIG_FILEPATH__"
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {"portMappings": true},
+      "snat": true
+    },
+    {
+      "type": "bandwidth",
+      "capabilities": {"bandwidth": true}
+    }
+  ]
+}

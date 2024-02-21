@@ -47,13 +47,15 @@ BUILD='__BUILD__'
 
 echo "Install-CNI ($0), Build: $BUILD"
 
+set -u -e
+
 # Overide calico network policy config if its cni is not installed as expected.
 # This can happen if the calico daemonset is removed but the master addon still exists.
 #
 # If this script is being run in order to generate the Calico config file, then skip this
 # check.
-echo "Calico network policy config: ${ENABLE_CALICO_NETWORK_POLICY}"
-if [ "${ENABLE_CALICO_NETWORK_POLICY}" == "true" ] && [ "${WRITE_CALICO_CONFIG_FILE}" != "true" ]; then
+echo "Calico network policy enabled: '${ENABLE_CALICO_NETWORK_POLICY:-}'; write config: '${WRITE_CALICO_CONFIG_FILE:-}'"
+if [[ "${ENABLE_CALICO_NETWORK_POLICY:-}" == "true" && "${WRITE_CALICO_CONFIG_FILE:-}" != "true" ]]; then
   # inotify calls back to the beginning of this script.
   # `timeout` exits failure when it's exiting due to time out, but this is an
   # expected situation when Calico is being disabled (see below).
@@ -63,29 +65,20 @@ if [ "${ENABLE_CALICO_NETWORK_POLICY}" == "true" ] && [ "${WRITE_CALICO_CONFIG_F
   # condition of the if-statement below, once we have more confidence in the
   # implementations of `timeout` and `inotify`, then `set -e` can be moved to
   # the top, right after inotify callbacks.
-  if ! calico_ready; then
+  if calico_ready; then
+    echo "Calico has written CNI config files. No action needed here."
+    exit 0
+  else
     # This handles the disabling process: https://github.com/GoogleCloudPlatform/netd/issues/91
     ENABLE_CALICO_NETWORK_POLICY=false
     echo "Update calico network policy config to ${ENABLE_CALICO_NETWORK_POLICY}"
   fi
 fi
 
-set -u -e
-
-# Get CNI spec template if needed.
-if [ "${ENABLE_CALICO_NETWORK_POLICY}" == "true" ]; then
-  echo "Calico Network Policy is enabled"
-  if [ -z "${CALICO_CNI_SPEC_TEMPLATE_FILE:-}" ]; then
-    echo "No Calico CNI spec template is specified. Exiting (0)..."
-    exit 0
-  fi
-  if [ -z "${CALICO_CNI_SPEC_TEMPLATE}" ]; then
-    echo "No Calico CNI spec template is specified. Exiting (0)..."
-    exit 0
-  fi
-  cni_spec=${CALICO_CNI_SPEC_TEMPLATE}
-else
-  cni_spec=${CNI_SPEC_TEMPLATE}
+cni_spec=${CALICO_CNI_SPEC_TEMPLATE:-${CNI_SPEC_TEMPLATE:-}}
+if [[ -z "${cni_spec}" ]]; then
+  echo "No CNI spec template or empty template is specified. Not taking actions."
+  exit 0
 fi
 
 if [ -f "/host/home/kubernetes/bin/gke" ]; then
@@ -256,25 +249,25 @@ if [[ -n "${ISTIO_CNI_CONFIG:-}" ]]; then
  echo "Istio plug-in binary is now confirmed as ready."
 fi
 
+# Atomically write to file.
+function write_file {
+  local file=$1
+  local content=$2
+
+  local temp_file
+  # Potential failure from mktemp will be caught by global `set -e`.
+  temp_file=$(mktemp -- "${file}.tmp.XXXXXX")
+  trap 'rm -f -- "${temp_file}"' EXIT
+
+  cat <<<"${content}" >"${temp_file}"
+  mv -- "${temp_file}" "${file}"
+  rm -f -- "${temp_file}"
+  trap - EXIT
+
+  echo "File written to '${file}' with content (base64): $(base64 -w 0 -- "${file}")"
+}
+
 # Output CNI spec (template).
-output_file=""
-if [ "${CALICO_CNI_SPEC_TEMPLATE_FILE:-}" ]; then
-  output_file=${CALICO_CNI_SPEC_TEMPLATE_FILE}
-  echo "Creating Calico CNI spec template..."
-else
-  output_file="/host/etc/cni/net.d/${CNI_SPEC_NAME}"
-  echo "Creating CNI spec..."
-fi
-
-# Atomically write CNI spec
-if ! temp_file=$(mktemp -- "${output_file}.tmp.XXXXXX"); then
-  echo "Failed to create temp file, Exiting (1)..."
-  exit 1
-fi
-trap 'rm -f -- "${temp_file}"' EXIT
-cat <<<"${cni_spec:-}" >"${temp_file}"
-mv -- "${temp_file}" "${output_file}"
-
-# Log the CNI spec written above in log
-echo "CNI spec at ${output_file}, compact: $(jq -c . -- "${output_file}")"
-echo "CNI spec at ${output_file}, base64: $(base64 -w 0 -- "${output_file}")"
+output_file=${CALICO_CNI_SPEC_TEMPLATE_FILE:-/host/etc/cni/net.d/${CNI_SPEC_NAME}}
+echo "Creating CNI spec at '${output_file}' with content: $(jq -c . <<<"${cni_spec}")"
+write_file "${output_file}" "${cni_spec}"

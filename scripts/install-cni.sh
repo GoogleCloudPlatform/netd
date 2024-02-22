@@ -106,9 +106,13 @@ if [ "${MIGRATE_TO_DPV2:-}" == "true" ]; then
   fi
 fi
 
-if [ "${ENABLE_CILIUM_PLUGIN}" == "true" ]; then
-  echo "Adding Cilium plug-in to the CNI config."
-  cni_spec=${cni_spec//@cniCiliumPlugin/, {\"type\": \"cilium-cni\", \"enable-route-mtu\": true\}}
+if [[ "${ENABLE_CILIUM_PLUGIN}" == "true" ]]; then
+  cilium_cni_config='{"type": "cilium-cni", "enable-route-mtu": true}'
+  if [[ -n "${CILIUM_FAST_START_NAMESPACES:-}" ]]; then
+    cilium_cni_config=$(jq --arg namespaces "${CILIUM_FAST_START_NAMESPACES:-}" '.["fast-start-namespaces"] = $namespaces' <<<"${cilium_cni_config}")
+  fi
+  echo "Adding Cilium plug-in to the CNI config: '$(jq -c . <<<"${cilium_cni_config}")'"
+  cni_spec=${cni_spec//@cniCiliumPlugin/, ${cilium_cni_config}}
 else
   echo "Not using Cilium plug-in."
   cni_spec=${cni_spec//@cniCiliumPlugin/}

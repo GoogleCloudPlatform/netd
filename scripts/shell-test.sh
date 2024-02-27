@@ -73,6 +73,9 @@ echo >/netd-test && rm /netd-test && [[ ! -f /netd-test ]] && pass || fail
 run_test timeout_cmd
 timeout 2s sleep 1s && pass || fail
 
+run_test sleep_infinity_cmd
+timeout 1s sleep infinity && fail || { [[ "$?" == 124 ]] && pass || fail; }
+
 run_test base64_cmd
 [[ "$(echo -n AAA | base64 -w 0)" == QUFB ]] && pass || fail
 

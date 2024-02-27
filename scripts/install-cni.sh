@@ -21,6 +21,7 @@ calico_ready() {
   compgen -G "/host/etc/cni/net.d/*calico*.conflist"
 }
 
+# shellcheck disable=SC2317 # when called with $1=cni_ready
 cni_ready() {
   local -r cni_bin="$1"
   echo "Running '/host/home/kubernetes/bin/${cni_bin}' with CNI_COMMAND=VERSION"
@@ -34,11 +35,11 @@ cni_ready() {
 }
 
 # inotify callback
-if [ -n "$1" ]; then
+if [[ -n "$1" ]]; then
   # We run into this branch at callback from inotify. In this case, call the
   # specified function then exit. The return value from that function (exit
   # status of the last command in the function) is used as the exit status.
-  # "$@" would be like "calico_ready" or "calico_ready" "cilium-cni".
+  # "$@" would be like "calico_ready" or "cni_ready" "cilium-cni".
   "$@"
   exit
 fi
@@ -230,18 +231,6 @@ if [ "${ENABLE_CILIUM_PLUGIN}" == "true" ]; then
   # inotify calls back to the beginning of this script.
   inotify /host/home/kubernetes/bin cilium-cni "$0" cni_ready cilium-cni
   echo "Cilium plug-in binary is now confirmed as ready."
-
-  HEALTHZ_PORT="${CILIUM_HEALTHZ_PORT:-9879}"
-  RETRY_MAX_TIME="${CILIUM_HEALTH_MAX_WAIT_TIME:-600}"
-  # Wait upto the specified time for the cilium pod to report healthy.
-  if curl -fsSm 1 --retry "${RETRY_MAX_TIME}" --retry-all-errors \
-      --retry-max-time "${RETRY_MAX_TIME}" --retry-delay 1 \
-      -o /dev/null --stderr - \
-      http://localhost:"${HEALTHZ_PORT}"/healthz; then
-    echo "Cilium healthz reported success."
-  else
-    echo "Cilium not yet ready. Continuing anyway."
-  fi
 fi
 
 # Wait for istio plug-in if it is enabled
@@ -273,5 +262,74 @@ function write_file {
 
 # Output CNI spec (template).
 output_file=${CALICO_CNI_SPEC_TEMPLATE_FILE:-/host/etc/cni/net.d/${CNI_SPEC_NAME}}
-echo "Creating CNI spec at '${output_file}' with content: $(jq -c . <<<"${cni_spec}")"
-write_file "${output_file}" "${cni_spec}"
+
+# Wait up to the specified time for the cilium pod to report healthy.
+cilium_health_check() {
+  local retry_max_time=$1
+  local healthz_port=${2:-${CILIUM_HEALTHZ_PORT:-9879}}
+
+  curl -fsSm 1 --retry "${retry_max_time}" --retry-all-errors \
+    --retry-max-time "${retry_max_time}" --retry-delay 1 \
+    -o /dev/null --stderr - \
+    http://localhost:"${healthz_port}"/healthz
+}
+
+# Try to decouple RUN_CNI_WATCHDOG and ENABLE_CILIUM_PLUGIN; don't assume
+# ENABLE_CILIUM_PLUGIN is set whenever RUN_CNI_WATCHDOG is set.
+if [[ "${RUN_CNI_WATCHDOG:-}" != "true" ]]; then
+
+  # In non-watchdog mode, we must exit after writing CNI config.
+  echo "Not running CNI watchdog. Will exit as soon as CNI config is written."
+
+  if [[ "${ENABLE_CILIUM_PLUGIN:-}" == "true" ]]; then
+    if cilium_health_check "${CILIUM_HEALTH_MAX_WAIT_TIME:-600}"; then
+      echo "Cilium healthz reported success."
+    else
+      echo "Cilium not yet ready. Continuing anyway."
+    fi
+  fi
+
+  echo "Creating CNI spec at '${output_file}' with content: $(jq -c . <<<"${cni_spec}")"
+  write_file "${output_file}" "${cni_spec}"
+
+  exit 0
+fi
+
+# In watchdog mode, we should write CNI config but never exit.
+if [[ "${ENABLE_CILIUM_PLUGIN:-}" != "true" ]]; then
+  echo "Running CNI watchdog, but there is no Cilium to watch."
+
+  echo "Creating CNI spec at '${output_file}' with content: $(jq -c . <<<"${cni_spec}")"
+  write_file "${output_file}" "${cni_spec}"
+
+  while true; do
+    echo "Sleeping infinity now."
+    sleep infinity
+  done
+  # In case of anything unexpected, don't fallthrough to the logic below.
+  exit 1
+fi
+
+echo "Running CNI watchdog to watch Cilium and manage CNI config at '${output_file}' with content: $(jq -c . <<<"${cni_spec}")"
+cilium_watchdog_success_wait=${CILIUM_WATCHDOG_SUCCESS_WAIT:-300}
+cilium_watchdog_failure_retry=${CILIUM_WATCHDOG_FAILURE_RETRY:-60}
+
+if [[ -n "${CILIUM_FAST_START_NAMESPACES:-}" ]]; then
+  echo "Cilium has fast-start; writing CNI config upfront then start to check Cilium health."
+  write_file "${output_file}" "${cni_spec}"
+fi
+
+while true; do
+  echo "Checking Cilium health allowing retries for up to ${cilium_watchdog_failure_retry}s."
+  if cilium_health_check "${cilium_watchdog_failure_retry}"; then
+    echo "Cilium healthz reported success; writing CNI config if not already there then wait for ${cilium_watchdog_success_wait}s."
+    [[ ! -f "${output_file}" ]] && write_file "${output_file}" "${cni_spec}"
+    sleep "${cilium_watchdog_success_wait}"s
+  else
+    echo "Cilium does not appear healthy; removing CNI config if it exists."
+    rm -f -- "${output_file}"
+  fi
+done
+
+# In case of anything unexpected, signal failure.
+exit 1

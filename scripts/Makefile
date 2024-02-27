@@ -344,8 +344,7 @@ version: # @HELP outputs the version string
 version:
 	echo $(VERSION)
 
-test: # @HELP runs tests
-test: container
+test-inotify:
 	echo "Building and testing inotify"
 	docker run                              \
 	    -i                                  \
@@ -355,6 +354,19 @@ test: container
 	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
 	    alpine:3.16                         \
 	    sh -c 'cp -a /src /inotify && cd /inotify && ./build.sh && ./test.sh'
+
+test-shell: container
+	echo "Running shell-test.sh"
+	docker run                              \
+	    -i                                  \
+	    --rm                                \
+	    -v $$(pwd)/shell-test.sh:/test.sh   \
+	    --env HTTP_PROXY="$(HTTP_PROXY)"    \
+	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
+	    $(REGISTRY)/$(BINS):$(TAG)          \
+	    /test.sh
+
+test-install-cni: container
 	echo "Testing install-cni.sh"
 	docker run                              \
 	    -i                                  \
@@ -367,15 +379,9 @@ test: container
 	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
 	    $(REGISTRY)/$(BINS):$(TAG)          \
 	    /src/test-install-cni.sh
-	echo "Running shell-test.sh"
-	docker run                              \
-	    -i                                  \
-	    --rm                                \
-	    -v $$(pwd)/shell-test.sh:/test.sh   \
-	    --env HTTP_PROXY="$(HTTP_PROXY)"    \
-	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
-	    $(REGISTRY)/$(BINS):$(TAG)          \
-	    /test.sh
+
+test: # @HELP runs tests
+test: test-inotify test-shell test-install-cni
 
 lint: # @HELP runs lint
 lint:

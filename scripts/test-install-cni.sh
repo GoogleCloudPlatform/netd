@@ -41,6 +41,14 @@ Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
   }
   export -f timeout
 
+  # shellcheck disable=SC2317
+  function sleep() {
+    echo "[MOCK called] sleep $*"
+    echo "[MOCK] sleep shouldn't be called during normal execution; exiting with ${TEST_EXIT_CODE_SLEEP} as a signal."
+    exit "${TEST_EXIT_CODE_SLEEP}"
+  }
+  export -f sleep
+
   function before_test() {
     echo "no custom init defined for testcase ${testcase}; define custom mocks in before_test() function as needed"
   }
@@ -55,6 +63,8 @@ function cleanup_envs() {
     CILIUM_FAST_START_NAMESPACES \
     CILIUM_HEALTHZ_PORT \
     CILIUM_HEALTH_MAX_WAIT_TIME \
+    CILIUM_WATCHDOG_FAILURE_RETRY \
+    CILIUM_WATCHDOG_SUCCESS_WAIT \
     CNI_SPEC_IPV6_ROUTE \
     CNI_SPEC_TEMPLATE \
     ENABLE_BANDWIDTH_PLUGIN \
@@ -65,10 +75,12 @@ function cleanup_envs() {
     ISTIO_CNI_CONFIG \
     MIGRATE_TO_DPV2 DPV2_MIGRATION_READY \
     RETRY_MAX_TIME \
+    RUN_CNI_WATCHDOG \
     STACK_TYPE \
     WRITE_CALICO_CONFIG_FILE
 }
 
+export TEST_EXIT_CODE_SLEEP=42
 
 FAIL_COUNT=0
 
@@ -77,7 +89,7 @@ run_test() {
 }
 
 pass() {
-  echo " PASS"
+  echo " PASS [$*]"
 }
 
 fail() {
@@ -97,6 +109,9 @@ for testcase in testcase/testcase-*.sh ; do
   # resetting envs
   cleanup_envs
 
+  # allow being overridden in testcase
+  TEST_WANT_EXIT_CODE=0
+
   # setting CNI_SPEC_NAME to testcase name (filename in test.out/)
   CNI_SPEC_NAME="${testcase%.sh}"
   export CNI_SPEC_NAME="${CNI_SPEC_NAME##*/}"
@@ -110,14 +125,14 @@ for testcase in testcase/testcase-*.sh ; do
   # running install-cni script
   ./install-cni.sh >>test.log 2>&1
   exit_code="$?"
-  if [ "0" != "${exit_code}" ] ; then
+  if [ "${TEST_WANT_EXIT_CODE}" != "${exit_code}" ] ; then
     # script exited with non-zero code
-    fail "non-zero exit code ($exit_code)"
+    fail "unexpected exit code ($exit_code) want (${TEST_WANT_EXIT_CODE})"
   # running testcase verification
   elif ! verify ; then
     fail "verification failure"
   else
-    pass
+    pass "${exit_code}"
   fi
 
 done

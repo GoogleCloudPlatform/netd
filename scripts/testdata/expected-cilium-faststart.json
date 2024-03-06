@@ -23,7 +23,7 @@
     }, {
       "type": "cilium-cni",
       "enable-route-mtu": true,
-      "fast-start-namespaces": "default,kube-system"
+      "dpv2-fast-start-namespaces": "default,kube-system"
     }
   ]
 }

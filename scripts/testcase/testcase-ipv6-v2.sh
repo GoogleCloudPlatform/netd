@@ -5,10 +5,12 @@ export ENABLE_CALICO_NETWORK_POLICY=false
 export ENABLE_BANDWIDTH_PLUGIN=false
 export ENABLE_CILIUM_PLUGIN=false
 export ENABLE_MASQUERADE=false
-export ENABLE_IPV6=true
+export ENABLE_IPV6=false
 
-CNI_SPEC_TEMPLATE=$(cat testdata/spec-template.json)
+CNI_SPEC_TEMPLATE=$(cat testdata/spec-template-v2.json)
 export CNI_SPEC_TEMPLATE
+
+export CNI_SPEC_TEMPLATE_VERSION=2.0
 
 function before_test() {
 
@@ -24,7 +26,7 @@ function before_test() {
         echo '{
                 "metadata": {
                   "labels": {
-                    "cloud.google.com/gke-stack-type": "IPV4_IPV6"
+                    "cloud.google.com/gke-stack-type": "IPV6"
                   },
                   "creationTimestamp": "2024-01-03T11:54:01Z",
                   "name": "gke-my-cluster-default-pool-128bc25d-9c94",
@@ -32,10 +34,9 @@ function before_test() {
                   "uid": "f2353a2f-ca8c-4ca0-8dd3-ad1f964a54f0"
                 },
                 "spec": {
-                  "podCIDR": "10.52.1.0/24",
+                  "podCIDR": "2600:1900:4000:318:0:7:0:0/112",
                   "podCIDRs": [
-                    "10.52.1.0/24",
-                    "2600:1900:4000:318:0:7::/112"
+                    "2600:1900:4000:318:0:7:0:0/112"
                   ],
                   "providerID": "gce://my-gke-project/us-central1-c/gke-my-cluster-default-pool-128bc25d-9c94"
                 }
@@ -55,7 +56,7 @@ function verify() {
   local expected
   local actual
 
-  expected=$(jq -S . <"testdata/expected-dualstack.json")
+  expected=$(jq -S . <"testdata/expected-ipv6.json")
   actual=$(jq -S . <"/host/etc/cni/net.d/${CNI_SPEC_NAME}")
 
   if [ "$expected" != "$actual" ] ; then

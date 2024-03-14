@@ -7,8 +7,10 @@ export ENABLE_CILIUM_PLUGIN=false
 export ENABLE_MASQUERADE=false
 export ENABLE_IPV6=true
 
-CNI_SPEC_TEMPLATE=$(cat testdata/spec-template.json)
+CNI_SPEC_TEMPLATE=$(cat testdata/spec-template-v2.json)
 export CNI_SPEC_TEMPLATE
+
+export CNI_SPEC_TEMPLATE_VERSION=2.0
 
 function before_test() {
 
@@ -35,7 +37,7 @@ function before_test() {
                   "podCIDR": "10.52.1.0/24",
                   "podCIDRs": [
                     "10.52.1.0/24",
-                    "2600:1900:4000:318:0:7::/112"
+                    "2600:1900:4000:318:0:7:0:0/112"
                   ],
                   "providerID": "gce://my-gke-project/us-central1-c/gke-my-cluster-default-pool-128bc25d-9c94"
                 }

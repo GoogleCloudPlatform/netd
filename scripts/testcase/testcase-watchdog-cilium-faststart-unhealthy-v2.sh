@@ -3,12 +3,19 @@ export KUBERNETES_SERVICE_PORT=443
 
 export ENABLE_CALICO_NETWORK_POLICY=false
 export ENABLE_BANDWIDTH_PLUGIN=false
-export ENABLE_CILIUM_PLUGIN=false
+export ENABLE_CILIUM_PLUGIN=true
+export CILIUM_HEALTHZ_PORT=63197
+export CILIUM_FAST_START_NAMESPACES=default,kube-system
 export ENABLE_MASQUERADE=false
-export ENABLE_IPV6=true
+export ENABLE_IPV6=false
+export RUN_CNI_WATCHDOG=true
 
-CNI_SPEC_TEMPLATE=$(cat testdata/spec-template.json)
+CNI_SPEC_TEMPLATE=$(cat testdata/spec-template-v2.json)
 export CNI_SPEC_TEMPLATE
+
+export CNI_SPEC_TEMPLATE_VERSION=2.0
+
+export TEST_WANT_EXIT_CODE=24
 
 function before_test() {
 
@@ -16,15 +23,12 @@ function before_test() {
     # shellcheck disable=SC2317
     case "$*" in
       *http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0*)
-        # call to GCE metadata server
         echo '{"ipv6s": ["2600:1900:4000:318:0:7:0:0"]}'
         ;;
       *https://kubernetes.default.svc:443/api/v1/nodes/*)
-        # call to kube-apiserver
         echo '{
                 "metadata": {
                   "labels": {
-                    "cloud.google.com/gke-stack-type": "IPV4_IPV6"
                   },
                   "creationTimestamp": "2024-01-03T11:54:01Z",
                   "name": "gke-my-cluster-default-pool-128bc25d-9c94",
@@ -34,15 +38,22 @@ function before_test() {
                 "spec": {
                   "podCIDR": "10.52.1.0/24",
                   "podCIDRs": [
-                    "10.52.1.0/24",
-                    "2600:1900:4000:318:0:7::/112"
+                    "10.52.1.0/24"
                   ],
                   "providerID": "gce://my-gke-project/us-central1-c/gke-my-cluster-default-pool-128bc25d-9c94"
                 }
               }'
         ;;
+      *http://localhost:63197/*)
+        # Return unhealthy on the first attempt, then exit on the following.
+        if [[ "${TEST_CILIUM_HEALTH_CHECKED:-}" == "true" ]]; then
+          exit "${TEST_WANT_EXIT_CODE}"
+        fi
+        TEST_CILIUM_HEALTH_CHECKED=true
+        return 1
+        ;;
       *)
-        # unmatched call
+        #unsupported
         exit 1
     esac
   }
@@ -50,18 +61,12 @@ function before_test() {
 
 }
 
-
 function verify() {
-  local expected
   local actual
 
-  expected=$(jq -S . <"testdata/expected-dualstack.json")
-  actual=$(jq -S . <"/host/etc/cni/net.d/${CNI_SPEC_NAME}")
-
-  if [ "$expected" != "$actual" ] ; then
-    echo "Expected cni_spec value:"
-    echo "$expected"
-    echo "but actual was"
+  if [[ -f "/host/etc/cni/net.d/${CNI_SPEC_NAME}" ]]; then
+    actual=$(jq -S . <"/host/etc/cni/net.d/${CNI_SPEC_NAME}")
+    echo "Expected CNI config to be missing, but it has:"
     echo "$actual"
     return 1
   fi

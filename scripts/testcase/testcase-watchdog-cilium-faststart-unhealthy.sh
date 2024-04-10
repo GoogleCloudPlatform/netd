@@ -57,6 +57,13 @@ function before_test() {
   }
   export -f curl
 
+  # shellcheck disable=SC2317
+  function sleep() {
+    echo "[MOCK called] sleep $*"
+    echo "[MOCK] this test expects a delay during fast start."
+  }
+  export -f sleep
+
 }
 
 function verify() {

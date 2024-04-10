@@ -313,10 +313,12 @@ fi
 echo "Running CNI watchdog to watch Cilium and manage CNI config at '${output_file}' with content: $(jq -c . <<<"${cni_spec}")"
 cilium_watchdog_success_wait=${CILIUM_WATCHDOG_SUCCESS_WAIT:-300}
 cilium_watchdog_failure_retry=${CILIUM_WATCHDOG_FAILURE_RETRY:-60}
+cilium_watchdog_fast_start_wait=${CILIUM_WATCHDOG_FAST_START_WAIT:-60}
 
 if [[ -n "${CILIUM_FAST_START_NAMESPACES:-}" ]]; then
-  echo "Cilium has fast-start; writing CNI config upfront then start to check Cilium health."
+  echo "Cilium has fast-start; writing CNI config upfront then wait for ${cilium_watchdog_fast_start_wait}s and start to check Cilium health."
   write_file "${output_file}" "${cni_spec}"
+  sleep "${cilium_watchdog_fast_start_wait}"s
 fi
 
 while true; do

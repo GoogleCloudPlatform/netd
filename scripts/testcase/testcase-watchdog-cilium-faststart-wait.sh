@@ -13,7 +13,7 @@ export RUN_CNI_WATCHDOG=true
 CNI_SPEC_TEMPLATE=$(cat testdata/spec-template.json)
 export CNI_SPEC_TEMPLATE
 
-export TEST_WANT_EXIT_CODE=24
+export TEST_WANT_EXIT_CODE=${TEST_EXIT_CODE_SLEEP}
 
 function before_test() {
 
@@ -43,9 +43,9 @@ function before_test() {
               }'
         ;;
       *http://localhost:63197/*)
-        # With fast-start enabled, CNI config should have been written
-        # at the first Cilium health check attempt.
-        exit "${TEST_WANT_EXIT_CODE}"
+        # This test shouldn't reach this. It should hit an exit-by-sleep
+        # earlier, at which time the CNI config must have been written.
+        exit 1
         ;;
       *)
         #unsupported
@@ -53,13 +53,6 @@ function before_test() {
     esac
   }
   export -f curl
-
-  # shellcheck disable=SC2317
-  function sleep() {
-    echo "[MOCK called] sleep $*"
-    echo "[MOCK] this test expects a delay during fast start."
-  }
-  export -f sleep
 
 }
 

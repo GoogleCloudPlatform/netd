@@ -333,7 +333,7 @@ default_nic=$(route -n | grep -E '^0\.0\.0\.0\s+\S+\s+0\.0\.0\.0' | grep -oE '\S
 
 # cilium_wg0 is the interface for node-to-node encryption. If it's available /
 # in use, it has a lower MTU than the default NIC (eth0) due to encryption headers.
-for nic in cilium_wg0 "$default_nic"; do
+for nic in cilium_wg0 $default_nic; do
   if [ -f "/sys/class/net/$nic/mtu" ]; then
     MTU=$(cat "/sys/class/net/$nic/mtu")
     MTU_SOURCE=$nic

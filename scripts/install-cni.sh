@@ -95,7 +95,13 @@ else
 fi
 
 token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-node_url="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/nodes/${HOSTNAME}"
+host=${KUBERNETES_SERVICE_HOST}
+# If host contains a colon (:), it is an IPv6 address, hence needs wrapping
+# with [..].
+if [[ "${host}" =~ : ]]; then
+  host="[$host]"
+fi
+node_url="https://$host:${KUBERNETES_SERVICE_PORT}/api/v1/nodes/${HOSTNAME}"
 response=$(curl -k -s -H "Authorization: Bearer $token" "$node_url")
 
 if [ "${MIGRATE_TO_DPV2:-}" == "true" ]; then

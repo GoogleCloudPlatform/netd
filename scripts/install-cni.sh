@@ -311,6 +311,7 @@ if [ "$POPULATE_IP6TABLES" == "true" ] ; then
 
   if [ "${ENABLE_CALICO_NETWORK_POLICY}" == "true" ]; then
     echo "Enabling IPv6 forwarding..."
+    # IPV6_FORWARDING_CONF override only to be used in tests.
     echo 1 > "${IPV6_FORWARDING_CONF:-/proc/sys/net/ipv6/conf/all/forwarding}"
   fi
 fi
@@ -329,13 +330,17 @@ MTU_SOURCE="<default>"
 # last field, which is the interface name. We stick to using grep to avoid
 # introducing too many new dependencies.
 
-default_nic=$(route -n | grep -E '^0\.0\.0\.0\s+\S+\s+0\.0\.0\.0' | grep -oE '\S+$')
+# In the case where there are multiple default routes (e.g. multi-networking
+# with route manager), try each one starting from the lowest metric value.
+readarray -t default_nics < <(route -n | grep -E '^0\.0\.0\.0\s+\S+\s+0\.0\.0\.0' | sort -n -k5,5 | grep -oE '\S+$')
 
 # cilium_wg0 is the interface for node-to-node encryption. If it's available /
 # in use, it has a lower MTU than the default NIC (eth0) due to encryption headers.
-for nic in cilium_wg0 "$default_nic"; do
-  if [ -f "/sys/class/net/$nic/mtu" ]; then
-    MTU=$(cat "/sys/class/net/$nic/mtu")
+for nic in cilium_wg0 "${default_nics[@]}"; do
+  # SYS_CLASS_NET override only to be used in tests.
+  mtu_file=${SYS_CLASS_NET:-/sys/class/net}/$nic/mtu
+  if [[ -f "$mtu_file" ]]; then
+    MTU=$(cat "$mtu_file")
     MTU_SOURCE=$nic
     break
   fi

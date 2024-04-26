@@ -59,7 +59,10 @@ run_test inotify_cmd
 inotify / '' /bin/cat /dev/null >/dev/null && pass || fail
 
 run_test default_nic_mtu
-[[ -f "/sys/class/net/$(route -n | grep -E '^0\.0\.0\.0\s+\S+\s+0\.0\.0\.0' | grep -oE '\S+$')/mtu" ]] && pass || fail
+[[ -f "/sys/class/net/$(route -n | grep -E '^0\.0\.0\.0\s+\S+\s+0\.0\.0\.0' | sort -n -k5,5 | grep -oE '\S+$')/mtu" ]] && pass || fail
+
+run_test sort_cmd
+[[ "$(echo $'A 11\nB 2' | sort -n -k2,2)" == $'B 2\nA 11' ]] && pass || fail
 
 run_test mktemp_cmd
 [[ -f "$(mktemp /tmp.XXXXXX)" ]] && pass || fail

@@ -2,5 +2,20 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "ignorePaths": [
+    "tools/"
+  ],
+  "packageRules": [
+    {
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["golang"],
+      "enabled": false
+    },
+    {
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["toolchain"],
+      "enabled": false
+    }
   ]
 }

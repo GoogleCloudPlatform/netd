@@ -8,12 +8,12 @@
   ],
   "packageRules": [
     {
-      "matchManagers": ["gomod"],
+      "matchCategories": ["golang"],
       "matchDepTypes": ["golang"],
       "enabled": false
     },
     {
-      "matchManagers": ["gomod"],
+      "matchCategories": ["golang"],
       "matchDepTypes": ["toolchain"],
       "enabled": false
     }

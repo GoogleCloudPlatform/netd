@@ -19,6 +19,7 @@ export TEST_WANT_EXIT_CODE=24
 
 function before_test() {
 
+  # shellcheck disable=SC2329
   function curl() {
     # shellcheck disable=SC2317
     case "$*" in
@@ -56,7 +57,7 @@ function before_test() {
   }
   export -f curl
 
-  # shellcheck disable=SC2317
+  # shellcheck disable=SC2317,SC2329
   function sleep() {
     echo "[MOCK called] sleep $*"
     echo "[MOCK] this test expects a delay during fast start."

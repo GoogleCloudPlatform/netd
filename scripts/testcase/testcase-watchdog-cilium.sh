@@ -18,6 +18,7 @@ TEST_WANT_EXIT_CODE=${TEST_EXIT_CODE_SLEEP}
 
 function before_test() {
 
+  # shellcheck disable=SC2329
   function curl() {
     # shellcheck disable=SC2317
     case "$*" in

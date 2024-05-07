@@ -13,6 +13,7 @@ export CNI_SPEC_TEMPLATE
 
 function before_test() {
 
+  # shellcheck disable=SC2329
   function curl() {
     # shellcheck disable=SC2317
     case "$*" in
@@ -45,6 +46,7 @@ function before_test() {
   }
   export -f curl
 
+  # shellcheck disable=SC2329
   function route() {
     # shellcheck disable=SC2317
     echo 'Kernel IP routing table

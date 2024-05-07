@@ -17,6 +17,7 @@ export CALICO_CNI_SPEC_TEMPLATE
 
 function before_test() {
 
+  # shellcheck disable=SC2329
   function curl() {
     # shellcheck disable=SC2317
     case "$*" in

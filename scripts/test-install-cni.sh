@@ -3,24 +3,28 @@
 function init_default_cmd_mocks() {
   shopt -s expand_aliases
 
+  # shellcheck disable=SC2329
   function iptables() {
     # shellcheck disable=SC2317
     echo "[MOCK called] iptables $*"
   }
   export -f iptables
 
+  # shellcheck disable=SC2329
   function ip6tables() {
     # shellcheck disable=SC2317
     echo "[MOCK called] ip6tables $*"
   }
   export -f ip6tables
 
+  # shellcheck disable=SC2329
   function inotify() {
     # shellcheck disable=SC2317
     echo "[MOCK called] inotify $*"
   }
   export -f inotify
 
+  # shellcheck disable=SC2329
   function route() {
     # shellcheck disable=SC2317
     echo 'Kernel IP routing table
@@ -29,19 +33,21 @@ Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
   }
   export -f route
 
+  # shellcheck disable=SC2329
   function curl() {
     # shellcheck disable=SC2317
     echo "[MOCK called] curl $*"
   }
   export -f curl
 
+  # shellcheck disable=SC2329
   function timeout() {
     # shellcheck disable=SC2317
     echo "[MOCK called] timeout $*"
   }
   export -f timeout
 
-  # shellcheck disable=SC2317
+  # shellcheck disable=SC2317,SC2329
   function sleep() {
     echo "[MOCK called] sleep $*"
     echo "[MOCK] sleep shouldn't be called during normal execution; exiting with ${TEST_EXIT_CODE_SLEEP} as a signal."

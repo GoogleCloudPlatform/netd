@@ -19,6 +19,7 @@ export TEST_WANT_EXIT_CODE=24
 
 function before_test() {
 
+  # shellcheck disable=SC2329
   function curl() {
     # shellcheck disable=SC2317
     case "$*" in

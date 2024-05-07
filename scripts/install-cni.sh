@@ -21,7 +21,7 @@ calico_ready() {
   compgen -G "/host/etc/cni/net.d/*calico*.conflist"
 }
 
-# shellcheck disable=SC2317 # when called with $1=cni_ready
+# shellcheck disable=SC2317,SC2329 # when called with $1=cni_ready
 cni_ready() {
   local -r cni_bin="$1"
   echo "Running '/host/home/kubernetes/bin/${cni_bin}' with CNI_COMMAND=VERSION"

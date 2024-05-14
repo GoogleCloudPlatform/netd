@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# shellcheck disable=SC2317,SC2329 # when called with $1=calico_ready
 calico_ready() {
   echo "Listing items matching /host/etc/cni/net.d/*calico*.conflist"
   echo "(this action repeats during bootstrap until a match is found)"
@@ -50,6 +51,24 @@ echo "Install-CNI ($0), Build: $BUILD"
 
 set -u -e
 
+# Try to decouple RUN_CNI_WATCHDOG and ENABLE_CILIUM_PLUGIN; don't assume
+# ENABLE_CILIUM_PLUGIN is set whenever RUN_CNI_WATCHDOG is set.
+# All exit paths should call `success` instead of `exit 0`,
+# so the appropriate actions can be taken according to RUN_CNI_WATCHDOG.
+success() {
+  echo "Install-CNI execution completed successfully."
+  if [[ "${RUN_CNI_WATCHDOG:-}" != "true" ]]; then
+    echo "Not running CNI watchdog; exiting now."
+    exit 0
+  fi
+  while true; do
+    echo "Running CNI watchdog; sleeping infinity now."
+    sleep infinity
+  done
+  # In case of anything unexpected, signal failure.
+  exit 1
+}
+
 # Overide calico network policy config if its cni is not installed as expected.
 # This can happen if the calico daemonset is removed but the master addon still exists.
 #
@@ -60,16 +79,11 @@ if [[ "${ENABLE_CALICO_NETWORK_POLICY:-}" == "true" && "${WRITE_CALICO_CONFIG_FI
   # inotify calls back to the beginning of this script.
   # `timeout` exits failure when it's exiting due to time out, but this is an
   # expected situation when Calico is being disabled (see below).
-  timeout 120s inotify /host/etc/cni/net.d '' "$0" calico_ready \
-    || echo "inotify for Calico CNI configuration files failed or timed out (status: $?)."
-  # Might be possible to just use the exit status from `timeout` as the
-  # condition of the if-statement below, once we have more confidence in the
-  # implementations of `timeout` and `inotify`, then `set -e` can be moved to
-  # the top, right after inotify callbacks.
-  if calico_ready; then
+  if timeout 120s inotify /host/etc/cni/net.d '' "$0" calico_ready; then
     echo "Calico has written CNI config files. No action needed here."
-    exit 0
+    success
   else
+    echo "inotify for Calico CNI configuration files failed or timed out (status: $?)."
     # This handles the disabling process: https://github.com/GoogleCloudPlatform/netd/issues/91
     ENABLE_CALICO_NETWORK_POLICY=false
     echo "Update calico network policy config to ${ENABLE_CALICO_NETWORK_POLICY}"
@@ -79,7 +93,7 @@ fi
 cni_spec=${CALICO_CNI_SPEC_TEMPLATE:-${CNI_SPEC_TEMPLATE:-}}
 if [[ -z "${cni_spec}" ]]; then
   echo "No CNI spec template or empty template is specified. Not taking actions."
-  exit 0
+  success
 fi
 
 if [ -f "/host/home/kubernetes/bin/gke" ]; then
@@ -405,40 +419,30 @@ cilium_health_check() {
     http://localhost:"${healthz_port}"/healthz
 }
 
-# Try to decouple RUN_CNI_WATCHDOG and ENABLE_CILIUM_PLUGIN; don't assume
-# ENABLE_CILIUM_PLUGIN is set whenever RUN_CNI_WATCHDOG is set.
-if [[ "${RUN_CNI_WATCHDOG:-}" != "true" ]]; then
-
-  # In non-watchdog mode, we must exit after writing CNI config.
-  echo "Not running CNI watchdog. Will exit as soon as CNI config is written."
-
-  if [[ "${ENABLE_CILIUM_PLUGIN:-}" == "true" ]]; then
-    if cilium_health_check "${CILIUM_HEALTH_MAX_WAIT_TIME:-600}"; then
-      echo "Cilium healthz reported success."
-    else
-      echo "Cilium not yet ready. Continuing anyway."
-    fi
+# Cilium health check logic before watchdog and CNI STATUS API are introduced.
+cilium_wait_or_ignore() {
+  if cilium_health_check "${CILIUM_HEALTH_MAX_WAIT_TIME:-600}"; then
+    echo "Cilium healthz reported success."
+  else
+    echo "Cilium not yet ready. Continuing anyway."
   fi
+}
 
+write_and_success() {
   echo "Creating CNI spec at '${output_file}' with content: $(jq -c . <<<"${cni_spec}")"
   write_file "${output_file}" "${cni_spec}"
+  success
+}
 
-  exit 0
+if [[ "${ENABLE_CILIUM_PLUGIN:-}" != "true" ]]; then
+  echo "Cilium CNI is not in use"
+  write_and_success
 fi
 
-# In watchdog mode, we should write CNI config but never exit.
-if [[ "${ENABLE_CILIUM_PLUGIN:-}" != "true" ]]; then
-  echo "Running CNI watchdog, but there is no Cilium to watch."
-
-  echo "Creating CNI spec at '${output_file}' with content: $(jq -c . <<<"${cni_spec}")"
-  write_file "${output_file}" "${cni_spec}"
-
-  while true; do
-    echo "Sleeping infinity now."
-    sleep infinity
-  done
-  # In case of anything unexpected, don't fallthrough to the logic below.
-  exit 1
+if [[ "${RUN_CNI_WATCHDOG:-}" != "true" ]]; then
+  echo "Cilium CNI is in use but CNI watchdog is not enabled"
+  cilium_wait_or_ignore
+  write_and_success
 fi
 
 echo "Running CNI watchdog to watch Cilium and manage CNI config at '${output_file}' with content: $(jq -c . <<<"${cni_spec}")"

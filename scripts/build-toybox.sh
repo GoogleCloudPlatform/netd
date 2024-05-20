@@ -6,7 +6,9 @@ set -exu
 # we're using it for display only so we should be good.
 # Toybox sh has more TODOs in multiple areas so don't use it.
 # Command mkdir is used for tests only.
-toys="base64 mkdir mktemp mv route sort timeout"
+# Commands nice and renice are not used directly, but included
+# for caller's (k8s manifest's) convenience.
+toys="base64 mkdir mktemp mv nice renice route sort timeout"
 
 cd /toybox-*/
 

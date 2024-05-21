@@ -1,7 +1,6 @@
 module github.com/GoogleCloudPlatform/netd
 
 go 1.22
-toolchain go1.22.2
 
 require (
 	github.com/containernetworking/plugins v1.3.0

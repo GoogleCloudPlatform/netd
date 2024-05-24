@@ -6,13 +6,9 @@ export ENABLE_BANDWIDTH_PLUGIN=false
 export ENABLE_CILIUM_PLUGIN=false
 export ENABLE_MASQUERADE=false
 export ENABLE_IPV6=false
-export RUN_CNI_WATCHDOG=true
 
 CNI_SPEC_TEMPLATE=$(cat testdata/spec-template.json)
 export CNI_SPEC_TEMPLATE
-
-# shellcheck disable=SC2034
-TEST_WANT_EXIT_CODE=${TEST_EXIT_CODE_SLEEP}
 
 function before_test() {
 
@@ -34,9 +30,39 @@ function before_test() {
                   "uid": "f2353a2f-ca8c-4ca0-8dd3-ad1f964a54f0"
                 },
                 "spec": {
+                  "providerID": "gce://my-gke-project/us-central1-c/gke-my-cluster-default-pool-128bc25d-9c94"
+                }
+              }}'
+        echo '{"object":{
+                "metadata": {
+                  "labels": {
+                  },
+                  "creationTimestamp": "2024-01-03T11:54:01Z",
+                  "name": "gke-my-cluster-default-pool-128bc25d-9c94",
+                  "resourceVersion": "891004",
+                  "uid": "f2353a2f-ca8c-4ca0-8dd3-ad1f964a54f0"
+                },
+                "spec": {
                   "podCIDR": "10.52.1.0/24",
                   "podCIDRs": [
                     "10.52.1.0/24"
+                  ],
+                  "providerID": "gce://my-gke-project/us-central1-c/gke-my-cluster-default-pool-128bc25d-9c94"
+                }
+              }}'
+        echo '{"object":{
+                "metadata": {
+                  "labels": {
+                  },
+                  "creationTimestamp": "2024-01-03T11:54:01Z",
+                  "name": "gke-my-cluster-default-pool-128bc25d-9c94",
+                  "resourceVersion": "891005",
+                  "uid": "f2353a2f-ca8c-4ca0-8dd3-ad1f964a54f0"
+                },
+                "spec": {
+                  "podCIDR": "10.52.1.1/24",
+                  "podCIDRs": [
+                    "10.52.1.1/24"
                   ],
                   "providerID": "gce://my-gke-project/us-central1-c/gke-my-cluster-default-pool-128bc25d-9c94"
                 }

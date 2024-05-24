@@ -24,8 +24,8 @@ function before_test() {
       *http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0*)
         echo '{"ipv6s": ["2600:1900:4000:318:0:7:0:0"]}'
         ;;
-      *https://kubernetes.default.svc:443/api/v1/nodes/*)
-        echo '{
+      *https://kubernetes.default.svc:443/api/v1/nodes*)
+        echo '{"object":{
                 "metadata": {
                   "labels": {
                   },
@@ -41,7 +41,7 @@ function before_test() {
                   ],
                   "providerID": "gce://my-gke-project/us-central1-c/gke-my-cluster-default-pool-128bc25d-9c94"
                 }
-              }'
+              }}'
         ;;
       *http://localhost:63197/*)
         # Return unhealthy on the first attempt, then exit on the following.

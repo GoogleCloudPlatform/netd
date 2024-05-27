@@ -24,7 +24,7 @@ function before_test() {
         # call to GCE metadata server
         echo '{}'
         ;;
-      *https://kubernetes.default.svc:443/api/v1/nodes/*)
+      *https://kubernetes.default.svc:443/api/v1/nodes*)
         # call to kube-apiserver
         echo '{}'
         ;;

@@ -18,6 +18,11 @@ log() {
   echo "$@"
 }
 
+fatal() {
+  echo FATAL: "$@" >&2
+  exit 1
+}
+
 # shellcheck disable=SC2317,SC2329 # when called with $1=calico_ready
 calico_ready() {
   log "Listing items matching /host/etc/cni/net.d/*calico*.conflist"
@@ -110,21 +115,48 @@ else
   cni_spec=${cni_spec//@cniBandwidthPlugin/}
 fi
 
-token=$(</var/run/secrets/kubernetes.io/serviceaccount/token)
-host=${KUBERNETES_SERVICE_HOST}
-# If host contains a colon (:), it is an IPv6 address, hence needs wrapping
-# with [..].
-if [[ "${host}" =~ : ]]; then
-  host="[$host]"
-fi
-node_url="https://$host:${KUBERNETES_SERVICE_PORT}/api/v1/nodes/${HOSTNAME}"
-response=$(curl -k -s -H "Authorization: Bearer $token" "$node_url")
+fetch_node_object() {
+  local attempts=$1
+  local timeout=$2
 
-if [ "${MIGRATE_TO_DPV2:-}" == "true" ]; then
-  DPV2_MIGRATION_READY=$(jq '.metadata.labels."cloud.google.com/gke-dpv2-migration-ready"' <<<"$response")
+  local host=${KUBERNETES_SERVICE_HOST}
+  # If host contains a colon (:), it is an IPv6 address, hence needs wrapping
+  # with [..].
+  if [[ "${host}" =~ : ]]; then
+    host="[${host}]"
+  fi
+
+  local token
+  local node_url="https://${host}:${KUBERNETES_SERVICE_PORT}/api/v1/nodes?watch=true&timeoutSeconds=${timeout}&fieldSelector=metadata.name=${HOSTNAME}"
+
+  for ((i=1; i<=attempts; i++)); do
+    log "Watching attempt #${i} at ${node_url}"
+    token=$(</var/run/secrets/kubernetes.io/serviceaccount/token)
+    # Grab the first object seen with .spec.podCIDR set.
+    # Note: curl process may be leaked until the next node update, or
+    # timeoutSeconds, whichever earlier. Shouldn't be a major issue.
+    # Do not use curl `-m` trying to guard timeout further: it will emit an
+    # error to stderr upon timeout even if a matching object is already seen
+    # (but no further node updates happen), and we can't redirect stderr to
+    # stdout here because stdout is in the data pipe.
+    node_object=$(grep --line-buffered -m1 . <(curl -fsSkN -H "Authorization: Bearer ${token}" "${node_url}" | jq --unbuffered -c '.object | select(.spec.podCIDR != null)')) || node_object=
+    [[ -n "${node_object}" ]] && return
+  done
+
+  fatal "Could not successfully watch node and wait for podCIDR."
+}
+
+# Watch for up to 1 minute, we don't expect podCIDR to be not populated for too
+# long, but this can also be three continuous retries and failures, then we wait
+# for kubelet to retry the whole container if node_object is still not fetched.
+fetch_node_object 3 20
+log "Node object fetched:"
+log "${node_object}"
+
+if [[ "${MIGRATE_TO_DPV2:-}" == "true" ]]; then
+  DPV2_MIGRATION_READY=$(jq -r '.metadata.labels."cloud.google.com/gke-dpv2-migration-ready"' <<<"${node_object}")
   log "Migration to DPv2 in progress; node ready: '${DPV2_MIGRATION_READY}'"
-  if [ "${DPV2_MIGRATION_READY}" != '"true"' ] # DPV2_MIGRATION_READY is a JSON string thus double quotes
-  then
+  if [[ "${DPV2_MIGRATION_READY}" != "true" ]]; then
     ENABLE_CILIUM_PLUGIN=false
   fi
 fi
@@ -134,7 +166,8 @@ if [[ "${ENABLE_CILIUM_PLUGIN}" == "true" ]]; then
   if [[ -n "${CILIUM_FAST_START_NAMESPACES:-}" ]]; then
     cilium_cni_config=$(jq --arg namespaces "${CILIUM_FAST_START_NAMESPACES:-}" '.["dpv2-fast-start-namespaces"] = $namespaces' <<<"${cilium_cni_config}")
   fi
-  log "Adding Cilium plug-in to the CNI config: ${cilium_cni_config//$'\n'/ }"
+  log "Adding Cilium plug-in to the CNI config:"
+  log "${cilium_cni_config//$'\n'/ }"
   cni_spec=${cni_spec//@cniCiliumPlugin/, ${cilium_cni_config}}
 else
   log "Not using Cilium plug-in."
@@ -218,8 +251,7 @@ function fillSubnetsInCniSpecV2Template {
       SUBNETS_REPLACEMENT+=("$(jq -nc --arg subnet "${subnet}" '[{"subnet": $subnet}]')")
       ROUTES_REPLACEMENT+=('{"dst": "::/0"}')
     else
-      log "[ERROR] Subnet detected in .spec.podCIDRs '${subnet}' is not a valid IP range"
-      exit 1
+      fatal "Subnet detected in .spec.podCIDRs '${subnet}' is not a valid IP range"
     fi
   done
 
@@ -261,13 +293,9 @@ function fillSubnetsInCniSpecLegacyTemplate {
     log "PodCIDR IPv4 detected: '${primary_subnet:-}'"
     cni_spec=${cni_spec//@ipv4Subnet/[{\"subnet\": \"${primary_subnet:-}\"\}]}
   elif is_ipv6_range "${primary_subnet:-}" ; then
-    log "Primary IPv6 pod range detected '${primary_subnet:-}'. It will only work with new spec template."
-    exit 1
+    fatal "Primary IPv6 pod range detected '${primary_subnet:-}'. It will only work with new spec template."
   else
-    log "Response from $node_url"
-    log "$node"
-    log "Failed to fetch PodCIDR from K8s API server, primary_subnet=${primary_subnet:-}. Exiting (1)..."
-    exit 1
+    fatal "Failed to fetch PodCIDR from K8s API server, primary_subnet=${primary_subnet:-}."
   fi
 
   if [ -n "${node_ipv6_addr:-}" ] && [ "${node_ipv6_addr}" != "null" ]; then
@@ -296,7 +324,7 @@ function fillSubnetsInCniSpec {
 }
 
 
-CLUSTER_STACK_TYPE=$(jq -r '.metadata.labels."cloud.google.com/gke-stack-type"' <<<"$response")
+CLUSTER_STACK_TYPE=$(jq -r '.metadata.labels."cloud.google.com/gke-stack-type"' <<<"${node_object}")
 log "Node's cluster stack type label: '${CLUSTER_STACK_TYPE:-}'"
 
 node_ipv6_addr=''
@@ -304,7 +332,7 @@ if [ "$ENABLE_IPV6" == "true" ] || [ "${CLUSTER_STACK_TYPE:-}" == "IPV4_IPV6" ];
   node_ipv6_addr=$(curl -s -k --fail "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/?recursive=true" -H "Metadata-Flavor: Google" | jq -r '.ipv6s[0]' ) ||:
 fi
 
-fillSubnetsInCniSpec "$response" "$node_ipv6_addr"
+fillSubnetsInCniSpec "${node_object}" "${node_ipv6_addr}"
 
 if [ "$POPULATE_IP6TABLES" == "true" ] ; then
   # Ensure the IPv6 firewall rules are as expected.
@@ -433,7 +461,8 @@ cilium_wait_or_ignore() {
 }
 
 write_and_success() {
-  log "Creating CNI spec at '${output_file}' with content: ${cni_spec//$'\n'/ }"
+  log "Creating CNI spec at '${output_file}' with content:"
+  log "${cni_spec//$'\n'/ }"
   write_file "${output_file}" "${cni_spec}"
   success
 }
@@ -449,7 +478,8 @@ if [[ "${RUN_CNI_WATCHDOG:-}" != "true" ]]; then
   write_and_success
 fi
 
-log "Running CNI watchdog to watch Cilium and manage CNI config at '${output_file}' with content: ${cni_spec//$'\n'/ }"
+log "Running CNI watchdog to watch Cilium and manage CNI config at '${output_file}' with content:"
+log "${cni_spec//$'\n'/ }"
 cilium_watchdog_success_wait=${CILIUM_WATCHDOG_SUCCESS_WAIT:-300}
 cilium_watchdog_failure_retry=${CILIUM_WATCHDOG_FAILURE_RETRY:-60}
 cilium_watchdog_fast_start_wait=${CILIUM_WATCHDOG_FAST_START_WAIT:-60}
@@ -467,8 +497,9 @@ while true; do
     [[ ! -f "${output_file}" ]] && write_file "${output_file}" "${cni_spec}"
     sleep "${cilium_watchdog_success_wait}"s
   else
-    log "Cilium does not appear healthy; removing CNI config if it exists."
+    log "Cilium does not appear healthy; removing CNI config if it exists then wait for 2s before retry."
     rm -f -- "${output_file}"
+    sleep 2s
   fi
 done
 

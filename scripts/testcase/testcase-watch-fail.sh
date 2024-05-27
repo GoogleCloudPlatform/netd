@@ -6,13 +6,11 @@ export ENABLE_BANDWIDTH_PLUGIN=false
 export ENABLE_CILIUM_PLUGIN=false
 export ENABLE_MASQUERADE=false
 export ENABLE_IPV6=false
-export RUN_CNI_WATCHDOG=true
 
 CNI_SPEC_TEMPLATE=$(cat testdata/spec-template.json)
 export CNI_SPEC_TEMPLATE
 
-# shellcheck disable=SC2034
-TEST_WANT_EXIT_CODE=${TEST_EXIT_CODE_SLEEP}
+export TEST_WANT_EXIT_CODE=1
 
 function before_test() {
 
@@ -34,10 +32,6 @@ function before_test() {
                   "uid": "f2353a2f-ca8c-4ca0-8dd3-ad1f964a54f0"
                 },
                 "spec": {
-                  "podCIDR": "10.52.1.0/24",
-                  "podCIDRs": [
-                    "10.52.1.0/24"
-                  ],
                   "providerID": "gce://my-gke-project/us-central1-c/gke-my-cluster-default-pool-128bc25d-9c94"
                 }
               }}'
@@ -52,16 +46,11 @@ function before_test() {
 }
 
 function verify() {
-  local expected
   local actual
 
-  expected=$(jq -S . <"testdata/expected-basic.json")
-  actual=$(jq -S . <"/host/etc/cni/net.d/${CNI_SPEC_NAME}")
-
-  if [ "$expected" != "$actual" ] ; then
-    echo "Expected cni_spec value:"
-    echo "$expected"
-    echo "but actual was"
+  if [[ -f "/host/etc/cni/net.d/${CNI_SPEC_NAME}" ]]; then
+    actual=$(jq -S . <"/host/etc/cni/net.d/${CNI_SPEC_NAME}")
+    echo "Expected CNI config to be missing, but it has:"
     echo "$actual"
     return 1
   fi

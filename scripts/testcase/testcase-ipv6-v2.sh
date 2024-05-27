@@ -22,9 +22,9 @@ function before_test() {
         # call to GCE metadata server
         echo '{"ipv6s": ["2600:1900:4000:318:0:7:0:0"]}'
         ;;
-      *https://kubernetes.default.svc:443/api/v1/nodes/*)
+      *https://kubernetes.default.svc:443/api/v1/nodes*)
         # call to kube-apiserver
-        echo '{
+        echo '{"object":{
                 "metadata": {
                   "labels": {
                     "cloud.google.com/gke-stack-type": "IPV6"
@@ -41,7 +41,7 @@ function before_test() {
                   ],
                   "providerID": "gce://my-gke-project/us-central1-c/gke-my-cluster-default-pool-128bc25d-9c94"
                 }
-              }'
+              }}'
         ;;
       *)
         # unmatched call

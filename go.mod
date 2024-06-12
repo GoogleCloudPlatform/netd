@@ -1,9 +1,10 @@
 module github.com/GoogleCloudPlatform/netd
 
 go 1.22
+toolchain go1.22.3
 
 require (
-	github.com/containernetworking/plugins v1.3.0
+	github.com/containernetworking/plugins v1.5.0
 	github.com/coreos/go-iptables v0.7.0
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/golang/glog v1.1.2
@@ -11,7 +12,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	github.com/vishvananda/netns v0.0.4
-	golang.org/x/sys v0.19.0
+	golang.org/x/sys v0.20.0
 	k8s.io/api v0.30.2
 	k8s.io/apimachinery v0.30.2
 	k8s.io/client-go v0.30.2
@@ -44,9 +45,9 @@ require (
 	github.com/prometheus/client_model v0.4.1-0.20230718164431-9a2bf3000d16 // indirect
 	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.11.1 // indirect
-	golang.org/x/net v0.23.0 // indirect
+	golang.org/x/net v0.24.0 // indirect
 	golang.org/x/oauth2 v0.10.0 // indirect
-	golang.org/x/term v0.18.0 // indirect
+	golang.org/x/term v0.19.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect

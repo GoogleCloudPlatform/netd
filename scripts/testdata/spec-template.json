@@ -3,7 +3,7 @@
   "cniVersion": "0.3.1",
   "plugins": [
     {
-      "type": "@cniType",
+      "type": "ptp",
       "mtu": @mtu,
       "ipam": {
           "type": "host-local",
@@ -20,6 +20,6 @@
       "capabilities": {
         "portMappings": true
       }
-    }@cniBandwidthPlugin@cniCiliumPlugin@cniIstioPlugin
+    }@cniCiliumPlugin@cniIstioPlugin
   ]
 }

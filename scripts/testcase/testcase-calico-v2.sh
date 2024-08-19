@@ -2,18 +2,17 @@ export KUBERNETES_SERVICE_HOST=kubernetes.default.svc
 export KUBERNETES_SERVICE_PORT=443
 
 export ENABLE_CALICO_NETWORK_POLICY=true
-export ENABLE_BANDWIDTH_PLUGIN=false
 export ENABLE_CILIUM_PLUGIN=false
 export ENABLE_MASQUERADE=false
 export ENABLE_IPV6=true
 export CNI_SPEC_IPV6_ROUTE="{\"dst\": \"2600:1900:4000::/42\"}"
-export CALICO_CNI_SPEC_TEMPLATE_FILE="/host/etc/cni/net.d/10-calico-v2.conflist.template"
+export CNI_SPEC_NAME="10-calico-v2.conflist.template"
 export CALICO_CNI_SERVICE_ACCOUNT="calico-cni-sa"
 export WRITE_CALICO_CONFIG_FILE=true
 export IPV6_FORWARDING_CONF=/tmp/mock-calico-enable-forwarding
 
-CALICO_CNI_SPEC_TEMPLATE=$(cat testdata/calico-spec-template-v2.json)
-export CALICO_CNI_SPEC_TEMPLATE
+CNI_SPEC_TEMPLATE=$(cat testdata/calico-spec-template-v2.json)
+export CNI_SPEC_TEMPLATE
 
 export CNI_SPEC_TEMPLATE_VERSION=2.0
 

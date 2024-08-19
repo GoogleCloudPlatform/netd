@@ -97,22 +97,10 @@ if [[ "${ENABLE_CALICO_NETWORK_POLICY:-}" == "true" && "${WRITE_CALICO_CONFIG_FI
   fi
 fi
 
-cni_spec=${CALICO_CNI_SPEC_TEMPLATE:-${CNI_SPEC_TEMPLATE:-}}
+cni_spec=${CNI_SPEC_TEMPLATE:-}
 if [[ -z "${cni_spec}" ]]; then
   log "No CNI spec template or empty template is specified. Not taking actions."
   success
-fi
-
-if [ -f "/host/home/kubernetes/bin/gke" ]; then
-  cni_spec=${cni_spec//@cniType/gke}
-else
-  cni_spec=${cni_spec//@cniType/ptp}
-fi
-
-if [ "${ENABLE_BANDWIDTH_PLUGIN:-}" == "true" ] && [ -f "/host/home/kubernetes/bin/bandwidth" ]; then
-  cni_spec=${cni_spec//@cniBandwidthPlugin/, {\"type\": \"bandwidth\", \"capabilities\": {\"bandwidth\": true\}\}}
-else
-  cni_spec=${cni_spec//@cniBandwidthPlugin/}
 fi
 
 fetch_node_object() {
@@ -438,7 +426,7 @@ function write_file {
 }
 
 # Output CNI spec (template).
-output_file=${CALICO_CNI_SPEC_TEMPLATE_FILE:-/host/etc/cni/net.d/${CNI_SPEC_NAME}}
+output_file=/host/etc/cni/net.d/${CNI_SPEC_NAME}
 
 # Wait up to the specified time for the cilium pod to report healthy.
 cilium_health_check() {

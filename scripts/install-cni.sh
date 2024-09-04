@@ -154,6 +154,9 @@ if [[ "${ENABLE_CILIUM_PLUGIN}" == "true" ]]; then
   if [[ -n "${CILIUM_FAST_START_NAMESPACES:-}" ]]; then
     cilium_cni_config=$(jq --arg namespaces "${CILIUM_FAST_START_NAMESPACES:-}" '.["dpv2-fast-start-namespaces"] = $namespaces' <<<"${cilium_cni_config}")
   fi
+  if [[ -n "${CILIUM_CHAINING_MODE:-}" ]]; then
+    cilium_cni_config=$(jq --arg chainingMode "${CILIUM_CHAINING_MODE:-}" '.["chaining-mode"] = $chainingMode' <<<"${cilium_cni_config}")
+  fi
   log "Adding Cilium plug-in to the CNI config:"
   log "${cilium_cni_config//$'\n'/ }"
   cni_spec=${cni_spec//@cniCiliumPlugin/, ${cilium_cni_config}}

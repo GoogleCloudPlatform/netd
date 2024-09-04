@@ -124,6 +124,6 @@ COPY --from=stuff / /
 
 # This container has to run as root for iptables. Be explicit here.
 USER 0:0
-ENV HOME /
+ENV HOME=/
 
 ENTRYPOINT ["/{ARG_BIN}"]

@@ -139,16 +139,15 @@ func createPodWatch() error {
 		v1.NamespaceAll,
 		fields.OneTermEqualSelector("spec.nodeName", nodeName),
 	)
-	_, controller := cache.NewInformer(
-		watchlist,
-		&v1.Pod{},
-		0,
-		cache.ResourceEventHandlerFuncs{
+	_, controller := cache.NewInformerWithOptions(cache.InformerOptions{
+		ListerWatcher: watchlist,
+		ObjectType:    &v1.Pod{},
+		Handler: cache.ResourceEventHandlerFuncs{
 			AddFunc:    onPodAdd,
 			UpdateFunc: onPodUpdate,
 			DeleteFunc: onPodDelete,
 		},
-	)
+	})
 
 	stopper := make(chan struct{})
 

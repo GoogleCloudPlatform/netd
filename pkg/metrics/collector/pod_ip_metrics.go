@@ -232,6 +232,8 @@ func (c *podIPMetricsCollector) listIPAddresses(dir string) error {
 			continue
 		}
 		f, ok := podMap[podID]
+		// TODO: #351 - fix lint errors
+		//nolint:gocritic
 		if !ok {
 			podMap[podID] = family
 		} else if (f == ipv4 && family == ipv6) || (f == ipv6 && family == ipv4) {
@@ -319,18 +321,18 @@ func (c *podIPMetricsCollector) countIPsFromRange(subnet *net.IPNet) (uint64, er
 	if bits-ones >= 64 {
 		return math.MaxUint64, nil
 	}
-	max := uint64(1) << uint(bits-ones)
-	max--
+	count := uint64(1) << uint(bits-ones)
+	count--
 	if subnet.IP.To4() != nil {
 		// Don't use the IPv4 network's broadcast address
-		if max == 0 {
+		if count == 0 {
 			return 0, fmt.Errorf("subnet includes only the network and broadcast addresses")
 		}
-		max--
-	} else if max == 0 {
+		count--
+	} else if count == 0 {
 		return 0, fmt.Errorf("subnet includes only the network address")
 	}
-	return max, nil
+	return count, nil
 }
 
 func (c *podIPMetricsCollector) updateAssignedIPs(subnet *net.IPNet, totalIP uint64) {

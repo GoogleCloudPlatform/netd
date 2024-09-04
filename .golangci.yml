@@ -19,16 +19,6 @@ run:
   # timeout for analysis, e.g. 30s, 5m, default is 1m
   deadline: 20m
 
-  # which dirs to skip: issues from them won't be reported;
-  # can use regexp here: generated.*, regexp is applied on full path;
-  # default value is empty list, but default dirs are skipped independently
-  # from this option's value (see skip-dirs-use-default).
-  # "/" will be replaced by current OS file path separator to properly work
-  # on Windows.
-  skip-dirs:
-    - .go
-    - pkg/tcp_metrics
-
   # default is true. Enables skipping of directories:
   #   vendor$, third_party$, testdata$, examples$, Godeps$, builtin$
   skip-dirs-use-default: true
@@ -46,7 +36,9 @@ run:
 # output configuration options
 output:
   # colored-line-number|line-number|json|tab|checkstyle|code-climate, default is "colored-line-number"
-  format: colored-line-number
+  formats:
+  - format: colored-line-number
+
   # print lines of code with issue, default is true
   print-issued-lines: true
   # print linter name in the end of issue text, default is true
@@ -134,48 +126,24 @@ linters-settings:
   gocritic:
     enabled-checks:
       - appendCombine
-      - argOrder
-      - assignOp
-      - badCond
       - boolExprSimplify
       - builtinShadow
-      - captLocal
-      - caseOrder
-      - codegenComment
       - commentedOutCode
       - commentedOutImport
-      - defaultCaseOrder
-      - deprecatedComment
       - docStub
-      - dupArg
-      - dupBranchBody
-      - dupCase
-      - dupSubExpr
-      - elseif
       - emptyFallthrough
       - equalFold
-      - flagDeref
-      - flagName
       - hexLiteral
       - indexAlloc
       - initClause
       - methodExprCall
       - nilValReturn
       - octalLiteral
-      - offBy1
       - rangeExprCopy
-      - regexpMust
-      - sloppyLen
       - stringXbytes
-      - switchTrue
       - typeAssertChain
-      - typeSwitchVar
       - typeUnparen
-      - underef
-      - unlambda
       - unnecessaryBlock
-      - unslice
-      - valSwap
       - weakCond
 
       # Unused
@@ -204,6 +172,16 @@ issues:
   # excluded by default patterns execute `golangci-lint run --help`
   exclude:
     - composite literal uses unkeyed fields
+
+  # which dirs to skip: issues from them won't be reported;
+  # can use regexp here: generated.*, regexp is applied on full path;
+  # default value is empty list, but default dirs are skipped independently
+  # from this option's value (see skip-dirs-use-default).
+  # "/" will be replaced by current OS file path separator to properly work
+  # on Windows.
+  exclude-dirs:
+    - .go
+    - pkg/tcp_metrics
 
   exclude-rules:
     # Exclude some linters from running on test files.

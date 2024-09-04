@@ -3,7 +3,7 @@ module github.com/GoogleCloudPlatform/netd
 go 1.23
 
 require (
-	github.com/containernetworking/plugins v1.3.0
+	github.com/containernetworking/plugins v1.5.1
 	github.com/coreos/go-iptables v0.7.0
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/golang/glog v1.1.2

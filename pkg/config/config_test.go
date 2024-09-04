@@ -49,8 +49,8 @@ func TestSysctlConfigEnsure(t *testing.T) {
 func TestIPRouteConfigEnsure(t *testing.T) {
 	r := IPRouteConfig{
 		Route:    netlink.Route{},
-		RouteAdd: func(route *netlink.Route) error { return os.ErrExist },
-		RouteDel: func(route *netlink.Route) error { return syscall.ESRCH },
+		RouteAdd: func(_ *netlink.Route) error { return os.ErrExist },
+		RouteDel: func(_ *netlink.Route) error { return syscall.ESRCH },
 	}
 	if err := r.Ensure(true); err != nil {
 		t.Error("ipRouteConfig.Ensure(true) should ignore the os.ErrExist Error.")
@@ -81,7 +81,7 @@ func TestIPRuleConfigEnsure(t *testing.T) {
 		Rule:     netlink.Rule{SuppressIfgroup: -1, SuppressPrefixlen: -1, Mark: -1, Mask: -1, Goto: -1},
 		RuleAdd:  func(rule *netlink.Rule) error { ruleList = append(ruleList, *rule); return nil },
 		RuleDel:  mockRuleDel,
-		RuleList: func(family int) ([]netlink.Rule, error) { return ruleList, nil },
+		RuleList: func(_ int) ([]netlink.Rule, error) { return ruleList, nil },
 	}
 	if count, _ := ipRule.count(); count != 2 {
 		t.Errorf("IPRuleConfig.count() should return 2.")

@@ -211,7 +211,7 @@ func TestSetupDirectoryWatcher(t *testing.T) {
 		t.Fatal("podIPMetricsWatcherIsIntialized: want: true, got: false")
 	}
 
-	//Add a new file to the directory. Verify metrics
+	// Add a new file to the directory. Verify metrics
 	mustCreateFile(t, dir1, "10.0.0.3", "hash3")
 	time.Sleep(1 * time.Second)
 	if mc.usedIPv4AddrCount != 3 {
@@ -230,7 +230,7 @@ func TestSetupDirectoryWatcher(t *testing.T) {
 		t.Errorf("duplicateIpCount. want: 0, got %d", mc.duplicateIPCount)
 	}
 
-	//Remove a file from the directory. Verify metrics
+	// Remove a file from the directory. Verify metrics
 	mustDeleteFile(t, dir1, "10.0.0.3")
 	time.Sleep(1 * time.Second)
 	if mc.usedIPv4AddrCount != 2 {
@@ -271,6 +271,8 @@ func TestSetupDirectoryWatcher(t *testing.T) {
 
 	for _, bound := range bucketKeys {
 		v, ok := mc.reuseIPs.buckets[bound]
+		// TODO: #351 - fix lint errors
+		//nolint:gocritic
 		if !ok {
 			t.Errorf("reused ip: buckets are initialized with 0 values. want: ok, got %v", ok)
 		} else if bound == 5e3 && v != 0 {

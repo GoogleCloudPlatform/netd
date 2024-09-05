@@ -118,8 +118,6 @@ COPY bin/{ARG_OS}_{ARG_ARCH}/{ARG_BIN} /{ARG_BIN}
 
 FROM {ARG_FROM}
 
-MAINTAINER Jingyuan Liang <jingyuanliang@google.com>
-
 COPY --from=stuff / /
 
 # This container has to run as root for iptables. Be explicit here.

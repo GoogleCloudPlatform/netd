@@ -30,6 +30,7 @@ import (
 	"golang.org/x/sys/unix"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -128,6 +129,7 @@ func createPodWatch() error {
 	if err != nil {
 		return err
 	}
+	config.ContentType = runtime.ContentTypeProtobuf
 	// creates the clientset
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {

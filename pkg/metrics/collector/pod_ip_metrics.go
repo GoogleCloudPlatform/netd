@@ -27,6 +27,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
@@ -162,6 +163,7 @@ func NewPodIPMetricsCollector() (Collector, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating in-cluster config: %v", err)
 	}
+	config.ContentType = runtime.ContentTypeProtobuf
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {

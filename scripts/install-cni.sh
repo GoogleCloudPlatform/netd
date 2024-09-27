@@ -475,17 +475,23 @@ cilium_watchdog_success_wait=${CILIUM_WATCHDOG_SUCCESS_WAIT:-300}
 cilium_watchdog_failure_retry=${CILIUM_WATCHDOG_FAILURE_RETRY:-60}
 cilium_watchdog_fast_start_wait=${CILIUM_WATCHDOG_FAST_START_WAIT:-60}
 
+file_written=false
+
 if [[ -n "${CILIUM_FAST_START_NAMESPACES:-}" ]]; then
   log "Cilium has fast-start; writing CNI config upfront then wait for ${cilium_watchdog_fast_start_wait}s and start to check Cilium health."
   write_file "${output_file}" "${cni_spec}"
+  file_written=true
   sleep "${cilium_watchdog_fast_start_wait}"s
 fi
 
 while true; do
   log "Checking Cilium health allowing retries for up to ${cilium_watchdog_failure_retry}s."
   if cilium_health_check "${cilium_watchdog_failure_retry}"; then
-    log "Cilium healthz reported success; writing CNI config if not already there then wait for ${cilium_watchdog_success_wait}s."
-    [[ ! -f "${output_file}" ]] && write_file "${output_file}" "${cni_spec}"
+    log "Cilium healthz reported success; writing CNI config if never written or not already there then wait for ${cilium_watchdog_success_wait}s."
+    if [[ ${file_written} != "true" ]] || [[ ! -f "${output_file}" ]]; then
+      write_file "${output_file}" "${cni_spec}"
+      file_written=true
+    fi
     sleep "${cilium_watchdog_success_wait}"s
   else
     log "Cilium does not appear healthy; removing CNI config if it exists then wait for 2s before retry."

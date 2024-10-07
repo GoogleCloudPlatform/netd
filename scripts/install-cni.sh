@@ -115,7 +115,7 @@ fetch_node_object() {
   fi
 
   local token
-  local node_url="https://${host}:${KUBERNETES_SERVICE_PORT}/api/v1/nodes?watch=true&timeoutSeconds=${timeout}&fieldSelector=metadata.name=${HOSTNAME}"
+  local node_url="https://${host}:${KUBERNETES_SERVICE_PORT}/api/v1/nodes?watch=true&timeoutSeconds=${timeout}&fieldSelector=metadata.name=${NODE_NAME:-${HOSTNAME}}"
 
   for ((i=1; i<=attempts; i++)); do
     log "Watching attempt #${i} at ${node_url}"

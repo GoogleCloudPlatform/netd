@@ -487,8 +487,8 @@ fi
 while true; do
   log "Checking Cilium health allowing retries for up to ${cilium_watchdog_failure_retry}s."
   if cilium_health_check "${cilium_watchdog_failure_retry}"; then
-    log "Cilium healthz reported success; writing CNI config if never written or not already there then wait for ${cilium_watchdog_success_wait}s."
-    if [[ ${file_written} != "true" ]] || [[ ! -f "${output_file}" ]]; then
+    log "Cilium healthz reported success; writing CNI config if never written (written: ${file_written}) or not already there then wait for ${cilium_watchdog_success_wait}s."
+    if [[ "${file_written}" != "true" ]] || [[ ! -f "${output_file}" ]]; then
       write_file "${output_file}" "${cni_spec}"
       file_written=true
     fi

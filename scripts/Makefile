@@ -394,7 +394,7 @@ lint:
 	    --env HTTP_PROXY="$(HTTP_PROXY)"    \
 	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
 	    python:3-alpine                     \
-	    sh -c 'pip install cpplint && cpplint --recursive .'
+	    sh -c 'pip install cpplint==1.6.1 && cpplint --recursive .'
 	echo "Linting install-cni.sh"
 	docker run                              \
 	    -i                                  \

@@ -6,7 +6,7 @@ export ENABLE_CILIUM_PLUGIN=false
 export ENABLE_MASQUERADE=false
 export ENABLE_IPV6=false
 
-export NODE_NAME=gke-my-cluster-default-pool-128bc25d-9c94
+export CURRENT_NODE_NAME=gke-my-cluster-default-pool-128bc25d-9c94
 export HOSTNAME=unexpected
 
 CNI_SPEC_TEMPLATE=$(cat testdata/spec-template.json)

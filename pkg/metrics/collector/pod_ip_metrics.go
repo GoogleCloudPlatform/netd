@@ -170,9 +170,12 @@ func NewPodIPMetricsCollector() (Collector, error) {
 		return nil, fmt.Errorf("error creating clientset: %v", err)
 	}
 
-	nodeName, err := os.Hostname()
-	if err != nil {
-		return nil, fmt.Errorf("error getting hostname: %v", err)
+	nodeName := os.Getenv("CURRENT_NODE_NAME")
+	if nodeName == "" {
+		nodeName, err = os.Hostname()
+		if err != nil {
+			return nil, fmt.Errorf("error getting hostname: %v", err)
+		}
 	}
 
 	return &podIPMetricsCollector{

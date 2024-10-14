@@ -103,6 +103,7 @@ if [[ -z "${cni_spec}" ]]; then
   success
 fi
 
+exec {stdout_dup}>&1
 fetch_node_object() {
   local attempts=$1
   local timeout=$2
@@ -120,14 +121,14 @@ fetch_node_object() {
   for ((i=1; i<=attempts; i++)); do
     log "Watching attempt #${i} at ${node_url}"
     token=$(</var/run/secrets/kubernetes.io/serviceaccount/token)
+    cacert="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
     # Grab the first object seen with .spec.podCIDR set.
     # Note: curl process may be leaked until the next node update, or
     # timeoutSeconds, whichever earlier. Shouldn't be a major issue.
-    # Do not use curl `-m` trying to guard timeout further: it will emit an
-    # error to stderr upon timeout even if a matching object is already seen
-    # (but no further node updates happen), and we can't redirect stderr to
-    # stdout here because stdout is in the data pipe.
-    node_object=$(grep --line-buffered -m1 . <(curl -fsSkN -H "Authorization: Bearer ${token}" "${node_url}" | jq --unbuffered -c '.object | select(.spec.podCIDR != null)')) || node_object=
+    # curl may eventually hit an error (e.g. timeout) so redirect its
+    # stderr to stdout to make it less visible in logs, but keep it
+    # in logs in case it runs into unexpected errors.
+    node_object=$(grep --line-buffered -m1 . <(curl -fsSN -m "${timeout}" -H "Authorization: Bearer ${token}" --cacert "${cacert}" "${node_url}" 2>&${stdout_dup} | jq --unbuffered -c '.object | select(.spec.podCIDR != null)')) || node_object=
     [[ -n "${node_object}" ]] && return
   done
 

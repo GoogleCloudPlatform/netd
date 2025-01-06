@@ -388,7 +388,7 @@ lint: | $(BUILD_DIRS)
 	    --env HTTP_PROXY="$(HTTP_PROXY)"                        \
 	    --env HTTPS_PROXY="$(HTTPS_PROXY)"                      \
 	    $(BUILD_IMAGE)                                          \
-	    ./build/lint.sh ./...
+	    ./build/lint.sh --timeout=5m ./...
 
 $(BUILD_DIRS):
 	mkdir -p $@

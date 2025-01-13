@@ -6,7 +6,7 @@ require (
 	github.com/containernetworking/plugins v1.3.0
 	github.com/coreos/go-iptables v0.7.0
 	github.com/fsnotify/fsnotify v1.6.0
-	github.com/golang/glog v1.2.3
+	github.com/golang/glog v1.2.4
 	github.com/prometheus/client_golang v1.17.0
 	github.com/spf13/pflag v1.0.5
 	github.com/vishvananda/netlink v1.2.1-beta.2

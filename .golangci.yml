@@ -17,7 +17,7 @@ service:
   golangci-lint-version: 1.30.x # use the fixed version to not introduce new linters unexpectedly
 run:
   # timeout for analysis, e.g. 30s, 5m, default is 1m
-  deadline: 20m
+  timeout: 20m
 
   # default is true. Enables skipping of directories:
   #   vendor$, third_party$, testdata$, examples$, Godeps$, builtin$

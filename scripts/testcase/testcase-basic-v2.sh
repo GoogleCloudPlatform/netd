@@ -24,6 +24,7 @@ function before_test() {
         echo '{"object":{
                 "metadata": {
                   "labels": {
+                    "cloud.google.com/gke-dpv2-unified-cni": "true"
                   },
                   "creationTimestamp": "2024-01-03T11:54:01Z",
                   "name": "gke-my-cluster-default-pool-128bc25d-9c94",

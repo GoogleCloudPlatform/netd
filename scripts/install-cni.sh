@@ -151,6 +151,11 @@ if [[ "${MIGRATE_TO_DPV2:-}" == "true" ]]; then
 fi
 
 if [[ "${ENABLE_CILIUM_PLUGIN}" == "true" ]]; then
+  dpv2_unified_cni=$(jq -r '.metadata.labels."cloud.google.com/gke-dpv2-unified-cni"' <<<"${node_object}")
+  log "Using Cilium plug-in; unified mode: '${dpv2_unified_cni}' (no action needed here if true)"
+  if [[ "${dpv2_unified_cni}" = "true" ]]; then
+    success
+  fi
   cilium_cni_config='{"type": "cilium-cni", "enable-route-mtu": true}'
   if [[ -n "${CILIUM_FAST_START_NAMESPACES:-}" ]]; then
     cilium_cni_config=$(jq --arg namespaces "${CILIUM_FAST_START_NAMESPACES:-}" '.["dpv2-fast-start-namespaces"] = $namespaces' <<<"${cilium_cni_config}")

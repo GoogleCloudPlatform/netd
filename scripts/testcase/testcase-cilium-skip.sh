@@ -2,7 +2,9 @@ export KUBERNETES_SERVICE_HOST=kubernetes.default.svc
 export KUBERNETES_SERVICE_PORT=443
 
 export ENABLE_CALICO_NETWORK_POLICY=false
-export ENABLE_CILIUM_PLUGIN=false
+export ENABLE_CILIUM_PLUGIN=true
+export CILIUM_HEALTHZ_PORT=63197
+export CILIUM_FAST_START_NAMESPACES=
 export ENABLE_MASQUERADE=false
 export ENABLE_IPV6=false
 
@@ -38,6 +40,9 @@ function before_test() {
                 }
               }}'
         ;;
+      *http://localhost:63197/*)
+        echo 'healthz'
+        ;;
       *)
         #unsupported
         exit 1
@@ -45,19 +50,16 @@ function before_test() {
   }
   export -f curl
 
+  rm -f "/host/etc/cni/net.d/${CNI_SPEC_NAME}"
+
 }
 
 function verify() {
-  local expected
   local actual
 
-  expected=$(jq -S . <"testdata/expected-basic.json")
-  actual=$(jq -S . <"/host/etc/cni/net.d/${CNI_SPEC_NAME}")
-
-  if [ "$expected" != "$actual" ] ; then
-    echo "Expected cni_spec value:"
-    echo "$expected"
-    echo "but actual was"
+  if [[ -f "/host/etc/cni/net.d/${CNI_SPEC_NAME}" ]]; then
+    actual=$(jq -S . <"/host/etc/cni/net.d/${CNI_SPEC_NAME}")
+    echo "Expected CNI config to be missing, but it has:"
     echo "$actual"
     return 1
   fi

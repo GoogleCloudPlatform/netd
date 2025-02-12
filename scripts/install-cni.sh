@@ -150,10 +150,39 @@ if [[ "${MIGRATE_TO_DPV2:-}" == "true" ]]; then
   fi
 fi
 
+populate_ip6tables() {
+  # Ensure the IPv6 firewall rules are as expected.
+  # These rules mirror the IPv4 rules installed by kubernetes/cluster/gce/gci/configure-helper.sh
+  log "Ensuring IPv6 firewall rules with ip6tables"
+
+  if ip6tables -w -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
+    log "Add rules to accept all inbound TCP/UDP/ICMP/SCTP IPv6 packets"
+    ip6tables -A INPUT -w -p tcp -j ACCEPT
+    ip6tables -A INPUT -w -p udp -j ACCEPT
+    ip6tables -A INPUT -w -p icmpv6 -j ACCEPT
+    ip6tables -A INPUT -w -p sctp -j ACCEPT
+  fi
+
+  if ip6tables -w -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
+    log "Add rules to accept all forwarded TCP/UDP/ICMP/SCTP IPv6 packets"
+    ip6tables -A FORWARD -w -p tcp -j ACCEPT
+    ip6tables -A FORWARD -w -p udp -j ACCEPT
+    ip6tables -A FORWARD -w -p icmpv6 -j ACCEPT
+    ip6tables -A FORWARD -w -p sctp -j ACCEPT
+  fi
+
+  # Ensure the other IPv6 rules we need are also installed, and in before any other node rules.
+  # Always allow ICMP
+  ip6tables -I OUTPUT -p icmpv6 -j ACCEPT -w
+  # Accept new and return traffic outbound
+  ip6tables -I OUTPUT -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT -w
+}
+
 if [[ "${ENABLE_CILIUM_PLUGIN}" == "true" ]]; then
   dpv2_unified_cni=$(jq -r '.metadata.labels."cloud.google.com/gke-dpv2-unified-cni"' <<<"${node_object}")
   log "Using Cilium plug-in; unified mode: '${dpv2_unified_cni}' (no action needed here if true)"
   if [[ "${dpv2_unified_cni}" = "true" ]]; then
+    populate_ip6tables
     success
   fi
   cilium_cni_config='{"type": "cilium-cni", "enable-route-mtu": true}'
@@ -332,31 +361,7 @@ fi
 fillSubnetsInCniSpec "${node_object}" "${node_ipv6_addr}"
 
 if [ "$POPULATE_IP6TABLES" == "true" ] ; then
-  # Ensure the IPv6 firewall rules are as expected.
-  # These rules mirror the IPv4 rules installed by kubernetes/cluster/gce/gci/configure-helper.sh
-  log "Ensuring IPv6 firewall rules with ip6tables"
-
-  if ip6tables -w -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
-    log "Add rules to accept all inbound TCP/UDP/ICMP/SCTP IPv6 packets"
-    ip6tables -A INPUT -w -p tcp -j ACCEPT
-    ip6tables -A INPUT -w -p udp -j ACCEPT
-    ip6tables -A INPUT -w -p icmpv6 -j ACCEPT
-    ip6tables -A INPUT -w -p sctp -j ACCEPT
-  fi
-
-  if ip6tables -w -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
-    log "Add rules to accept all forwarded TCP/UDP/ICMP/SCTP IPv6 packets"
-    ip6tables -A FORWARD -w -p tcp -j ACCEPT
-    ip6tables -A FORWARD -w -p udp -j ACCEPT
-    ip6tables -A FORWARD -w -p icmpv6 -j ACCEPT
-    ip6tables -A FORWARD -w -p sctp -j ACCEPT
-  fi
-
-  # Ensure the other IPv6 rules we need are also installed, and in before any other node rules.
-  # Always allow ICMP
-  ip6tables -I OUTPUT -p icmpv6 -j ACCEPT -w
-  # Accept new and return traffic outbound
-  ip6tables -I OUTPUT -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT -w
+  populate_ip6tables
 
   if [ "${ENABLE_CALICO_NETWORK_POLICY}" == "true" ]; then
     log "Enabling IPv6 forwarding..."

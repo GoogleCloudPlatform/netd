@@ -290,7 +290,7 @@ func getSnapshots(req *nl.NetlinkRequest) ([]*parser.Snapshot, error) {
 			continue
 		}
 		defer s.Close()
-		if err := s.Send(req); err != nil {
+		if err := s.Send(req); err != nil { //nolint:govet
 			return nil, err
 		}
 		pid, err := s.GetPid()

@@ -412,7 +412,7 @@ func (c *podIPMetricsCollector) setupDirectoryWatcher(dir string) error {
 					glog.Error("watcher is not ok")
 					return
 				}
-				if err := c.listIPAddresses(dir); err != nil {
+				if err := c.listIPAddresses(dir); err != nil { //nolint:govet
 					return
 				}
 				// Only update the ip reuse mininum, average and histogram for IPv4.
@@ -421,7 +421,7 @@ func (c *podIPMetricsCollector) setupDirectoryWatcher(dir string) error {
 					c.updateReuseIPStats(e, f)
 				}
 
-			case err, ok := <-watcher.Errors:
+			case err, ok := <-watcher.Errors: //nolint:govet
 				glog.Errorf("Received error from watcher %v, ok: %t", err, ok)
 				if !ok {
 					return

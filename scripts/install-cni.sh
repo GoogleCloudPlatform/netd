@@ -179,9 +179,9 @@ populate_ip6tables() {
 }
 
 if [[ "${ENABLE_CILIUM_PLUGIN}" == "true" ]]; then
-  dpv2_unified_cni=$(jq -r '.metadata.labels."cloud.google.com/gke-dpv2-unified-cni"' <<<"${node_object}")
-  log "Using Cilium plug-in; unified mode: '${dpv2_unified_cni}' (no action needed here if true)"
-  if [[ "${dpv2_unified_cni}" = "true" ]]; then
+  dpv2_unified_cni=$(jq '.metadata.labels."cloud.google.com/gke-dpv2-unified-cni"' <<<"${node_object}")
+  log "Using Cilium plug-in; unified mode: '${dpv2_unified_cni}' (no action needed here if not null)"
+  if [[ "${dpv2_unified_cni}" != "null" ]]; then
     populate_ip6tables
     success
   fi

@@ -21,9 +21,16 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/version"
+
 	"github.com/golang/glog"
 
 	"github.com/GoogleCloudPlatform/netd/pkg/config"
+	"github.com/GoogleCloudPlatform/netd/pkg/kernel"
+)
+
+const (
+	brokenLocalUDPKernelVersionStart = "6.6.57"
 )
 
 // NetworkConfigController defines the controller
@@ -46,6 +53,16 @@ func NewNetworkConfigController(enablePolicyRouting, enableSourceValidMark, excl
 	}
 	if excludeDNS {
 		configSet[0].Configs = append(configSet[0].Configs, config.ExcludeDNSIPRuleConfigs...)
+	}
+	kernelVersion, err := kernel.GetVersion()
+	if err != nil {
+		glog.Errorf("Could not check kernel version: %v. Skip installing UDP exempt rule.", err)
+	} else {
+		glog.Infof("Kernel version detected: %v.", kernelVersion)
+		if kernelVersion.AtLeast(version.MustParseGeneric(brokenLocalUDPKernelVersionStart)) {
+			glog.Infof("Kernel version is impacted by a known issue (start version: %v). Including an IP rule to exempt UDP traffic.", brokenLocalUDPKernelVersionStart)
+			configSet[0].Configs = append(configSet[0].Configs, config.ExcludeUDPIPRuleConfig)
+		}
 	}
 
 	return &NetworkConfigController{

@@ -51,7 +51,8 @@ const (
 )
 
 const (
-	hairpinDNSRequestRulePriority = 29999 + iota
+	hairpinUDPRequestRulePriority = 29998 + iota
+	hairpinDNSRequestRulePriority
 	hairpinDNSResponseRulePriority
 	hairpinRulePriority
 	localRulePriority
@@ -256,4 +257,21 @@ var ExcludeDNSIPRuleConfigs = []Config{
 		RuleDel:  netlink.RuleDel,
 		RuleList: netlink.RuleList,
 	},
+}
+
+var ExcludeUDPIPRuleConfig = IPRuleConfig{
+	Rule: netlink.Rule{
+		Table:             unix.RT_TABLE_MAIN,
+		Priority:          hairpinUDPRequestRulePriority,
+		IPProto:           unix.IPPROTO_UDP,
+		SuppressIfgroup:   -1,
+		SuppressPrefixlen: -1,
+		Mark:              -1,
+		Mask:              -1,
+		Goto:              -1,
+		Flow:              -1,
+	},
+	RuleAdd:  netlink.RuleAdd,
+	RuleDel:  netlink.RuleDel,
+	RuleList: netlink.RuleList,
 }

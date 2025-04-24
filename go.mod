@@ -6,7 +6,7 @@ toolchain go1.24.2
 
 require (
 	github.com/containernetworking/plugins v1.3.0
-	github.com/coreos/go-iptables v0.7.0
+	github.com/coreos/go-iptables v0.8.0
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/golang/glog v1.2.4
 	github.com/prometheus/client_golang v1.17.0

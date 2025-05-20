@@ -51,7 +51,7 @@ const (
 )
 
 const (
-	hairpinUDPRequestRulePriority = 29998 + iota
+	hairpinUDPRulePriority = 50 + iota
 	hairpinDNSRequestRulePriority
 	hairpinDNSResponseRulePriority
 	hairpinRulePriority
@@ -262,7 +262,7 @@ var ExcludeDNSIPRuleConfigs = []Config{
 var ExcludeUDPIPRuleConfig = IPRuleConfig{
 	Rule: netlink.Rule{
 		Table:             unix.RT_TABLE_MAIN,
-		Priority:          hairpinUDPRequestRulePriority,
+		Priority:          hairpinUDPRulePriority,
 		IPProto:           unix.IPPROTO_UDP,
 		SuppressIfgroup:   -1,
 		SuppressPrefixlen: -1,

@@ -234,3 +234,91 @@ func TestIPTablesRuleConfig(t *testing.T) {
 		t.Error("Ensure should keep 0 rule for iptableRule1.")
 	}
 }
+
+func TestIsRuleEqualWithoutPriority(t *testing.T) {
+	for _, tc := range []struct {
+		desc  string
+		rule1 netlink.Rule
+		rule2 netlink.Rule
+		want  bool
+	}{
+		{
+			desc: "equal case",
+			rule1: netlink.Rule{
+				Table:    customRouteTable,
+				IifName:  defaultNetdev,
+				Priority: hairpinUDPRulePriority,
+				Dport:    netlink.NewRulePortRange(53, 53),
+				Sport:    netlink.NewRulePortRange(53, 53),
+				Mark:     hairpinMark,
+				Mask:     hairpinMask,
+				Invert:   true,
+			},
+			rule2: netlink.Rule{
+				Table:    customRouteTable,
+				IifName:  defaultNetdev,
+				Priority: hairpinUDPRulePriority,
+				Dport:    netlink.NewRulePortRange(53, 53),
+				Sport:    netlink.NewRulePortRange(53, 53),
+				Mark:     hairpinMark,
+				Mask:     hairpinMask,
+				Invert:   true,
+			},
+			want: true,
+		},
+		{
+			desc: "port range not equal case",
+			rule1: netlink.Rule{
+				Table:    customRouteTable,
+				IifName:  defaultNetdev,
+				Priority: hairpinUDPRulePriority,
+				Dport:    netlink.NewRulePortRange(53, 53),
+				Sport:    netlink.NewRulePortRange(53, 53),
+				Mark:     hairpinMark,
+				Mask:     hairpinMask,
+				Invert:   true,
+			},
+			rule2: netlink.Rule{
+				Table:    customRouteTable,
+				IifName:  defaultNetdev,
+				Priority: hairpinUDPRulePriority,
+				Dport:    netlink.NewRulePortRange(443, 443),
+				Sport:    netlink.NewRulePortRange(443, 443),
+				Mark:     hairpinMark,
+				Mask:     hairpinMask,
+				Invert:   true,
+			},
+			want: false,
+		},
+		{
+			desc: "equal except priority",
+			rule1: netlink.Rule{
+				Table:    customRouteTable,
+				IifName:  defaultNetdev,
+				Priority: 50,
+				Dport:    netlink.NewRulePortRange(53, 53),
+				Sport:    netlink.NewRulePortRange(53, 53),
+				Mark:     hairpinMark,
+				Mask:     hairpinMask,
+				Invert:   true,
+			},
+			rule2: netlink.Rule{
+				Table:    customRouteTable,
+				IifName:  defaultNetdev,
+				Priority: 30000,
+				Dport:    netlink.NewRulePortRange(53, 53),
+				Sport:    netlink.NewRulePortRange(53, 53),
+				Mark:     hairpinMark,
+				Mask:     hairpinMask,
+				Invert:   true,
+			},
+			want: true,
+		},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			if isRuleEqualWithoutPriority(tc.rule1, tc.rule2) != tc.want {
+				t.Errorf("isRuleEqualWithoutPriority(%v, %v) = %v, want %v", tc.rule1, tc.rule2, !tc.want, tc.want)
+			}
+		})
+	}
+}

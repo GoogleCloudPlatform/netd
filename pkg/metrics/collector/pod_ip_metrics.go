@@ -27,13 +27,14 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/GoogleCloudPlatform/netd/pkg/utils/clients"
+	"github.com/GoogleCloudPlatform/netd/pkg/utils/nodeinfo"
 )
 
 type ipFamily int
@@ -159,23 +160,13 @@ func init() {
 // NewPodIpMetricsCollector returns a new Collector exposing pod IP allocation
 // stats.
 func NewPodIPMetricsCollector() (Collector, error) {
-	config, err := rest.InClusterConfig()
+	clientset, err := clients.NewClientSet()
 	if err != nil {
-		return nil, fmt.Errorf("error creating in-cluster config: %v", err)
+		return nil, err
 	}
-	config.ContentType = runtime.ContentTypeProtobuf
-
-	clientset, err := kubernetes.NewForConfig(config)
+	nodeName, err := nodeinfo.GetNodeName()
 	if err != nil {
-		return nil, fmt.Errorf("error creating clientset: %v", err)
-	}
-
-	nodeName := os.Getenv("CURRENT_NODE_NAME")
-	if nodeName == "" {
-		nodeName, err = os.Hostname()
-		if err != nil {
-			return nil, fmt.Errorf("error getting hostname: %v", err)
-		}
+		return nil, err
 	}
 
 	return &podIPMetricsCollector{
@@ -354,12 +345,9 @@ func (c *podIPMetricsCollector) calculateAssignedIP() error {
 		return fmt.Errorf("error getting node %s: %v", c.nodeName, err)
 	}
 
-	podCIDRs := node.Spec.PodCIDRs
-	if len(podCIDRs) == 0 {
-		if node.Spec.PodCIDR == "" {
-			return fmt.Errorf("both podCIDR and podCIDRs are empty")
-		}
-		podCIDRs = []string{node.Spec.PodCIDR}
+	podCIDRs, err := nodeinfo.GetPodCIDRs(node)
+	if err != nil {
+		return err
 	}
 	var firstErr error
 	for _, podCIDR := range podCIDRs {

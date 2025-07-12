@@ -30,14 +30,12 @@ import (
 	"golang.org/x/sys/unix"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/GoogleCloudPlatform/netd/pkg/tcp_metrics/inetdiag"
 	"github.com/GoogleCloudPlatform/netd/pkg/tcp_metrics/parser"
 	"github.com/GoogleCloudPlatform/netd/pkg/tcp_metrics/tcp"
+	"github.com/GoogleCloudPlatform/netd/pkg/utils/clients"
 )
 
 // Note, a sum over the pod tcp connections/ retransmits != the same value
@@ -124,14 +122,7 @@ func (curMap *safeIPMap) safeIPRead(key string) (*v1.Pod, bool) {
 
 // Functionality for pod watching.
 func createPodWatch() error {
-	// Creates the in-cluster config.
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return err
-	}
-	config.ContentType = runtime.ContentTypeProtobuf
-	// creates the clientset
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := clients.NewClientSet()
 	if err != nil {
 		return err
 	}

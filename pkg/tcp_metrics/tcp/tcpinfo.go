@@ -130,4 +130,11 @@ type LinuxTCPInfo struct {
 	RcvOooPack uint32
 
 	SndWnd uint32
+	RcvWnd uint32
+
+	Rehash uint32
+
+	TotalRto           uint16
+	TotalRtoRecoveries uint16
+	TotalRtoTime       uint32
 }

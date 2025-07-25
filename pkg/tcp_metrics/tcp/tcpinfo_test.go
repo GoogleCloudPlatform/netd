@@ -2,11 +2,22 @@ package tcp_test
 
 import (
 	"testing"
+	"unsafe"
 
 	"github.com/GoogleCloudPlatform/netd/pkg/tcp_metrics/tcp"
+	"golang.org/x/sys/unix"
 )
 
-// TODO - sanity checks against syscall structs?
+func TestLinuxTCPInfoSize(t *testing.T) {
+	// This test checks if the size of our tcp.LinuxTCPInfo struct
+	// matches the size of the kernel's tcp_info struct from x/sys/unix.
+	// A mismatch can cause issues when parsing netlink messages.
+	var want = unsafe.Sizeof(unix.TCPInfo{})
+	var got = unsafe.Sizeof(tcp.LinuxTCPInfo{})
+	if got != want {
+		t.Errorf("sizeof(tcp.LinuxTCPInfo) = %d, want sizeof(unix.TCPInfo) = %d", got, want)
+	}
+}
 
 func TestState_String(t *testing.T) {
 	tests := []struct {

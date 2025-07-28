@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 	"os/signal"
@@ -50,6 +51,9 @@ func main() {
 	wg.Add(1)
 
 	glog.Infof("Starting netd")
+	if err := nc.Init(context.Background()); err != nil {
+		glog.Fatalf("Failed to initialize network config controller: %v", err)
+	}
 	go nc.Run(stopCh, &wg)
 
 	err := metrics.StartCollector()

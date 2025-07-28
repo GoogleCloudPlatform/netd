@@ -17,6 +17,7 @@ limitations under the License.
 package netconf
 
 import (
+	"context"
 	"reflect"
 	"sync"
 	"time"
@@ -44,8 +45,6 @@ func NewNetworkConfigController(enablePolicyRouting, enableSourceValidMark, excl
 	var configSet []*config.Set
 
 	configSet = append(configSet, &config.PolicyRoutingConfigSet)
-	glog.Info("Including local table rules.")
-	configSet[0].Configs = append(configSet[0].Configs, config.LocalTableRuleConfigs...)
 
 	if enablePolicyRouting {
 		config.PolicyRoutingConfigSet.Enabled = true
@@ -71,6 +70,11 @@ func NewNetworkConfigController(enablePolicyRouting, enableSourceValidMark, excl
 		configSet:         configSet,
 		reconcileInterval: reconcileInterval,
 	}
+}
+
+// Init initializes the NetworkConfigController.
+func (n *NetworkConfigController) Init(ctx context.Context) error {
+	return config.InitPolicyRouting(ctx)
 }
 
 // Run runs the NetworkConfigController

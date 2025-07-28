@@ -20,9 +20,11 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	netutils "k8s.io/utils/net"
 
@@ -89,7 +91,9 @@ var PolicyRoutingConfigSet = Set{
 	nil,
 }
 
-func init() {
+// InitPolicyRouting performs necessary initialization for policy routing.
+// It should be called before running the policy routing enforcement loop.
+func InitPolicyRouting(ctx context.Context) error {
 	f := func(ip net.IP) (linkIndex int, netdev string, gw net.IP) {
 		routes, err := netlink.RouteGet(ip)
 		if err != nil {
@@ -119,17 +123,14 @@ func init() {
 
 	clientset, err := clients.NewClientSet()
 	if err != nil {
-		glog.Error(err)
-		return
+		return err
 	}
 	nodeName, err := nodeinfo.GetNodeName()
 	if err != nil {
-		glog.Error(err)
-		return
+		return err
 	}
-	if err := fillLocalRulesFromNode(clientset, nodeName); err != nil {
-		glog.Errorf("configure local rule destinations from node: %v", err)
-		return
+	if err := fillLocalRulesFromNode(ctx, clientset, nodeName); err != nil {
+		return fmt.Errorf("configure local rule destinations from node: %w", err)
 	}
 
 	sysctlReversePathFilter := fmt.Sprintf("net.ipv4.conf.%s.rp_filter", defaultNetdev)
@@ -254,13 +255,25 @@ func init() {
 			RuleList: netlink.RuleList,
 		},
 	}
+	glog.Info("Including local table rules.")
+	PolicyRoutingConfigSet.Configs = append(PolicyRoutingConfigSet.Configs, LocalTableRuleConfigs...)
+
+	return nil
 }
 
-func fillLocalRulesFromNode(clientset kubernetes.Interface, nodeName string) error {
+func fillLocalRulesFromNode(ctx context.Context, clientset kubernetes.Interface, nodeName string) error {
 	// Retrieve necessary IP info from the node object.
-	node, err := clientset.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("getting node %s: %w", nodeName, err)
+	var node *v1.Node
+	if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		var err error
+		node, err = clientset.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+		if err != nil {
+			glog.Errorf("Failed to get node %s: %v", nodeName, err)
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		return err
 	}
 
 	nodeInternalIPs := []net.IP{}

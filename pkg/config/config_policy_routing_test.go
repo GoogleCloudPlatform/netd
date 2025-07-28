@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"net"
 	"testing"
 
@@ -160,7 +161,7 @@ func TestFillLocalRulesFromNode(t *testing.T) {
 	originLocalTableRuleConfigs := LocalTableRuleConfigs
 	for _, tc := range testCases {
 		fakeClient := fake.NewSimpleClientset(tc.node)
-		if err := fillLocalRulesFromNode(fakeClient, tc.node.Name); err != nil {
+		if err := fillLocalRulesFromNode(context.Background(), fakeClient, tc.node.Name); err != nil {
 			if !tc.wantErr {
 				t.Errorf("fillLocalRulesFromNode() error = %v", err)
 			}

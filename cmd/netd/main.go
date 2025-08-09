@@ -30,6 +30,8 @@ import (
 	"github.com/GoogleCloudPlatform/netd/pkg/controllers/netconf"
 	"github.com/GoogleCloudPlatform/netd/pkg/metrics"
 	"github.com/GoogleCloudPlatform/netd/pkg/options"
+	"github.com/GoogleCloudPlatform/netd/pkg/utils/clients"
+	"github.com/GoogleCloudPlatform/netd/pkg/utils/nodeinfo"
 	"github.com/GoogleCloudPlatform/netd/pkg/version"
 )
 
@@ -50,14 +52,21 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
+	clientset, err := clients.NewClientSet()
+	if err != nil {
+		glog.Fatal(err)
+	}
+	nodeName, err := nodeinfo.GetNodeName()
+	if err != nil {
+		glog.Fatal(err)
+	}
 	glog.Infof("Starting netd")
-	if err := nc.Init(context.Background()); err != nil {
+	if err := nc.Init(context.Background(), clientset, nodeName); err != nil {
 		glog.Fatalf("Failed to initialize network config controller: %v", err)
 	}
 	go nc.Run(stopCh, &wg)
 
-	err := metrics.StartCollector()
-	if err != nil {
+	if err := metrics.StartCollector(); err != nil {
 		glog.Errorf("Could not start metrics collector: %v", err)
 	}
 

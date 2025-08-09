@@ -8,7 +8,7 @@ import (
 )
 
 // GetNodeName returns the current node name.
-func GetNodeName() (string, error) {
+var GetNodeName = func() (string, error) {
 	nodeName := os.Getenv("CURRENT_NODE_NAME")
 	if nodeName != "" {
 		return nodeName, nil

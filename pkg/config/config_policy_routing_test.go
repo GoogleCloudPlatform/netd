@@ -21,6 +21,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/vishvananda/netlink"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -173,7 +174,7 @@ func TestFillLocalRulesFromNode(t *testing.T) {
 		matchedNodeIPs := len(tc.wantNodeInternalIPs)
 		for _, nodeInternalIP := range tc.wantNodeInternalIPs {
 			for _, localRule := range LocalTableRuleConfigs {
-				if nodeInternalIP.Equal(localRule.(IPRuleConfig).Rule.Dst.IP) {
+				if localRule.(IPRuleConfig).Rule.Dst != nil && nodeInternalIP.Equal(localRule.(IPRuleConfig).Rule.Dst.IP) {
 					matchedNodeIPs--
 				}
 			}
@@ -184,5 +185,103 @@ func TestFillLocalRulesFromNode(t *testing.T) {
 		}
 		// Resetting local configs for testing purpose.
 		LocalTableRuleConfigs = originLocalTableRuleConfigs
+	}
+}
+
+func TestInitPolicyRouting(t *testing.T) {
+	nodeName := "test-node"
+	podCIDR := "10.0.0.0/24"
+	internalIP := "192.168.1.100"
+
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: nodeName,
+		},
+		Spec: v1.NodeSpec{
+			PodCIDR: podCIDR,
+		},
+		Status: v1.NodeStatus{
+			Addresses: []v1.NodeAddress{
+				{
+					Type:    v1.NodeInternalIP,
+					Address: internalIP,
+				},
+			},
+		},
+	}
+	fakeClient := fake.NewSimpleClientset(node)
+
+	// Save original state and defer restoration. This is important because PolicyRoutingConfigSet is a global variable.
+	originalPolicyRoutingConfigSet := PolicyRoutingConfigSet
+	originalLocalTableRuleConfigs := make([]Config, len(LocalTableRuleConfigs))
+	copy(originalLocalTableRuleConfigs, LocalTableRuleConfigs)
+	defer func() {
+		PolicyRoutingConfigSet = originalPolicyRoutingConfigSet
+		LocalTableRuleConfigs = originalLocalTableRuleConfigs
+	}()
+
+	// Reset global state for the test.
+	PolicyRoutingConfigSet.Configs = nil
+	LocalTableRuleConfigs = []Config{}
+
+	// Mock the dependencies
+	originalRouteGet := RouteGet
+	originalLinkByIndex := LinkByIndex
+
+	defer func() {
+		RouteGet = originalRouteGet
+		LinkByIndex = originalLinkByIndex
+	}()
+
+	RouteGet = func(_ net.IP) ([]netlink.Route, error) {
+		return []netlink.Route{
+			{
+				Gw:        net.IPv4(192, 168, 1, 1),
+				LinkIndex: 2,
+			},
+		}, nil
+	}
+	LinkByIndex = func(_ int) (netlink.Link, error) {
+		return &netlink.Dummy{
+			LinkAttrs: netlink.LinkAttrs{
+				Name: "eth0",
+			},
+		}, nil
+	}
+
+	err := InitPolicyRouting(context.Background(), fakeClient, nodeName)
+	if err != nil {
+		t.Fatalf("InitPolicyRouting() returned an unexpected error: %v", err)
+	}
+
+	// fillLocalRulesFromNode populates LocalTableRuleConfigs, and InitPolicyRouting appends them.
+	// We expect one rule for the node's internal IP.
+	if len(LocalTableRuleConfigs) != 1 {
+		t.Fatalf("Expected 1 local table rule, but got %d", len(LocalTableRuleConfigs))
+	}
+
+	// Check if the populated configs were appended to the main config set.
+	if len(PolicyRoutingConfigSet.Configs) < len(LocalTableRuleConfigs) {
+		t.Fatalf("Expected at least %d configs, but got %d", len(LocalTableRuleConfigs), len(PolicyRoutingConfigSet.Configs))
+	}
+
+	localRulesMap := make(map[string]struct{})
+	for _, config := range LocalTableRuleConfigs {
+		localRulesMap[config.(IPRuleConfig).Rule.Dst.String()] = struct{}{}
+	}
+
+	foundRules := 0
+	for _, config := range PolicyRoutingConfigSet.Configs {
+		if ipRuleConfig, ok := config.(IPRuleConfig); ok {
+			if ipRuleConfig.Rule.Dst != nil {
+				if _, ok := localRulesMap[ipRuleConfig.Rule.Dst.String()]; ok {
+					foundRules++
+				}
+			}
+		}
+	}
+
+	if foundRules != len(LocalTableRuleConfigs) {
+		t.Errorf("Expected to find %d local rules, but found %d", len(LocalTableRuleConfigs), foundRules)
 	}
 }

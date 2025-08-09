@@ -34,7 +34,6 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 
-	"github.com/GoogleCloudPlatform/netd/pkg/utils/clients"
 	"github.com/GoogleCloudPlatform/netd/pkg/utils/nodeinfo"
 )
 
@@ -84,6 +83,11 @@ var (
 	vethGatewayDst   net.IPNet
 )
 
+var (
+	RouteGet    = netlink.RouteGet
+	LinkByIndex = netlink.LinkByIndex
+)
+
 // PolicyRoutingConfigSet defines the Policy Routing rules
 var PolicyRoutingConfigSet = Set{
 	false,
@@ -93,9 +97,9 @@ var PolicyRoutingConfigSet = Set{
 
 // InitPolicyRouting performs necessary initialization for policy routing.
 // It should be called before running the policy routing enforcement loop.
-func InitPolicyRouting(ctx context.Context) error {
+func InitPolicyRouting(ctx context.Context, clientset kubernetes.Interface, nodeName string) error {
 	f := func(ip net.IP) (linkIndex int, netdev string, gw net.IP) {
-		routes, err := netlink.RouteGet(ip)
+		routes, err := RouteGet(ip)
 		if err != nil {
 			glog.Errorf("failed to get route for IP: %v (%v)", ip, err)
 			return
@@ -103,7 +107,7 @@ func InitPolicyRouting(ctx context.Context) error {
 		gw = routes[0].Gw
 		linkIndex = routes[0].LinkIndex
 
-		l, err := netlink.LinkByIndex(linkIndex)
+		l, err := LinkByIndex(linkIndex)
 		if err != nil {
 			glog.Errorf("failed to get the link by index: %v (%v)", linkIndex, err)
 		}
@@ -121,21 +125,13 @@ func InitPolicyRouting(ctx context.Context) error {
 		Mask: net.CIDRMask(32, 32),
 	}
 
-	clientset, err := clients.NewClientSet()
-	if err != nil {
-		return err
-	}
-	nodeName, err := nodeinfo.GetNodeName()
-	if err != nil {
-		return err
-	}
 	if err := fillLocalRulesFromNode(ctx, clientset, nodeName); err != nil {
 		return fmt.Errorf("configure local rule destinations from node: %w", err)
 	}
 
 	sysctlReversePathFilter := fmt.Sprintf("net.ipv4.conf.%s.rp_filter", defaultNetdev)
 	hairpinMaskStr := fmt.Sprintf("0x%x", hairpinMask)
-	PolicyRoutingConfigSet.Configs = []Config{
+	PolicyRoutingConfigSet.Configs = append(PolicyRoutingConfigSet.Configs,
 		SysctlConfig{
 			Key:          sysctlReversePathFilter,
 			Value:        "2",
@@ -254,7 +250,8 @@ func InitPolicyRouting(ctx context.Context) error {
 			RuleDel:  netlink.RuleDel,
 			RuleList: netlink.RuleList,
 		},
-	}
+	)
+
 	glog.Info("Including local table rules.")
 	PolicyRoutingConfigSet.Configs = append(PolicyRoutingConfigSet.Configs, LocalTableRuleConfigs...)
 

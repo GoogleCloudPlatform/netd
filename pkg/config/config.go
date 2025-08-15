@@ -18,7 +18,6 @@ package config
 
 import (
 	"os"
-	"reflect"
 	"strings"
 	"syscall"
 
@@ -175,22 +174,11 @@ func (r IPRuleConfig) count() (int, error) {
 	}
 	count := 0
 	for _, rule := range rules {
-		if isRuleEqualWithoutPriority(rule, r.Rule) {
+		if rule == r.Rule {
 			count++
 		}
 	}
 	return count, nil
-}
-
-// isRuleEqualWithoutPriority checks whether two rules are the same without
-// looking at priority. This is just a naive way to avoid writing duplicate
-// rules when we are migrating to use a new set of priorities.
-func isRuleEqualWithoutPriority(rule1, rule2 netlink.Rule) bool {
-	rule1Copy := rule1
-	rule2Copy := rule2
-	rule1Copy.Priority = 0
-	rule2Copy.Priority = 0
-	return reflect.DeepEqual(rule1Copy, rule2Copy)
 }
 
 func (c IPTablesChainSpec) ensure(enabled bool) error {

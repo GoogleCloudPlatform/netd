@@ -29,9 +29,6 @@ import (
 	"github.com/GoogleCloudPlatform/netd/pkg/kernel"
 )
 
-// GetKernelVersion is a variable for mocking in tests.
-var GetKernelVersion = kernel.GetVersion
-
 const (
 	brokenLocalUDPKernelVersionStart = "6.6.57"
 )
@@ -57,7 +54,7 @@ func NewNetworkConfigController(enablePolicyRouting, enableSourceValidMark, excl
 	if excludeDNS {
 		configSet[0].Configs = append(configSet[0].Configs, config.ExcludeDNSIPRuleConfigs...)
 	}
-	kernelVersion, err := GetKernelVersion()
+	kernelVersion, err := kernel.GetVersion()
 	if err != nil {
 		glog.Errorf("Could not check kernel version: %v. Skip installing UDP exempt rule.", err)
 	} else {

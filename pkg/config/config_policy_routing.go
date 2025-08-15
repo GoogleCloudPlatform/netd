@@ -17,24 +17,13 @@ limitations under the License.
 package config
 
 import (
-	"context"
 	"fmt"
 	"net"
-	"time"
 
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
-	netutils "k8s.io/utils/net"
-
-	"github.com/containernetworking/plugins/pkg/ip"
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
-
-	"github.com/GoogleCloudPlatform/netd/pkg/utils/nodeinfo"
 )
 
 const (
@@ -62,15 +51,12 @@ const (
 )
 
 const (
-	// Note that localTableRulePriority will be shared by multiple local rules.
-	// As the ordering of them don't matter.
-	localTableRulePriority = 70 + iota
-	hairpinUDPRulePriority
+	hairpinUDPRequestRulePriority = 29998 + iota
 	hairpinDNSRequestRulePriority
 	hairpinDNSResponseRulePriority
 	hairpinRulePriority
 	localRulePriority
-	policyRoutingRulePriority // The last priority is 76.
+	policyRoutingRulePriority
 )
 
 var (
@@ -78,14 +64,6 @@ var (
 	defaultLinkIndex int
 	defaultNetdev    string
 	localNetdev      string
-	loopbackDst      net.IPNet
-	ciliumHostDst    net.IPNet
-	vethGatewayDst   net.IPNet
-)
-
-var (
-	RouteGet    = netlink.RouteGet
-	LinkByIndex = netlink.LinkByIndex
 )
 
 // PolicyRoutingConfigSet defines the Policy Routing rules
@@ -95,11 +73,9 @@ var PolicyRoutingConfigSet = Set{
 	nil,
 }
 
-// InitPolicyRouting performs necessary initialization for policy routing.
-// It should be called before running the policy routing enforcement loop.
-func InitPolicyRouting(ctx context.Context, clientset kubernetes.Interface, nodeName string) error {
+func init() {
 	f := func(ip net.IP) (linkIndex int, netdev string, gw net.IP) {
-		routes, err := RouteGet(ip)
+		routes, err := netlink.RouteGet(ip)
 		if err != nil {
 			glog.Errorf("failed to get route for IP: %v (%v)", ip, err)
 			return
@@ -107,7 +83,7 @@ func InitPolicyRouting(ctx context.Context, clientset kubernetes.Interface, node
 		gw = routes[0].Gw
 		linkIndex = routes[0].LinkIndex
 
-		l, err := LinkByIndex(linkIndex)
+		l, err := netlink.LinkByIndex(linkIndex)
 		if err != nil {
 			glog.Errorf("failed to get the link by index: %v (%v)", linkIndex, err)
 		}
@@ -116,22 +92,10 @@ func InitPolicyRouting(ctx context.Context, clientset kubernetes.Interface, node
 	}
 	defaultLinkIndex, defaultNetdev, defaultGateway = f(net.IPv4(8, 8, 8, 8))
 	_, localNetdev, _ = f(net.IPv4(127, 0, 0, 1))
-	loopbackDst = net.IPNet{
-		IP:   net.IPv4(127, 0, 0, 0),
-		Mask: net.CIDRMask(8, 32),
-	}
-	ciliumHostDst = net.IPNet{
-		IP:   net.IPv4(169, 254, 4, 6),
-		Mask: net.CIDRMask(32, 32),
-	}
-
-	if err := fillLocalRulesFromNode(ctx, clientset, nodeName); err != nil {
-		return fmt.Errorf("configure local rule destinations from node: %w", err)
-	}
 
 	sysctlReversePathFilter := fmt.Sprintf("net.ipv4.conf.%s.rp_filter", defaultNetdev)
 	hairpinMaskStr := fmt.Sprintf("0x%x", hairpinMask)
-	PolicyRoutingConfigSet.Configs = append(PolicyRoutingConfigSet.Configs,
+	PolicyRoutingConfigSet.Configs = []Config{
 		SysctlConfig{
 			Key:          sysctlReversePathFilter,
 			Value:        "2",
@@ -250,72 +214,7 @@ func InitPolicyRouting(ctx context.Context, clientset kubernetes.Interface, node
 			RuleDel:  netlink.RuleDel,
 			RuleList: netlink.RuleList,
 		},
-	)
-
-	glog.Info("Including local table rules.")
-	PolicyRoutingConfigSet.Configs = append(PolicyRoutingConfigSet.Configs, LocalTableRuleConfigs...)
-
-	return nil
-}
-
-func fillLocalRulesFromNode(ctx context.Context, clientset kubernetes.Interface, nodeName string) error {
-	// Retrieve necessary IP info from the node object.
-	var node *v1.Node
-	if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
-		var err error
-		node, err = clientset.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-		if err != nil {
-			glog.Errorf("Failed to get node %s: %v", nodeName, err)
-			return false, nil
-		}
-		return true, nil
-	}); err != nil {
-		return err
 	}
-
-	nodeInternalIPs := []net.IP{}
-	for _, address := range node.Status.Addresses {
-		if !netutils.IsIPv4String(address.Address) ||
-			address.Type != v1.NodeInternalIP {
-			continue
-		}
-		nodeInternalIPs = append(nodeInternalIPs, net.ParseIP(address.Address))
-	}
-	if len(nodeInternalIPs) == 0 {
-		return fmt.Errorf("no InternalIP found in node %s", nodeName)
-	}
-	for _, ip := range nodeInternalIPs {
-		ipDst := net.IPNet{
-			IP:   ip,
-			Mask: net.CIDRMask(32, 32),
-		}
-		LocalTableRuleConfigs = append(LocalTableRuleConfigs,
-			newNodeInternalIPRuleConfig(localTableRulePriority, ipDst))
-	}
-
-	var vethGatewayIP net.IP
-	podCIDRs, err := nodeinfo.GetPodCIDRs(node)
-	if err != nil {
-		return err
-	}
-	for _, podCIDR := range podCIDRs {
-		if !netutils.IsIPv4CIDRString(podCIDR) {
-			continue
-		}
-		vethGatewayIP, _, err = net.ParseCIDR(podCIDR)
-		if err != nil {
-			return fmt.Errorf("parse podCIDR %s: %w", podCIDR, err)
-		}
-	}
-	if vethGatewayIP == nil {
-		return fmt.Errorf("no PodCIDR found in node %s", nodeName)
-	}
-	vethGatewayDst = net.IPNet{
-		// vethGateway is the first usable IP from Pod CIDR.
-		IP:   ip.NextIP(vethGatewayIP),
-		Mask: net.CIDRMask(32, 32),
-	}
-	return nil
 }
 
 var SourceValidMarkConfig = SysctlConfig{
@@ -363,7 +262,7 @@ var ExcludeDNSIPRuleConfigs = []Config{
 var ExcludeUDPIPRuleConfig = IPRuleConfig{
 	Rule: netlink.Rule{
 		Table:             unix.RT_TABLE_MAIN,
-		Priority:          hairpinUDPRulePriority,
+		Priority:          hairpinUDPRequestRulePriority,
 		IPProto:           unix.IPPROTO_UDP,
 		SuppressIfgroup:   -1,
 		SuppressPrefixlen: -1,
@@ -375,79 +274,4 @@ var ExcludeUDPIPRuleConfig = IPRuleConfig{
 	RuleAdd:  netlink.RuleAdd,
 	RuleDel:  netlink.RuleDel,
 	RuleList: netlink.RuleList,
-}
-
-// LocalTableRuleConfigs are needed to enforce necessary traffic to go through
-// the local routing table. This is required when our policy routing configs
-// are installed with a high priority than the default local rule.
-// Notably some additional configs will be rendered dynamically and appended
-// during init time.
-var LocalTableRuleConfigs = []Config{
-	IPRuleConfig{
-		Rule: netlink.Rule{
-			Table:             unix.RT_TABLE_LOCAL,
-			Priority:          localTableRulePriority,
-			Dst:               &loopbackDst,
-			SuppressIfgroup:   -1,
-			SuppressPrefixlen: -1,
-			Mark:              -1,
-			Mask:              -1,
-			Goto:              -1,
-			Flow:              -1,
-		},
-		RuleAdd:  netlink.RuleAdd,
-		RuleDel:  netlink.RuleDel,
-		RuleList: netlink.RuleList,
-	},
-	IPRuleConfig{
-		Rule: netlink.Rule{
-			Table:             unix.RT_TABLE_LOCAL,
-			Priority:          localTableRulePriority,
-			Dst:               &ciliumHostDst,
-			SuppressIfgroup:   -1,
-			SuppressPrefixlen: -1,
-			Mark:              -1,
-			Mask:              -1,
-			Goto:              -1,
-			Flow:              -1,
-		},
-		RuleAdd:  netlink.RuleAdd,
-		RuleDel:  netlink.RuleDel,
-		RuleList: netlink.RuleList,
-	},
-	IPRuleConfig{
-		Rule: netlink.Rule{
-			Table:             unix.RT_TABLE_LOCAL,
-			Priority:          localTableRulePriority,
-			Dst:               &vethGatewayDst,
-			SuppressIfgroup:   -1,
-			SuppressPrefixlen: -1,
-			Mark:              -1,
-			Mask:              -1,
-			Goto:              -1,
-			Flow:              -1,
-		},
-		RuleAdd:  netlink.RuleAdd,
-		RuleDel:  netlink.RuleDel,
-		RuleList: netlink.RuleList,
-	},
-}
-
-func newNodeInternalIPRuleConfig(prio int, dst net.IPNet) IPRuleConfig {
-	return IPRuleConfig{
-		Rule: netlink.Rule{
-			Table:             unix.RT_TABLE_LOCAL,
-			Priority:          prio,
-			Dst:               &dst,
-			SuppressIfgroup:   -1,
-			SuppressPrefixlen: -1,
-			Mark:              -1,
-			Mask:              -1,
-			Goto:              -1,
-			Flow:              -1,
-		},
-		RuleAdd:  netlink.RuleAdd,
-		RuleDel:  netlink.RuleDel,
-		RuleList: netlink.RuleList,
-	}
 }

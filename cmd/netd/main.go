@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"context"
 	"flag"
 	"os"
 	"os/signal"
@@ -27,18 +26,15 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
-	"github.com/GoogleCloudPlatform/netd/pkg/config"
 	"github.com/GoogleCloudPlatform/netd/pkg/controllers/netconf"
 	"github.com/GoogleCloudPlatform/netd/pkg/metrics"
 	"github.com/GoogleCloudPlatform/netd/pkg/options"
-	"github.com/GoogleCloudPlatform/netd/pkg/utils/clients"
-	"github.com/GoogleCloudPlatform/netd/pkg/utils/nodeinfo"
 	"github.com/GoogleCloudPlatform/netd/pkg/version"
 )
 
 func main() {
-	netdConfig := options.NewNetdConfig()
-	netdConfig.AddFlags(pflag.CommandLine)
+	config := options.NewNetdConfig()
+	config.AddFlags(pflag.CommandLine)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 	glog.Infof("netd version: %s", version.Version)
@@ -46,20 +42,7 @@ func main() {
 		glog.Infof("FLAG: --%s=%q", f.Name, f.Value)
 	})
 
-	clientset, err := clients.NewClientSet()
-	if err != nil {
-		glog.Fatal(err)
-	}
-	nodeName, err := nodeinfo.GetNodeName()
-	if err != nil {
-		glog.Fatal(err)
-	}
-
-	if err := config.InitPolicyRouting(context.Background(), clientset, nodeName); err != nil {
-		glog.Fatalf("Failed to create policy routing config set: %v", err)
-	}
-
-	nc := netconf.NewNetworkConfigController(netdConfig.EnablePolicyRouting, netdConfig.EnableSourceValidMark, netdConfig.ExcludeDNS, netdConfig.ReconcileInterval)
+	nc := netconf.NewNetworkConfigController(config.EnablePolicyRouting, config.EnableSourceValidMark, config.ExcludeDNS, config.ReconcileInterval)
 
 	stopCh := make(chan struct{})
 
@@ -69,7 +52,8 @@ func main() {
 	glog.Infof("Starting netd")
 	go nc.Run(stopCh, &wg)
 
-	if err := metrics.StartCollector(); err != nil {
+	err := metrics.StartCollector()
+	if err != nil {
 		glog.Errorf("Could not start metrics collector: %v", err)
 	}
 

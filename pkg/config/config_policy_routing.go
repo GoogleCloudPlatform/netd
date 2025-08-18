@@ -79,7 +79,7 @@ var (
 	defaultNetdev    string
 	localNetdev      string
 	loopbackDst      net.IPNet
-	ciliumHostDst    net.IPNet
+	linkLocalNet     net.IPNet
 	vethGatewayDst   net.IPNet
 )
 
@@ -120,9 +120,11 @@ func InitPolicyRouting(ctx context.Context, clientset kubernetes.Interface, node
 		IP:   net.IPv4(127, 0, 0, 0),
 		Mask: net.CIDRMask(8, 32),
 	}
-	ciliumHostDst = net.IPNet{
-		IP:   net.IPv4(169, 254, 4, 6),
-		Mask: net.CIDRMask(32, 32),
+	// Traffic to 169.254.0.0/16 should always be routed to the local table.
+	// This is the link-local address space.
+	linkLocalNet = net.IPNet{
+		IP:   net.IPv4(169, 254, 0, 0),
+		Mask: net.CIDRMask(16, 32),
 	}
 
 	if err := fillLocalRulesFromNode(ctx, clientset, nodeName); err != nil {
@@ -290,7 +292,7 @@ func fillLocalRulesFromNode(ctx context.Context, clientset kubernetes.Interface,
 			Mask: net.CIDRMask(32, 32),
 		}
 		LocalTableRuleConfigs = append(LocalTableRuleConfigs,
-			newNodeInternalIPRuleConfig(localTableRulePriority, ipDst))
+			newNodeInternalIPRuleConfig(ipDst))
 	}
 
 	var vethGatewayIP net.IP
@@ -403,7 +405,7 @@ var LocalTableRuleConfigs = []Config{
 		Rule: netlink.Rule{
 			Table:             unix.RT_TABLE_LOCAL,
 			Priority:          localTableRulePriority,
-			Dst:               &ciliumHostDst,
+			Dst:               &linkLocalNet,
 			SuppressIfgroup:   -1,
 			SuppressPrefixlen: -1,
 			Mark:              -1,
@@ -433,11 +435,11 @@ var LocalTableRuleConfigs = []Config{
 	},
 }
 
-func newNodeInternalIPRuleConfig(prio int, dst net.IPNet) IPRuleConfig {
+func newNodeInternalIPRuleConfig(dst net.IPNet) IPRuleConfig {
 	return IPRuleConfig{
 		Rule: netlink.Rule{
 			Table:             unix.RT_TABLE_LOCAL,
-			Priority:          prio,
+			Priority:          localTableRulePriority,
 			Dst:               &dst,
 			SuppressIfgroup:   -1,
 			SuppressPrefixlen: -1,

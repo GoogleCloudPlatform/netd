@@ -156,11 +156,12 @@ populate_ip6tables() {
   log "Ensuring IPv6 firewall rules with ip6tables"
 
   if ip6tables -w -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
-    log "Add rules to accept all inbound TCP/UDP/ICMP/SCTP IPv6 packets"
+    log "Add rules to accept all inbound TCP/UDP/ICMP/SCTP/GRE IPv6 packets"
     ip6tables -A INPUT -w -p tcp -j ACCEPT
     ip6tables -A INPUT -w -p udp -j ACCEPT
     ip6tables -A INPUT -w -p icmpv6 -j ACCEPT
     ip6tables -A INPUT -w -p sctp -j ACCEPT
+    ip6tables -A INPUT -w -p gre -j ACCEPT
   fi
 
   if ip6tables -w -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then

@@ -166,15 +166,27 @@ func hasPodIP(pod *v1.Pod) bool {
 }
 
 func onPodAdd(podObj interface{}) {
-	pod := podObj.(*v1.Pod)
+	pod, ok := podObj.(*v1.Pod)
+	if !ok {
+		glog.Warningf("Expected object to be of type *v1.Pod, but got %T instead.", podObj)
+		return
+	}
 	if hasPodIP(pod) {
 		ipMap.safeIPWrite(pod.Status.PodIP, pod)
 	}
 }
 
 func onPodUpdate(oldPod, newPod interface{}) {
-	prevPod := oldPod.(*v1.Pod)
-	pod := newPod.(*v1.Pod)
+	prevPod, ok := oldPod.(*v1.Pod)
+	if !ok {
+		glog.Warningf("Expected object to be of type *v1.Pod, but got %T instead.", oldPod)
+		return
+	}
+	pod, ok := newPod.(*v1.Pod)
+	if !ok {
+		glog.Warningf("Expected object to be of type *v1.Pod, but got %T instead.", newPod)
+		return
+	}
 	if prevPod.Status.PodIP == pod.Status.PodIP {
 		return
 	}
@@ -188,7 +200,11 @@ func onPodUpdate(oldPod, newPod interface{}) {
 }
 
 func onPodDelete(podObj interface{}) {
-	pod := podObj.(*v1.Pod)
+	pod, ok := podObj.(*v1.Pod)
+	if !ok {
+		glog.Warningf("Expected object to be of type *v1.Pod, but got %T instead.", podObj)
+		return
+	}
 	if hasPodIP(pod) {
 		ipMap.safeIPDelete(pod.Status.PodIP)
 	}

@@ -82,4 +82,7 @@ timeout 1s sleep infinity && fail || { [[ "$?" == 124 ]] && pass || fail; }
 run_test base64_cmd
 [[ "$(echo -n AAA | base64 -w 0)" == QUFB ]] && pass || fail
 
+run_test system_ca_not_empty
+[[ -s "/etc/ssl/certs/ca-certificates.crt" ]] && pass || fail
+
 exit $FAIL_COUNT

@@ -122,6 +122,11 @@ fetch_node_object() {
     log "Watching attempt #${i} at ${node_url}"
     token=$(</var/run/secrets/kubernetes.io/serviceaccount/token)
     cacert="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+    # Use system CA when cluster CA doesn't exist
+    if [[ ! -f "${cacert}" ]]; then
+      cacert="/etc/ssl/certs/ca-certificates.crt"
+    fi
+
     # Grab the first object seen with .spec.podCIDR set.
     # Note: curl process may be leaked until the next node update, or
     # timeoutSeconds, whichever earlier. Shouldn't be a major issue.

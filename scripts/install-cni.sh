@@ -56,6 +56,20 @@ fi
 
 log "Install-CNI ($0), Build: __BUILD__"
 
+
+cacert=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --cacert=*)
+      cacert="${1#*=}"
+      shift 1
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
 set -u -e
 
 # Try to decouple RUN_CNI_WATCHDOG and ENABLE_CILIUM_PLUGIN; don't assume
@@ -121,14 +135,18 @@ fetch_node_object() {
   for ((i=1; i<=attempts; i++)); do
     log "Watching attempt #${i} at ${node_url}"
     token=$(</var/run/secrets/kubernetes.io/serviceaccount/token)
-    cacert="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+    local local_cacert=${cacert:-/var/run/secrets/kubernetes.io/serviceaccount/ca.crt}
+    local cacert_arg=()
+    if [[ -s "${local_cacert}" ]]; then
+      cacert_arg=(--cacert "${local_cacert}")
+    fi
     # Grab the first object seen with .spec.podCIDR set.
     # Note: curl process may be leaked until the next node update, or
     # timeoutSeconds, whichever earlier. Shouldn't be a major issue.
     # curl may eventually hit an error (e.g. timeout) so redirect its
     # stderr to stdout to make it less visible in logs, but keep it
     # in logs in case it runs into unexpected errors.
-    node_object=$(grep --line-buffered -m1 . <(curl -fsSN -m "${timeout}" -H "Authorization: Bearer ${token}" --cacert "${cacert}" "${node_url}" 2>&${stdout_dup} | jq --unbuffered -c '.object | select(.spec.podCIDR != null)')) || node_object=
+    node_object=$(grep --line-buffered -m1 . <(curl -fsSN -m "${timeout}" -H "Authorization: Bearer ${token}" "${cacert_arg[@]}" "${node_url}" 2>&${stdout_dup} | jq --unbuffered -c '.object | select(.spec.podCIDR != null)')) || node_object=
     [[ -n "${node_object}" ]] && return
   done
 

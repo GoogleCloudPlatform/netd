@@ -23,7 +23,7 @@ run_test sleep_cmd
 sleep 1 && pass || fail
 
 run_test curl_cmd
-[[ "$(curl -s -k -H "Header: netd-test" https://httpbin.org/headers)" =~ netd-test ]] && pass || fail
+[[ "$(curl -sw '%{response_code}' https://www.google.com/generate_204)" == '204' ]] && pass || fail
 
 run_test ipv4_subnet
 # shellcheck disable=SC2050

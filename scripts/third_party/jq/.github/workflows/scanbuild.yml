@@ -1,0 +1,47 @@
+name: Clang scan-build Static Analyzer Build
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  scan-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install packages
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y automake autoconf gdb valgrind clang clang-tools
+          echo "CC=clang" >> "$GITHUB_ENV"
+      - name: Build
+        run: |
+          autoreconf -i
+          ./configure --enable-valgrind CFLAGS="-g -O0"
+          scan-build --keep-going --exclude vendor/ make -j"$(nproc)"
+      - name: Test
+        run: |
+          ulimit -c unlimited
+          scan-build --keep-going --exclude vendor/ make -j"$(nproc)" check
+      - name: Core dump stacks
+        run: |
+          if [[ -f core ]]; then
+            gdb -batch -ex "thread apply all bt" \
+              "$(file core | sed "s/^[^']*'//; s/[ '].*$//")" core
+            exit 1
+          fi
+      - name: Test logs
+        if: ${{ failure() }}
+        run: |
+          cat test-suite.log tests/*.log
+      - name: Upload Logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: Scan-Build Reports
+          path: /tmp/scan-build*
+          if-no-files-found: ignore
+          retention-days: 7

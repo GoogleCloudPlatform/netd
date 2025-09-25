@@ -6,6 +6,9 @@ cd /jq-*/
 
 apk add build-base clang
 
+apk add autoconf automake libtool
+autoreconf -fi
+
 # gcc doesn't work for some reason: `configure: error: C compiler cannot create executables`
 export CC=clang
 

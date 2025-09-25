@@ -20,8 +20,8 @@ export CC=clang
 
 # apply patches if needed
 #patch -p1 < ../static.patch
-#apk add autoconf automake libtool
-#autoreconf -fi
+apk add autoconf automake libtool
+autoreconf -fi
 # end apply patches
 
 # set up any required curl options here

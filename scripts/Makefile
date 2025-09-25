@@ -46,7 +46,7 @@ DBG ?=
 
 # Third party binary dependencies.
 CURL_VERSION ?= 8.4.0
-JQ_VERSION ?= 1.6
+JQ_VERSION ?= 1.8.1
 TOYBOX_VERSION ?= 0.8.9
 SPDX_LICENSE_VERSION ?= 3.18
 
@@ -234,19 +234,19 @@ GIT_BASE ?= https://github.com
 
 third_party/curl:
 	git clone $(GIT_BASE)/curl/curl $@
-	pushd $@; git checkout curl-$(subst .,_,$(CURL_VERSION)); autoreconf -fi; popd
+	pushd $@; git checkout curl-$(subst .,_,$(CURL_VERSION)); rm -rf .git; popd
 
 third_party/jq:
-	git clone $(GIT_BASE)/stedolan/jq $@
-	pushd $@; git checkout jq-$(JQ_VERSION); autoreconf -fi; popd
+	git clone $(GIT_BASE)/jqlang/jq $@
+	pushd $@; git checkout jq-$(JQ_VERSION); rm -rf .git; popd
 
 third_party/toybox:
 	git clone $(GIT_BASE)/landley/toybox $@
-	pushd $@; git checkout $(TOYBOX_VERSION); popd
+	pushd $@; git checkout $(TOYBOX_VERSION); rm -rf .git; popd
 
 third_party/license-list-data:
 	git clone $(GIT_BASE)/spdx/license-list-data $@
-	pushd $@; git checkout v$(SPDX_LICENSE_VERSION); popd
+	pushd $@; git checkout v$(SPDX_LICENSE_VERSION); rm -rf .git; popd
 
 status.d/%:
 	mkdir -p status.d

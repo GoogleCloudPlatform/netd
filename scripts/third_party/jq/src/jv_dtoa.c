@@ -195,6 +195,7 @@
 #include "jv_dtoa.h"
 
 #include "jv_alloc.h"
+#include "jv.h"
 #define MALLOC jv_mem_alloc
 #define FREE jv_mem_free
 
@@ -298,7 +299,7 @@ extern "C" {
 #endif
 
 #if defined(IEEE_8087) + defined(IEEE_MC68k) + defined(VAX) + defined(IBM) != 1
-Exactly one of IEEE_8087, IEEE_MC68k, VAX, or IBM should be defined.
+#  error Exactly one of IEEE_8087, IEEE_MC68k, VAX, or IBM should be defined.
 #endif
 
 typedef union { double d; ULong L[2]; } U;
@@ -1723,6 +1724,7 @@ gethex(struct dtoa_context* C,  CONST char **sp, U *rvp, int rounding, int sign)
 		  case '-':
 			esign = 1;
 			/* no break */
+			JQ_FALLTHROUGH;
 		  case '+':
 			s++;
 		  }
@@ -2327,7 +2329,10 @@ retlow1:
 jvp_strtod
  (struct dtoa_context* C, const char *s00, char **se)
 {
-	int bb2, bb5, bbe, bd2, bd5, bbbits, bs2, c, e, e1, test_scale;
+	int bb2, bb5, bbe, bd2, bd5, bbbits, bs2, c, e, e1;
+#ifdef Honor_FLT_ROUNDS
+	int test_scale;
+#endif
 	int esign, i, j, k, nd, nd0, nf, nz, nz0, nz1, sign;
 	CONST char *s, *s0, *s1;
 	double aadj, aadj1;
@@ -2363,27 +2368,21 @@ jvp_strtod
 
 	sign = nz0 = nz1 = nz = bc.dplen = bc.uflchk = 0;
 	dval(&rv) = 0.;
-	for(s = s00;;s++) switch(*s) {
+	switch(*(s = s00)) {
 		case '-':
 			sign = 1;
 			/* no break */
+			JQ_FALLTHROUGH;
 		case '+':
 			if (*++s)
-				goto break2;
+				break;
 			/* no break */
+			JQ_FALLTHROUGH;
 		case 0:
 			goto ret0;
-		case '\t':
-		case '\n':
-		case '\v':
-		case '\f':
-		case '\r':
-		case ' ':
-			continue;
 		default:
-			goto break2;
+			break;
 		}
- break2:
 	if (*s == '0') {
 #ifndef NO_HEX_FP /*{*/
 		switch(s[1]) {
@@ -2478,6 +2477,7 @@ jvp_strtod
 		switch(c = *++s) {
 			case '-':
 				esign = 1;
+				JQ_FALLTHROUGH;
 			case '+':
 				c = *++s;
 			}
@@ -3699,6 +3699,7 @@ jvp_dtoa
 		case 2:
 			leftright = 0;
 			/* no break */
+			JQ_FALLTHROUGH;
 		case 4:
 			if (ndigits <= 0)
 				ndigits = 1;
@@ -3707,6 +3708,7 @@ jvp_dtoa
 		case 3:
 			leftright = 0;
 			/* no break */
+			JQ_FALLTHROUGH;
 		case 5:
 			i = ndigits + k + 1;
 			ilim = i;

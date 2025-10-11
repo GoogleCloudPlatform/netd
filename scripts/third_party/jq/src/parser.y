@@ -5,6 +5,7 @@
 #include <string.h>
 #include "compile.h"
 #include "jv_alloc.h"
+#include "builtin.h"
 #define YYMALLOC jv_mem_alloc
 #define YYFREE jv_mem_free
 %}
@@ -26,7 +27,7 @@ struct lexer_param;
 }
 
 %locations
-%error-verbose
+%define parse.error verbose
 %define api.pure
 %union {
   jv literal;
@@ -49,6 +50,7 @@ struct lexer_param;
 %token INVALID_CHARACTER
 %token <literal> IDENT
 %token <literal> FIELD
+%token <literal> BINDING
 %token <literal> LITERAL
 %token <literal> FORMAT
 %token REC ".."
@@ -74,7 +76,7 @@ struct lexer_param;
 %token CATCH "catch"
 %token LABEL "label"
 %token BREAK "break"
-%token LOC "__loc__"
+%token LOC "$__loc__"
 %token SETPIPE "|="
 %token SETPLUS "+="
 %token SETMINUS "-="
@@ -106,14 +108,14 @@ struct lexer_param;
 %left '+' '-'
 %left '*' '/' '%'
 %precedence NONOPT /* non-optional; rules for which a specialized
-                      '?' rule should be preferred over Exp '?' */
-%precedence '?'
+                      '?' rule should be preferred over Expr '?' */
+%precedence '?' '.' '[' FIELD
 %precedence "try"
 %precedence "catch"
 
 
-%type <blk> Exp Term
-%type <blk> MkDict MkDictPair ExpD
+%type <blk> Query Expr Term
+%type <blk> DictPairs DictPair DictExpr
 %type <blk> ElseBody
 %type <blk> String QQString
 %type <blk> FuncDef FuncDefs
@@ -121,6 +123,7 @@ struct lexer_param;
 %type <blk> Param Params Arg Args
 %type <blk> Patterns RepPatterns Pattern ArrayPats ObjPats ObjPat
 %type <literal> Keyword
+%type <literal> StringStart
 %{
 #include "lexer.h"
 struct lexer_param {
@@ -136,15 +139,7 @@ struct lexer_param {
 void yyerror(YYLTYPE* loc, block* answer, int* errors,
              struct locfile* locations, struct lexer_param* lexer_param_ptr, const char *s){
   (*errors)++;
-  if (strstr(s, "unexpected")) {
-#ifdef WIN32
-      locfile_locate(locations, *loc, "jq: error: %s (Windows cmd shell quoting issues?)", s);
-#else
-      locfile_locate(locations, *loc, "jq: error: %s (Unix shell quoting issues?)", s);
-#endif
-  } else {
-      locfile_locate(locations, *loc, "jq: error: %s", s);
-  }
+  locfile_locate(locations, *loc, "jq: error: %s", s);
 }
 
 int yylex(YYSTYPE* yylval, YYLTYPE* yylloc, block* answer, int* errors,
@@ -172,7 +167,7 @@ static jv check_object_key(block k) {
     char errbuf[15];
     return jv_string_fmt("Cannot use %s (%s) as object key",
         jv_kind_name(block_const_kind(k)),
-        jv_dump_string_trunc(jv_copy(block_const(k)), errbuf, sizeof(errbuf)));
+        jv_dump_string_trunc(block_const(k), errbuf, sizeof(errbuf)));
   }
   return jv_invalid();
 }
@@ -200,49 +195,31 @@ static block constant_fold(block a, block b, int op) {
   if (!block_is_single(a) || !block_is_const(a) ||
       !block_is_single(b) || !block_is_const(b))
     return gen_noop();
-  if (op == '+') {
-    if (block_const_kind(a) == JV_KIND_NULL) {
-      block_free(a);
-      return b;
-    }
-    if (block_const_kind(b) == JV_KIND_NULL) {
-      block_free(b);
-      return a;
-    }
-  }
-  if (block_const_kind(a) != block_const_kind(b))
-    return gen_noop();
+
+  jv jv_a = block_const(a);
+  block_free(a);
+  jv jv_b = block_const(b);
+  block_free(b);
 
   jv res = jv_invalid();
-
-  if (block_const_kind(a) == JV_KIND_NUMBER) {
-    double na = jv_number_value(block_const(a));
-    double nb = jv_number_value(block_const(b));
-    switch (op) {
-    case '+': res = jv_number(na + nb); break;
-    case '-': res = jv_number(na - nb); break;
-    case '*': res = jv_number(na * nb); break;
-    case '/': res = jv_number(na / nb); break;
-    case EQ:  res = (na == nb ? jv_true() : jv_false()); break;
-    case NEQ: res = (na != nb ? jv_true() : jv_false()); break;
-    case '<': res = (na < nb ? jv_true() : jv_false()); break;
-    case '>': res = (na > nb ? jv_true() : jv_false()); break;
-    case LESSEQ: res = (na <= nb ? jv_true() : jv_false()); break;
-    case GREATEREQ: res = (na >= nb ? jv_true() : jv_false()); break;
-    default: break;
-    }
-  } else if (op == '+' && block_const_kind(a) == JV_KIND_STRING) {
-    res = jv_string_concat(block_const(a),  block_const(b));
-  } else {
-    return gen_noop();
+  switch (op) {
+  case '+': res = binop_plus(jv_a, jv_b); break;
+  case '-': res = binop_minus(jv_a, jv_b); break;
+  case '*': res = binop_multiply(jv_a, jv_b); break;
+  case '/': res = binop_divide(jv_a, jv_b); break;
+  case '%': res = binop_mod(jv_a, jv_b); break;
+  case EQ: res = binop_equal(jv_a, jv_b); break;
+  case NEQ: res = binop_notequal(jv_a, jv_b); break;
+  case '<': res = binop_less(jv_a, jv_b); break;
+  case '>': res = binop_greater(jv_a, jv_b); break;
+  case LESSEQ: res = binop_lesseq(jv_a, jv_b); break;
+  case GREATEREQ: res = binop_greatereq(jv_a, jv_b); break;
   }
 
-  if (jv_get_kind(res) == JV_KIND_INVALID)
-    return gen_noop();
+  if (jv_is_valid(res))
+    return gen_const(res);
 
-  block_free(a);
-  block_free(b);
-  return gen_const(res);
+  return gen_error(jv_invalid_get_msg(res));
 }
 
 static block gen_binop(block a, block b, int op) {
@@ -293,11 +270,16 @@ static block gen_update(block object, block val, int optype) {
                                                               optype)))));
 }
 
+static block gen_loc_object(location *loc, struct locfile *locations) {
+  return gen_const(JV_OBJECT(jv_string("file"), jv_copy(locations->fname),
+                             jv_string("line"), jv_number(locfile_get_line(locations, loc->start) + 1)));
+}
+
 %}
 
 %%
 TopLevel:
-Module Imports Exp {
+Module Imports Query {
   *answer = BLOCK($1, $2, gen_op_simple(TOP), $3);
 } |
 Module Imports FuncDefs {
@@ -308,9 +290,13 @@ Module:
 %empty {
   $$ = gen_noop();
 } |
-"module" Exp ';' {
+"module" Query ';' {
   if (!block_is_const($2)) {
-    FAIL(@$, "Module metadata must be constant");
+    FAIL(@2, "Module metadata must be constant");
+    $$ = gen_noop();
+    block_free($2);
+  } else if (block_const_kind($2) != JV_KIND_OBJECT) {
+    FAIL(@2, "Module metadata must be an object");
     $$ = gen_noop();
     block_free($2);
   } else {
@@ -331,181 +317,118 @@ FuncDefs:
   $$ = gen_noop();
 } |
 FuncDef FuncDefs {
-  $$ = block_bind($1, $2, OP_IS_CALL_PSEUDO);
+  $$ = block_join($1, $2);
 }
 
-Exp:
-FuncDef Exp %prec FUNCDEF {
+
+Query:
+FuncDef Query %prec FUNCDEF {
   $$ = block_bind_referenced($1, $2, OP_IS_CALL_PSEUDO);
 } |
-
-Term "as" Patterns '|' Exp {
+Expr "as" Patterns '|' Query {
   $$ = gen_destructure($1, $3, $5);
 } |
-"reduce" Term "as" Patterns '(' Exp ';' Exp ')' {
-  $$ = gen_reduce($2, $4, $6, $8);
-} |
-
-"foreach" Term "as" Patterns '(' Exp ';' Exp ';' Exp ')' {
-  $$ = gen_foreach($2, $4, $6, $8, $10);
-} |
-
-"foreach" Term "as" Patterns '(' Exp ';' Exp ')' {
-  $$ = gen_foreach($2, $4, $6, $8, gen_noop());
-} |
-
-"if" Exp "then" Exp ElseBody {
-  $$ = gen_cond($2, $4, $5);
-} |
-"if" Exp "then" error {
-  FAIL(@$, "Possibly unterminated 'if' statement");
-  $$ = $2;
-} |
-
-"try" Exp "catch" Exp {
-  //$$ = BLOCK(gen_op_target(FORK_OPT, $2), $2, $4);
-  $$ = gen_try($2, gen_try_handler($4));
-} |
-"try" Exp {
-  //$$ = BLOCK(gen_op_target(FORK_OPT, $2), $2, gen_op_simple(BACKTRACK));
-  $$ = gen_try($2, gen_op_simple(BACKTRACK));
-} |
-"try" Exp "catch" error {
-  FAIL(@$, "Possibly unterminated 'try' statement");
-  $$ = $2;
-} |
-
-"label" '$' IDENT '|' Exp {
-  jv v = jv_string_fmt("*label-%s", jv_string_value($3));
-  $$ = gen_location(@$, locations, gen_label(jv_string_value(v), $5));
-  jv_free($3);
+"label" BINDING '|' Query {
+  jv v = jv_string_fmt("*label-%s", jv_string_value($2));
+  $$ = gen_location(@$, locations, gen_label(jv_string_value(v), $4));
+  jv_free($2);
   jv_free(v);
 } |
-
-Exp '?' {
-  $$ = gen_try($1, gen_op_simple(BACKTRACK));
-} |
-
-Exp '=' Exp {
-  $$ = gen_call("_assign", BLOCK(gen_lambda($1), gen_lambda($3)));
-} |
-
-Exp "or" Exp {
-  $$ = gen_or($1, $3);
-} |
-
-Exp "and" Exp {
-  $$ = gen_and($1, $3);
-} |
-
-Exp "//" Exp {
-  $$ = gen_definedor($1, $3);
-} |
-
-Exp "//=" Exp {
-  $$ = gen_definedor_assign($1, $3);
-} |
-
-Exp "|=" Exp {
-  $$ = gen_call("_modify", BLOCK(gen_lambda($1), gen_lambda($3)));
-} |
-
-Exp '|' Exp {
+Query '|' Query {
   $$ = block_join($1, $3);
 } |
-
-Exp ',' Exp {
+Query ',' Query {
   $$ = gen_both($1, $3);
 } |
-
-Exp '+' Exp {
-  $$ = gen_binop($1, $3, '+');
-} |
-
-Exp "+=" Exp {
-  $$ = gen_update($1, $3, '+');
-} |
-
-'-' Exp {
-  $$ = BLOCK($2, gen_call("_negate", gen_noop()));
-} |
-
-Exp '-' Exp {
-  $$ = gen_binop($1, $3, '-');
-} |
-
-Exp "-=" Exp {
-  $$ = gen_update($1, $3, '-');
-} |
-
-Exp '*' Exp {
-  $$ = gen_binop($1, $3, '*');
-} |
-
-Exp "*=" Exp {
-  $$ = gen_update($1, $3, '*');
-} |
-
-Exp '/' Exp {
-  $$ = gen_binop($1, $3, '/');
-  if (block_is_const_inf($$))
-    FAIL(@$, "Division by zero?");
-} |
-
-Exp '%' Exp {
-  $$ = gen_binop($1, $3, '%');
-  if (block_is_const_inf($$))
-    FAIL(@$, "Remainder by zero?");
-} |
-
-Exp "/=" Exp {
-  $$ = gen_update($1, $3, '/');
-} |
-
-Exp SETMOD Exp {
-  $$ = gen_update($1, $3, '%');
-} |
-
-Exp "==" Exp {
-  $$ = gen_binop($1, $3, EQ);
-} |
-
-Exp "!=" Exp {
-  $$ = gen_binop($1, $3, NEQ);
-} |
-
-Exp '<' Exp {
-  $$ = gen_binop($1, $3, '<');
-} |
-
-Exp '>' Exp {
-  $$ = gen_binop($1, $3, '>');
-} |
-
-Exp "<=" Exp {
-  $$ = gen_binop($1, $3, LESSEQ);
-} |
-
-Exp ">=" Exp {
-  $$ = gen_binop($1, $3, GREATEREQ);
-} |
-
-Term {
+Expr {
   $$ = $1;
 }
+
+
+Expr:
+Expr "//" Expr {
+  $$ = gen_definedor($1, $3);
+} |
+Expr '=' Expr {
+  $$ = gen_call("_assign", BLOCK(gen_lambda($1), gen_lambda($3)));
+} |
+Expr "or" Expr {
+  $$ = gen_or($1, $3);
+} |
+Expr "and" Expr {
+  $$ = gen_and($1, $3);
+} |
+Expr "//=" Expr {
+  $$ = gen_definedor_assign($1, $3);
+} |
+Expr "|=" Expr {
+  $$ = gen_call("_modify", BLOCK(gen_lambda($1), gen_lambda($3)));
+} |
+Expr '+' Expr {
+  $$ = gen_binop($1, $3, '+');
+} |
+Expr "+=" Expr {
+  $$ = gen_update($1, $3, '+');
+} |
+Expr '-' Expr {
+  $$ = gen_binop($1, $3, '-');
+} |
+Expr "-=" Expr {
+  $$ = gen_update($1, $3, '-');
+} |
+Expr '*' Expr {
+  $$ = gen_binop($1, $3, '*');
+} |
+Expr "*=" Expr {
+  $$ = gen_update($1, $3, '*');
+} |
+Expr '/' Expr {
+  $$ = gen_binop($1, $3, '/');
+} |
+Expr '%' Expr {
+  $$ = gen_binop($1, $3, '%');
+} |
+Expr "/=" Expr {
+  $$ = gen_update($1, $3, '/');
+} |
+Expr SETMOD Expr {
+  $$ = gen_update($1, $3, '%');
+} |
+Expr "==" Expr {
+  $$ = gen_binop($1, $3, EQ);
+} |
+Expr "!=" Expr {
+  $$ = gen_binop($1, $3, NEQ);
+} |
+Expr '<' Expr {
+  $$ = gen_binop($1, $3, '<');
+} |
+Expr '>' Expr {
+  $$ = gen_binop($1, $3, '>');
+} |
+Expr "<=" Expr {
+  $$ = gen_binop($1, $3, LESSEQ);
+} |
+Expr ">=" Expr {
+  $$ = gen_binop($1, $3, GREATEREQ);
+} |
+Term %prec NONOPT {
+  $$ = $1;
+}
+
 
 Import:
 ImportWhat ';' {
   $$ = $1;
 } |
-ImportWhat Exp ';' {
+ImportWhat Query ';' {
   if (!block_is_const($2)) {
-    FAIL(@$, "Module metadata must be constant");
+    FAIL(@2, "Module metadata must be constant");
     $$ = gen_noop();
     block_free($1);
     block_free($2);
   } else if (block_const_kind($2) != JV_KIND_OBJECT) {
-    FAIL(@$, "Module metadata must be an object");
+    FAIL(@2, "Module metadata must be an object");
     $$ = gen_noop();
     block_free($1);
     block_free($2);
@@ -515,13 +438,13 @@ ImportWhat Exp ';' {
 }
 
 ImportWhat:
-"import" ImportFrom "as" '$' IDENT {
+"import" ImportFrom "as" BINDING {
   jv v = block_const($2);
   // XXX Make gen_import take only blocks and the int is_data so we
   // don't have to free so much stuff here
-  $$ = gen_import(jv_string_value(v), jv_string_value($5), 1);
+  $$ = gen_import(jv_string_value(v), jv_string_value($4), 1);
   block_free($2);
-  jv_free($5);
+  jv_free($4);
   jv_free(v);
 } |
 "import" ImportFrom "as" IDENT {
@@ -541,7 +464,7 @@ ImportWhat:
 ImportFrom:
 String {
   if (!block_is_const($1)) {
-    FAIL(@$, "Import path must be constant");
+    FAIL(@1, "Import path must be constant");
     $$ = gen_const(jv_string(""));
     block_free($1);
   } else {
@@ -550,12 +473,12 @@ String {
 }
 
 FuncDef:
-"def" IDENT ':' Exp ';' {
+"def" IDENT ':' Query ';' {
   $$ = gen_function(jv_string_value($2), gen_noop(), $4);
   jv_free($2);
 } |
 
-"def" IDENT '(' Params ')' ':' Exp ';' {
+"def" IDENT '(' Params ')' ':' Query ';' {
   $$ = gen_function(jv_string_value($2), $4, $7);
   jv_free($2);
 }
@@ -569,26 +492,30 @@ Params ';' Param {
 }
 
 Param:
-'$' IDENT {
-  $$ = gen_param_regular(jv_string_value($2));
-  jv_free($2);
+BINDING {
+  $$ = gen_param_regular(jv_string_value($1));
+  jv_free($1);
 } |
-
 IDENT {
   $$ = gen_param(jv_string_value($1));
   jv_free($1);
 }
 
 
-String:
-QQSTRING_START { $<literal>$ = jv_string("text"); } QQString QQSTRING_END {
-  $$ = $3;
-  jv_free($<literal>2);
+StringStart:
+FORMAT QQSTRING_START {
+  $$ = $1;
 } |
-FORMAT QQSTRING_START { $<literal>$ = $1; } QQString QQSTRING_END {
-  $$ = $4;
-  jv_free($<literal>3);
+QQSTRING_START {
+  $$ = jv_string("text");
 }
+
+
+String:
+StringStart QQString QQSTRING_END {
+  $$ = $2;
+  jv_free($1);
+};
 
 
 QQString:
@@ -598,28 +525,20 @@ QQString:
 QQString QQSTRING_TEXT {
   $$ = gen_binop($1, gen_const($2), '+');
 } |
-QQString QQSTRING_INTERP_START Exp QQSTRING_INTERP_END {
+QQString QQSTRING_INTERP_START Query QQSTRING_INTERP_END {
   $$ = gen_binop($1, gen_format($3, jv_copy($<literal>0)), '+');
 }
 
 
 ElseBody:
-"elif" Exp "then" Exp ElseBody {
+"elif" Query "then" Query ElseBody {
   $$ = gen_cond($2, $4, $5);
 } |
-"else" Exp "end" {
+"else" Query "end" {
   $$ = $2;
-}
-
-ExpD:
-ExpD '|' ExpD {
-  $$ = block_join($1, $3);
 } |
-'-' ExpD {
-  $$ = BLOCK($2, gen_call("_negate", gen_noop()));
-} |
-Term {
-  $$ = $1;
+"end" {
+  $$ = gen_noop();
 }
 
 
@@ -630,13 +549,13 @@ Term:
 REC {
   $$ = gen_call("recurse", gen_noop());
 } |
-BREAK '$' IDENT {
-  jv v = jv_string_fmt("*label-%s", jv_string_value($3));     // impossible symbol
+BREAK BINDING {
+  jv v = jv_string_fmt("*label-%s", jv_string_value($2));     // impossible symbol
   $$ = gen_location(@$, locations,
                     BLOCK(gen_op_unbound(LOADV, jv_string_value(v)),
                     gen_call("error", gen_noop())));
   jv_free(v);
-  jv_free($3);
+  jv_free($2);
 } |
 BREAK error {
   FAIL(@$, "break requires a label to break to");
@@ -676,11 +595,17 @@ Term '.' String %prec NONOPT {
   $$ = gen_noop();
 } |
 /* FIXME: string literals */
-Term '[' Exp ']' '?' {
+Term '[' Query ']' '?' {
   $$ = gen_index_opt($1, $3);
 } |
-Term '[' Exp ']' %prec NONOPT {
+Term '[' Query ']' %prec NONOPT {
   $$ = gen_index($1, $3);
+} |
+Term '.' '[' Query ']' '?' {
+  $$ = gen_index_opt($1, $4);
+} |
+Term '.' '[' Query ']' %prec NONOPT {
+  $$ = gen_index($1, $4);
 } |
 Term '[' ']' '?' {
   $$ = block_join($1, gen_op_simple(EACH_OPT));
@@ -688,23 +613,32 @@ Term '[' ']' '?' {
 Term '[' ']' %prec NONOPT {
   $$ = block_join($1, gen_op_simple(EACH));
 } |
-Term '[' Exp ':' Exp ']' '?' {
+Term '.' '[' ']' '?' {
+  $$ = block_join($1, gen_op_simple(EACH_OPT));
+} |
+Term '.' '[' ']' %prec NONOPT {
+  $$ = block_join($1, gen_op_simple(EACH));
+} |
+Term '[' Query ':' Query ']' '?' {
   $$ = gen_slice_index($1, $3, $5, INDEX_OPT);
 } |
-Term '[' Exp ':' ']' '?' {
+Term '[' Query ':' ']' '?' {
   $$ = gen_slice_index($1, $3, gen_const(jv_null()), INDEX_OPT);
 } |
-Term '[' ':' Exp ']' '?' {
+Term '[' ':' Query ']' '?' {
   $$ = gen_slice_index($1, gen_const(jv_null()), $4, INDEX_OPT);
 } |
-Term '[' Exp ':' Exp ']' %prec NONOPT {
+Term '[' Query ':' Query ']' %prec NONOPT {
   $$ = gen_slice_index($1, $3, $5, INDEX);
 } |
-Term '[' Exp ':' ']' %prec NONOPT {
+Term '[' Query ':' ']' %prec NONOPT {
   $$ = gen_slice_index($1, $3, gen_const(jv_null()), INDEX);
 } |
-Term '[' ':' Exp ']' %prec NONOPT {
+Term '[' ':' Query ']' %prec NONOPT {
   $$ = gen_slice_index($1, gen_const(jv_null()), $4, INDEX);
+} |
+Term '?' {
+  $$ = gen_try($1, gen_op_simple(BACKTRACK));
 } |
 LITERAL {
   $$ = gen_const($1);
@@ -715,29 +649,76 @@ String {
 FORMAT {
   $$ = gen_format(gen_noop(), $1);
 } |
-'(' Exp ')' {
+'-' Term {
+  $$ = BLOCK($2, gen_call("_negate", gen_noop()));
+} |
+'(' Query ')' {
   $$ = $2;
 } |
-'[' Exp ']' {
+'[' Query ']' {
   $$ = gen_collect($2);
 } |
 '[' ']' {
   $$ = gen_const(jv_array());
 } |
-'{' MkDict '}' {
+'{' DictPairs '}' {
   block o = gen_const_object($2);
   if (o.first != NULL)
     $$ = o;
   else
     $$ = BLOCK(gen_subexp(gen_const(jv_object())), $2, gen_op_simple(POP));
 } |
-'$' LOC {
-  $$ = gen_const(JV_OBJECT(jv_string("file"), jv_copy(locations->fname),
-                           jv_string("line"), jv_number(locfile_get_line(locations, @$.start) + 1)));
+"reduce" Expr "as" Patterns '(' Query ';' Query ')' {
+  $$ = gen_reduce($2, $4, $6, $8);
 } |
-'$' IDENT {
-  $$ = gen_location(@$, locations, gen_op_unbound(LOADV, jv_string_value($2)));
-  jv_free($2);
+"foreach" Expr "as" Patterns '(' Query ';' Query ';' Query ')' {
+  $$ = gen_foreach($2, $4, $6, $8, $10);
+} |
+"foreach" Expr "as" Patterns '(' Query ';' Query ')' {
+  $$ = gen_foreach($2, $4, $6, $8, gen_noop());
+} |
+"if" Query "then" Query ElseBody {
+  $$ = gen_cond($2, $4, $5);
+} |
+"if" Query "then" error {
+  FAIL(@$, "Possibly unterminated 'if' statement");
+  $$ = $2;
+} |
+"try" Expr "catch" Expr {
+  $$ = gen_try($2, $4);
+} |
+"try" Expr "catch" error {
+  FAIL(@$, "Possibly unterminated 'try' statement");
+  $$ = $2;
+} |
+"try" Expr {
+  $$ = gen_try($2, gen_op_simple(BACKTRACK));
+} |
+/*
+ * This `$$$$varname` hack is strictly private to jq builtins.  DO NOT USE!!
+ *
+ * This is used in `_modify`, in src/builtin.jq, to avoid holding on to a
+ * reference to `.`.
+ *
+ * We could just have the compiler emit bytecode for `_modify` so it can use
+ * LOADVN w/o needing jq syntax for LOADVN.
+ *
+ * This syntax, `$$$$varname`, violates referential transparency: it has
+ * side-effects that are surprising.
+ *
+ * DO NOT USE!!  I will break your jq code if you do use this outside
+ * src/builtin.jq.
+ */
+'$' '$' '$' BINDING {
+  $$ = gen_location(@$, locations, gen_op_unbound(LOADVN, jv_string_value($4)));
+  jv_free($4);
+} |
+BINDING {
+  $$ = gen_location(@$, locations, gen_op_unbound(LOADV, jv_string_value($1)));
+  jv_free($1);
+} |
+"$__loc__" {
+  $$ = gen_loc_object(&@$, locations);
 } |
 IDENT {
   const char *s = jv_string_value($1);
@@ -770,7 +751,7 @@ Args ';' Arg {
 }
 
 Arg:
-Exp {
+Query {
   $$ = gen_lambda($1);
 }
 
@@ -791,9 +772,9 @@ Pattern {
 }
 
 Pattern:
-'$' IDENT {
-  $$ = gen_op_unbound(STOREV, jv_string_value($2));
-  jv_free($2);
+BINDING {
+  $$ = gen_op_unbound(STOREV, jv_string_value($1));
+  jv_free($1);
 } |
 '[' ArrayPats ']' {
   $$ = BLOCK($2, gen_op_simple(POP));
@@ -819,11 +800,11 @@ ObjPats ',' ObjPat {
 }
 
 ObjPat:
-'$' IDENT {
-  $$ = gen_object_matcher(gen_const($2), gen_op_unbound(STOREV, jv_string_value($2)));
+BINDING {
+  $$ = gen_object_matcher(gen_const($1), gen_op_unbound(STOREV, jv_string_value($1)));
 } |
-'$' IDENT ':' Pattern {
-  $$ = gen_object_matcher(gen_const($2), BLOCK(gen_op_simple(DUP), gen_op_unbound(STOREV, jv_string_value($2)), $4));
+BINDING ':' Pattern {
+  $$ = gen_object_matcher(gen_const($1), BLOCK(gen_op_simple(DUP), gen_op_unbound(STOREV, jv_string_value($1)), $3));
 } |
 IDENT ':' Pattern {
   $$ = gen_object_matcher(gen_const($1), $3);
@@ -834,10 +815,10 @@ Keyword ':' Pattern {
 String ':' Pattern {
   $$ = gen_object_matcher($1, $3);
 } |
-'(' Exp ')' ':' Pattern {
+'(' Query ')' ':' Pattern {
   jv msg = check_object_key($2);
   if (jv_is_valid(msg)) {
-    FAIL(@$, jv_string_value(msg));
+    FAIL(@2, jv_string_value(msg));
   }
   jv_free(msg);
   $$ = gen_object_matcher($2, $5);
@@ -901,53 +882,75 @@ Keyword:
 } |
 "break" {
   $$ = jv_string("break");
-} |
-"__loc__" {
-  $$ = jv_string("__loc__");
 }
 
-MkDict:
-%empty {
-  $$=gen_noop();
-} |
- MkDictPair { $$ = $1; }
-| MkDictPair ',' MkDict { $$=block_join($1, $3); }
-| error ',' MkDict { $$ = $3; }
 
-MkDictPair:
-IDENT ':' ExpD {
+DictPairs:
+%empty {
+  $$ = gen_noop();
+} |
+DictPair {
+  $$ = $1;
+} |
+DictPair ',' DictPairs {
+  $$ = block_join($1, $3);
+}
+
+DictPair:
+IDENT ':' DictExpr {
   $$ = gen_dictpair(gen_const($1), $3);
- }
-| Keyword ':' ExpD {
+} |
+Keyword ':' DictExpr {
   $$ = gen_dictpair(gen_const($1), $3);
-  }
-| String ':' ExpD {
+} |
+String ':' DictExpr {
   $$ = gen_dictpair($1, $3);
-  }
-| String {
+} |
+String {
   $$ = gen_dictpair($1, BLOCK(gen_op_simple(POP), gen_op_simple(DUP2),
                               gen_op_simple(DUP2), gen_op_simple(INDEX)));
-  }
-| '$' IDENT {
-  $$ = gen_dictpair(gen_const($2),
-                    gen_location(@$, locations, gen_op_unbound(LOADV, jv_string_value($2))));
-  }
-| IDENT {
+} |
+BINDING ':' DictExpr {
+  $$ = gen_dictpair(gen_location(@$, locations, gen_op_unbound(LOADV, jv_string_value($1))),
+                    $3);
+  jv_free($1);
+} |
+BINDING {
+  $$ = gen_dictpair(gen_const($1),
+                    gen_location(@$, locations, gen_op_unbound(LOADV, jv_string_value($1))));
+} |
+IDENT {
   $$ = gen_dictpair(gen_const(jv_copy($1)),
                     gen_index(gen_noop(), gen_const($1)));
-  }
-| '(' Exp ')' ':' ExpD {
+} |
+"$__loc__" {
+  $$ = gen_dictpair(gen_const(jv_string("__loc__")),
+                    gen_loc_object(&@$, locations));
+} |
+Keyword {
+  $$ = gen_dictpair(gen_const(jv_copy($1)),
+                    gen_index(gen_noop(), gen_const($1)));
+} |
+'(' Query ')' ':' DictExpr {
   jv msg = check_object_key($2);
   if (jv_is_valid(msg)) {
-    FAIL(@$, jv_string_value(msg));
+    FAIL(@2, jv_string_value(msg));
   }
   jv_free(msg);
   $$ = gen_dictpair($2, $5);
-  }
-| error ':' ExpD {
-  FAIL(@$, "May need parentheses around object key expression");
+} |
+error ':' DictExpr {
+  FAIL(@1, "May need parentheses around object key expression");
   $$ = $3;
-  }
+}
+
+DictExpr:
+DictExpr '|' DictExpr {
+  $$ = block_join($1, $3);
+} |
+Expr {
+  $$ = $1;
+}
 %%
 
 int jq_parse(struct locfile* locations, block* answer) {

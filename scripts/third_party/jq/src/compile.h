@@ -16,13 +16,13 @@ typedef struct block {
 
 block gen_location(location, struct locfile*, block);
 
-block gen_noop();
+block gen_noop(void);
 int block_is_noop(block b);
 block gen_op_simple(opcode op);
+block gen_error(jv constant);
 block gen_const(jv constant);
 block gen_const_global(jv constant, const char *name);
 int block_is_const(block b);
-int block_is_const_inf(block b);
 jv_kind block_const_kind(block b);
 jv block_const(block b);
 block gen_op_target(opcode op, block target);
@@ -59,7 +59,6 @@ block gen_destructure(block var, block matcher, block body);
 block gen_destructure_alt(block matcher);
 
 block gen_cond(block cond, block iftrue, block iffalse);
-block gen_try_handler(block handler);
 block gen_try(block exp, block handler);
 block gen_label(const char *label, block exp);
 
@@ -72,9 +71,9 @@ int block_has_only_binders(block, int bindflags);
 int block_has_main(block);
 int block_is_funcdef(block b);
 int block_is_single(block b);
-block block_bind(block binder, block body, int bindflags);
 block block_bind_library(block binder, block body, int bindflags, const char* libname);
 block block_bind_referenced(block binder, block body, int bindflags);
+block block_bind_self(block binder, int bindflags);
 block block_drop_unreferenced(block body);
 
 jv block_take_imports(block* body);
@@ -87,7 +86,7 @@ void block_free(block);
 
 
 // Here's some horrible preprocessor gunk so that code
-// sequences can be contructed as BLOCK(block1, block2, block3)
+// sequences can be constructed as BLOCK(block1, block2, block3)
 
 #define BLOCK_1(b1) (b1)
 #define BLOCK_2(b1,b2) (block_join((b1),(b2)))

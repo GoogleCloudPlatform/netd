@@ -46,7 +46,7 @@ DBG ?=
 
 # Third party binary dependencies.
 CURL_VERSION ?= 8.4.0
-JQ_VERSION ?= 1.6
+JQ_VERSION ?= 1.8.1
 TOYBOX_VERSION ?= 0.8.9
 SPDX_LICENSE_VERSION ?= 3.18
 

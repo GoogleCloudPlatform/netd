@@ -11,7 +11,7 @@
 typedef const char* presult;
 
 #ifndef MAX_PARSING_DEPTH
-#define MAX_PARSING_DEPTH (256)
+#define MAX_PARSING_DEPTH (10000)
 #endif
 
 #define TRY(x) do {presult msg__ = (x); if (msg__) return msg__; } while(0)
@@ -124,14 +124,19 @@ static void parser_free(struct jv_parser* p) {
 
 static pfunc value(struct jv_parser* p, jv val) {
   if ((p->flags & JV_PARSE_STREAMING)) {
-    if (jv_is_valid(p->next) || p->last_seen == JV_LAST_VALUE)
+    if (jv_is_valid(p->next) || p->last_seen == JV_LAST_VALUE) {
+      jv_free(val);
       return "Expected separator between values";
+    }
     if (p->stacklen > 0)
       p->last_seen = JV_LAST_VALUE;
     else
       p->last_seen = JV_LAST_NONE;
   } else {
-    if (jv_is_valid(p->next)) return "Expected separator between values";
+    if (jv_is_valid(p->next)) {
+      jv_free(val);
+      return "Expected separator between values";
+    }
   }
   jv_free(p->next);
   p->next = val;
@@ -241,6 +246,17 @@ static pfunc stream_token(struct jv_parser* p, char ch) {
   case '[':
     if (jv_is_valid(p->next))
       return "Expected a separator between values";
+    if (p->last_seen == JV_LAST_OPEN_OBJECT)
+      // Looks like {["foo"]}
+      return "Expected string key after '{', not '['";
+    if (p->last_seen == JV_LAST_COMMA) {
+      last = jv_array_get(jv_copy(p->path), p->stacklen - 1);
+      k = jv_get_kind(last);
+      jv_free(last);
+      if (k != JV_KIND_NUMBER)
+        // Looks like {"x":"y",["foo"]}
+        return "Expected string key after ',' in object, not '['";
+    }
     p->path = jv_array_append(p->path, jv_number(0)); // push
     p->last_seen = JV_LAST_OPEN_ARRAY;
     p->stacklen++;
@@ -249,6 +265,17 @@ static pfunc stream_token(struct jv_parser* p, char ch) {
   case '{':
     if (p->last_seen == JV_LAST_VALUE)
       return "Expected a separator between values";
+    if (p->last_seen == JV_LAST_OPEN_OBJECT)
+      // Looks like {{"foo":"bar"}}
+      return "Expected string key after '{', not '{'";
+    if (p->last_seen == JV_LAST_COMMA) {
+      last = jv_array_get(jv_copy(p->path), p->stacklen - 1);
+      k = jv_get_kind(last);
+      jv_free(last);
+      if (k != JV_KIND_NUMBER)
+        // Looks like {"x":"y",{"foo":"bar"}}
+        return "Expected string key after ',' in object, not '{'";
+    }
     // Push object key: null, since we don't know it yet
     p->path = jv_array_append(p->path, jv_null()); // push
     p->last_seen = JV_LAST_OPEN_OBJECT;
@@ -256,8 +283,12 @@ static pfunc stream_token(struct jv_parser* p, char ch) {
     break;
 
   case ':':
-    if (p->stacklen == 0 || jv_get_kind(jv_array_get(jv_copy(p->path), p->stacklen - 1)) == JV_KIND_NUMBER)
+    last = jv_invalid();
+    if (p->stacklen == 0 || jv_get_kind(last = jv_array_get(jv_copy(p->path), p->stacklen - 1)) == JV_KIND_NUMBER) {
+      jv_free(last);
       return "':' not as part of an object";
+    }
+    jv_free(last);
     if (!jv_is_valid(p->next) || p->last_seen == JV_LAST_NONE)
       return "Expected string key before ':'";
     if (jv_get_kind(p->next) != JV_KIND_STRING)
@@ -290,7 +321,7 @@ static pfunc stream_token(struct jv_parser* p, char ch) {
         p->output = JV_ARRAY(jv_copy(p->path), p->next);
         p->next = jv_invalid();
       }
-      p->path = jv_array_set(p->path, p->stacklen - 1, jv_true()); // ready for another name:value pair
+      p->path = jv_array_set(p->path, p->stacklen - 1, jv_null()); // ready for another key:value pair
       p->last_seen = JV_LAST_COMMA;
     } else {
       assert(k == JV_KIND_NULL);
@@ -462,7 +493,7 @@ static pfunc found_string(struct jv_parser* p) {
         return "Invalid escape";
       }
     } else {
-      if (c > 0 && c < 0x001f)
+      if (!(c & ~0x1F))
         return "Invalid string: control characters from U+0000 through U+001F must be escaped";
       *out++ = c;
     }
@@ -481,7 +512,13 @@ static pfunc check_literal(struct jv_parser* p) {
   switch (p->tokenbuf[0]) {
   case 't': pattern = "true"; plen = 4; v = jv_true(); break;
   case 'f': pattern = "false"; plen = 5; v = jv_false(); break;
-  case 'n': pattern = "null"; plen = 4; v = jv_null(); break;
+  case '\'':
+    return "Invalid string literal; expected \", but got '";
+  case 'n':
+    // if it starts with 'n', it could be a literal "nan"
+    if (p->tokenpos > 1 && p->tokenbuf[1] == 'u') {
+      pattern = "null"; plen = 4; v = jv_null();
+    }
   }
   if (pattern) {
     if (p->tokenpos != plen) return "Invalid literal";
@@ -492,11 +529,20 @@ static pfunc check_literal(struct jv_parser* p) {
   } else {
     // FIXME: better parser
     p->tokenbuf[p->tokenpos] = 0;
-    char* end = 0;
-    double d = jvp_strtod(&p->dtoa, p->tokenbuf, &end);
-    if (end == 0 || *end != 0)
+#ifdef USE_DECNUM
+    jv number = jv_number_with_literal(p->tokenbuf);
+    if (jv_get_kind(number) == JV_KIND_INVALID) {
       return "Invalid numeric literal";
+    }
+    TRY(value(p, number));
+#else
+    char *end = 0;
+    double d = jvp_strtod(&p->dtoa, p->tokenbuf, &end);
+    if (end == 0 || *end != 0) {
+      return "Invalid numeric literal";
+    }
     TRY(value(p, jv_number(d)));
+#endif
   }
   p->tokenpos = 0;
   return 0;
@@ -566,11 +612,11 @@ static int stream_check_done(struct jv_parser* p, jv* out) {
   }
 }
 
-static int parse_check_truncation(struct jv_parser* p) {
-  return ((p->flags & JV_PARSE_SEQ) && !p->last_ch_was_ws && (p->stackpos > 0 || p->tokenpos > 0 || jv_get_kind(p->next) == JV_KIND_NUMBER));
+static int seq_check_truncation(struct jv_parser* p) {
+  return (!p->last_ch_was_ws && (p->stackpos > 0 || p->tokenpos > 0 || jv_get_kind(p->next) == JV_KIND_NUMBER));
 }
 
-static int stream_check_truncation(struct jv_parser* p) {
+static int stream_seq_check_truncation(struct jv_parser* p) {
   jv_kind k = jv_get_kind(p->next);
   return (p->stacklen > 0 || k == JV_KIND_NUMBER || k == JV_KIND_TRUE || k == JV_KIND_FALSE || k == JV_KIND_NULL);
 }
@@ -590,7 +636,7 @@ static int stream_is_top_num(struct jv_parser* p) {
    (((p)->flags & JV_PARSE_STREAMING) ? stream_token((p), (ch)) : parse_token((p), (ch)))
 
 #define check_truncation(p) \
-   (((p)->flags & JV_PARSE_STREAMING) ? stream_check_truncation((p)) : parse_check_truncation((p)))
+   (((p)->flags & JV_PARSE_STREAMING) ? stream_seq_check_truncation((p)) : seq_check_truncation((p)))
 
 #define is_top_num(p) \
    (((p)->flags & JV_PARSE_STREAMING) ? stream_is_top_num((p)) : parse_is_top_num((p)))
@@ -601,7 +647,8 @@ static pfunc scan(struct jv_parser* p, char ch, jv* out) {
     p->line++;
     p->column = 0;
   }
-  if (ch == '\036' /* ASCII RS; see draft-ietf-json-sequence-07 */) {
+  if ((p->flags & JV_PARSE_SEQ)
+      && ch == '\036' /* ASCII RS; see draft-ietf-json-sequence-07 */) {
     if (check_truncation(p)) {
       if (check_literal(p) == 0 && is_top_num(p))
         return "Potentially truncated top-level numeric value";
@@ -814,9 +861,9 @@ jv jv_parser_next(struct jv_parser* p) {
   }
 }
 
-jv jv_parse_sized(const char* string, int length) {
+jv jv_parse_sized_custom_flags(const char* string, int length, int flags) {
   struct jv_parser parser;
-  parser_init(&parser, 0);
+  parser_init(&parser, flags);
   jv_parser_set_buf(&parser, string, length, 0);
   jv value = jv_parser_next(&parser);
   if (jv_is_valid(value)) {
@@ -853,6 +900,14 @@ jv jv_parse_sized(const char* string, int length) {
   return value;
 }
 
+jv jv_parse_sized(const char* string, int length) {
+  return jv_parse_sized_custom_flags(string, length, 0);
+}
+
 jv jv_parse(const char* string) {
   return jv_parse_sized(string, strlen(string));
+}
+
+jv jv_parse_custom_flags(const char* string, int flags) {
+  return jv_parse_sized_custom_flags(string, strlen(string), flags);
 }

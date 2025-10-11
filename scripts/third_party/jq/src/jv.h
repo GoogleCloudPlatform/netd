@@ -5,6 +5,17 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#if (defined(__GNUC__) && __GNUC__ >= 7) || \
+    (defined(__clang__) && __clang_major__ >= 10)
+# define JQ_FALLTHROUGH __attribute__((fallthrough))
+#else
+# define JQ_FALLTHROUGH do {} while (0) /* fallthrough */
+#endif
+
 typedef enum {
   JV_KIND_INVALID,
   JV_KIND_NULL,
@@ -54,15 +65,20 @@ jv jv_invalid_with_msg(jv);
 jv jv_invalid_get_msg(jv);
 int jv_invalid_has_msg(jv);
 
-
 jv jv_null(void);
 jv jv_true(void);
 jv jv_false(void);
 jv jv_bool(int);
 
 jv jv_number(double);
+jv jv_number_with_literal(const char*);
 double jv_number_value(jv);
 int jv_is_integer(jv);
+jv jv_number_abs(jv);
+jv jv_number_negate(jv);
+
+int jv_number_has_literal(jv);
+const char* jv_number_get_literal(jv);
 
 jv jv_array(void);
 jv jv_array_sized(int);
@@ -99,6 +115,9 @@ jv jv_array_indexes(jv, jv);
   __attribute__ ((__format__( __printf__, fmt_arg_num, args_num)))
 #define JV_VPRINTF_LIKE(fmt_arg_num) \
   __attribute__ ((__format__( __printf__, fmt_arg_num, 0)))
+#else
+#define JV_PRINTF_LIKE(fmt_arg_num, args_num)
+#define JV_VPRINTF_LIKE(fmt_arg_num)
 #endif
 
 
@@ -117,6 +136,7 @@ jv jv_string_fmt(const char*, ...) JV_PRINTF_LIKE(1, 2);
 jv jv_string_append_codepoint(jv a, uint32_t c);
 jv jv_string_append_buf(jv a, const char* buf, int len);
 jv jv_string_append_str(jv a, const char* str);
+jv jv_string_repeat(jv j, int n);
 jv jv_string_split(jv j, jv sep);
 jv jv_string_explode(jv j);
 jv jv_string_implode(jv j);
@@ -209,7 +229,7 @@ enum jv_print_flags {
   JV_PRINT_SPACE2   = 1024,
 };
 #define JV_PRINT_INDENT_FLAGS(n) \
-    ((n) < 0 || (n) > 7 ? JV_PRINT_TAB | JV_PRINT_PRETTY : (n) == 0 ? 0 : (n) << 8 | JV_PRINT_PRETTY)
+    ((n) < 0 || (n) > 7 ? JV_PRINT_TAB | JV_PRINT_PRETTY : (n) << 8 | JV_PRINT_PRETTY)
 void jv_dumpf(jv, FILE *f, int flags);
 void jv_dump(jv, int flags);
 void jv_show(jv, int flags);
@@ -224,6 +244,7 @@ enum {
 
 jv jv_parse(const char* string);
 jv jv_parse_sized(const char* string, int length);
+jv jv_parse_custom_flags(const char* string, int flags);
 
 typedef void (*jv_nomem_handler_f)(void *);
 void jv_nomem_handler(jv_nomem_handler_f, void *);
@@ -246,9 +267,13 @@ jv jv_delpaths(jv, jv);
 jv jv_keys(jv /*object or array*/);
 jv jv_keys_unsorted(jv /*object or array*/);
 int jv_cmp(jv, jv);
-jv jv_group(jv, jv);
 jv jv_sort(jv, jv);
+jv jv_group(jv, jv);
+jv jv_unique(jv, jv);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

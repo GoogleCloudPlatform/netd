@@ -46,11 +46,11 @@ DBG ?=
 
 # Third party binary dependencies.
 CURL_VERSION ?= 8.4.0
-JQ_VERSION ?= 1.6
+JQ_VERSION ?= 1.8.1
 TOYBOX_VERSION ?= 0.8.9
 SPDX_LICENSE_VERSION ?= 3.18
 
-THIRD_PARTY_SOURCE_FILES = third_party/curl status.d/curl third_party/jq status.d/jq third_party/toybox status.d/toybox third_party/license-list-data
+THIRD_PARTY_SOURCE_FILES = third_party/curl/configure status.d/curl third_party/jq/configure status.d/jq third_party/toybox/configure status.d/toybox third_party/license-list-data
 
 ###
 ### These variables should not need tweaking.
@@ -232,21 +232,29 @@ $(LICENSES): ../LICENSE third_party/curl third_party/jq third_party/toybox | $(B
 
 GIT_BASE ?= https://github.com
 
+third_party/curl/configure: third_party/curl
+	pushd $<; autoreconf -fi; popd
+
 third_party/curl:
 	git clone $(GIT_BASE)/curl/curl $@
-	pushd $@; git checkout curl-$(subst .,_,$(CURL_VERSION)); autoreconf -fi; popd
+	pushd $@; git checkout curl-$(subst .,_,$(CURL_VERSION)); rm -rf .git; popd
+
+third_party/jq/configure: third_party/jq
+	pushd $<; autoreconf -fi; popd
 
 third_party/jq:
-	git clone $(GIT_BASE)/stedolan/jq $@
-	pushd $@; git checkout jq-$(JQ_VERSION); autoreconf -fi; popd
+	git clone $(GIT_BASE)/jqlang/jq $@
+	pushd $@; git checkout jq-$(JQ_VERSION); rm -rf .git; find . -type d -empty -exec touch {}/.gitkeep \;; popd
+
+third_party/toybox/configure: third_party/toybox
 
 third_party/toybox:
 	git clone $(GIT_BASE)/landley/toybox $@
-	pushd $@; git checkout $(TOYBOX_VERSION); popd
+	pushd $@; git checkout $(TOYBOX_VERSION); rm -rf .git; popd
 
 third_party/license-list-data:
 	git clone $(GIT_BASE)/spdx/license-list-data $@
-	pushd $@; git checkout v$(SPDX_LICENSE_VERSION); popd
+	pushd $@; git checkout v$(SPDX_LICENSE_VERSION); rm -rf .git; popd
 
 status.d/%:
 	mkdir -p status.d

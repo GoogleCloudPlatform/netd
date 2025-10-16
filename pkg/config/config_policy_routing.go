@@ -80,7 +80,6 @@ var (
 	localNetdev      string
 	loopbackDst      net.IPNet
 	linkLocalNet     net.IPNet
-	vethGatewayDst   net.IPNet
 )
 
 var (
@@ -263,9 +262,11 @@ func InitPolicyRouting(ctx context.Context, clientset kubernetes.Interface, node
 func fillLocalRulesFromNode(ctx context.Context, clientset kubernetes.Interface, nodeName string) error {
 	// Retrieve necessary IP info from the node object.
 	var node *v1.Node
-	if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 60*time.Second, true, func(ctx context.Context) (bool, error) {
 		var err error
-		node, err = clientset.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+		ctxWithTimeout, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+		node, err = clientset.CoreV1().Nodes().Get(ctxWithTimeout, nodeName, metav1.GetOptions{})
 		if err != nil {
 			glog.Errorf("Failed to get node %s: %v", nodeName, err)
 			return false, nil
@@ -275,48 +276,58 @@ func fillLocalRulesFromNode(ctx context.Context, clientset kubernetes.Interface,
 		return err
 	}
 
-	nodeInternalIPs := []net.IP{}
+	var hasNodeInternalIPv4, hasNodeInternalIPv6 bool
 	for _, address := range node.Status.Addresses {
-		if !netutils.IsIPv4String(address.Address) ||
-			address.Type != v1.NodeInternalIP {
+		if address.Type != v1.NodeInternalIP {
 			continue
 		}
-		nodeInternalIPs = append(nodeInternalIPs, net.ParseIP(address.Address))
-	}
-	if len(nodeInternalIPs) == 0 {
-		return fmt.Errorf("no InternalIP found in node %s", nodeName)
-	}
-	for _, ip := range nodeInternalIPs {
-		ipDst := net.IPNet{
-			IP:   ip,
-			Mask: net.CIDRMask(32, 32),
+		// Add local rule only for IPv4 node addresses.
+		if netutils.IsIPv4String(address.Address) {
+			ipDst := net.IPNet{
+				IP:   net.ParseIP(address.Address),
+				Mask: net.CIDRMask(32, 32),
+			}
+			LocalTableRuleConfigs = append(LocalTableRuleConfigs,
+				newLocalTableRuleConfig(ipDst))
+			hasNodeInternalIPv4 = true
+		} else if netutils.IsIPv6String(address.Address) {
+			hasNodeInternalIPv6 = true
 		}
-		LocalTableRuleConfigs = append(LocalTableRuleConfigs,
-			newNodeInternalIPRuleConfig(ipDst))
+	}
+	// Don't fail for IPv6 single stack.
+	if !hasNodeInternalIPv4 && !hasNodeInternalIPv6 {
+		return fmt.Errorf("no InternalIP (v4 or v6) found in node %s", nodeName)
 	}
 
-	var vethGatewayIP net.IP
+	var hasPodCIDRIPv4, hasPodCIDRIPv6 bool
 	podCIDRs, err := nodeinfo.GetPodCIDRs(node)
 	if err != nil {
 		return err
 	}
 	for _, podCIDR := range podCIDRs {
-		if !netutils.IsIPv4CIDRString(podCIDR) {
-			continue
+		// Add local rule only for IPv4 pod CIDRs.
+		if netutils.IsIPv4CIDRString(podCIDR) {
+			vethGatewayIP, _, err := net.ParseCIDR(podCIDR)
+			if err != nil {
+				return fmt.Errorf("parse podCIDR %s: %w", podCIDR, err)
+			}
+			vethGatewayDst := net.IPNet{
+				// vethGateway is the first usable IP from Pod CIDR.
+				IP:   ip.NextIP(vethGatewayIP),
+				Mask: net.CIDRMask(32, 32),
+			}
+			LocalTableRuleConfigs = append(LocalTableRuleConfigs,
+				newLocalTableRuleConfig(vethGatewayDst))
+			hasPodCIDRIPv4 = true
+		} else if netutils.IsIPv6CIDRString(podCIDR) {
+			hasPodCIDRIPv6 = true
 		}
-		vethGatewayIP, _, err = net.ParseCIDR(podCIDR)
-		if err != nil {
-			return fmt.Errorf("parse podCIDR %s: %w", podCIDR, err)
-		}
 	}
-	if vethGatewayIP == nil {
-		return fmt.Errorf("no PodCIDR found in node %s", nodeName)
+	// Don't fail for IPv6 single stack.
+	if !hasPodCIDRIPv4 && !hasPodCIDRIPv6 {
+		return fmt.Errorf("no PodCIDR (v4 or v6) found in node %s", nodeName)
 	}
-	vethGatewayDst = net.IPNet{
-		// vethGateway is the first usable IP from Pod CIDR.
-		IP:   ip.NextIP(vethGatewayIP),
-		Mask: net.CIDRMask(32, 32),
-	}
+
 	return nil
 }
 
@@ -417,25 +428,9 @@ var LocalTableRuleConfigs = []Config{
 		RuleDel:  netlink.RuleDel,
 		RuleList: netlink.RuleList,
 	},
-	IPRuleConfig{
-		Rule: netlink.Rule{
-			Table:             unix.RT_TABLE_LOCAL,
-			Priority:          localTableRulePriority,
-			Dst:               &vethGatewayDst,
-			SuppressIfgroup:   -1,
-			SuppressPrefixlen: -1,
-			Mark:              -1,
-			Mask:              -1,
-			Goto:              -1,
-			Flow:              -1,
-		},
-		RuleAdd:  netlink.RuleAdd,
-		RuleDel:  netlink.RuleDel,
-		RuleList: netlink.RuleList,
-	},
 }
 
-func newNodeInternalIPRuleConfig(dst net.IPNet) IPRuleConfig {
+func newLocalTableRuleConfig(dst net.IPNet) IPRuleConfig {
 	return IPRuleConfig{
 		Rule: netlink.Rule{
 			Table:             unix.RT_TABLE_LOCAL,

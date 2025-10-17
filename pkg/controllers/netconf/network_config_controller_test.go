@@ -71,10 +71,52 @@ func TestNewNetworkConfigController(t *testing.T) {
 			wantConfigs:   []config.Config{config.ExcludeUDPIPRuleConfig},
 		},
 		{
-			desc:          "higher impacted kernel version",
+			desc:          "last impacted kernel version",
+			kernelVersion: "6.6.93",
+			wantEnabled:   false,
+			wantConfigs:   []config.Config{config.ExcludeUDPIPRuleConfig},
+		},
+		{
+			desc:          "first fixed kernel version",
+			kernelVersion: "6.6.94",
+			wantEnabled:   false,
+			wantConfigs:   []config.Config{},
+		},
+		{
+			desc:          "6.7 kernel version is impacted",
 			kernelVersion: "6.7.0",
 			wantEnabled:   false,
 			wantConfigs:   []config.Config{config.ExcludeUDPIPRuleConfig},
+		},
+		{
+			desc:          "6.12 kernel version is impacted",
+			kernelVersion: "6.12.1",
+			wantEnabled:   false,
+			wantConfigs:   []config.Config{config.ExcludeUDPIPRuleConfig},
+		},
+		{
+			desc:          "6.12 fixed version is not impacted",
+			kernelVersion: "6.12.34",
+			wantEnabled:   false,
+			wantConfigs:   []config.Config{},
+		},
+		{
+			desc:          "6.13 kernel version is impacted",
+			kernelVersion: "6.13.1",
+			wantEnabled:   false,
+			wantConfigs:   []config.Config{config.ExcludeUDPIPRuleConfig},
+		},
+		{
+			desc:          "6.15 kernel version is impacted",
+			kernelVersion: "6.15.1",
+			wantEnabled:   false,
+			wantConfigs:   []config.Config{config.ExcludeUDPIPRuleConfig},
+		},
+		{
+			desc:          "6.15 fixed version is not impacted",
+			kernelVersion: "6.15.3",
+			wantEnabled:   false,
+			wantConfigs:   []config.Config{},
 		},
 		{
 			desc:                  "all enabled with impacted kernel",

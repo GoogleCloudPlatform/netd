@@ -232,15 +232,19 @@ $(LICENSES): ../LICENSE third_party/curl third_party/jq third_party/toybox | $(B
 
 GIT_BASE ?= https://github.com
 
-third_party/curl/configure: third_party/curl
-	pushd $<; autoreconf -fi; popd
+third_party/curl/configure: third_party/curl/configure.ac
+	pushd $$(dirname $@); autoreconf -fi; popd
+
+third_party/curl/configure.ac: third_party/curl
 
 third_party/curl:
 	git clone $(GIT_BASE)/curl/curl $@
 	pushd $@; git checkout curl-$(subst .,_,$(CURL_VERSION)); rm -rf .git; popd
 
-third_party/jq/configure: third_party/jq
-	pushd $<; autoreconf -fi; popd
+third_party/jq/configure: third_party/jq/configure.ac
+	pushd $$(dirname $@); autoreconf -fi; popd
+
+third_party/jq/configure.ac: third_party/jq
 
 third_party/jq:
 	git clone $(GIT_BASE)/jqlang/jq $@

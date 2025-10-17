@@ -196,45 +196,159 @@ func TestFillLocalRulesFromNode(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			desc: "dual-stack: PodCIDRs and InternalIPs",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+				},
+				Spec: v1.NodeSpec{
+					PodCIDRs: []string{"10.124.0.0/16", "fd20:1234:5678:9abc:0:10:0:0/112"},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.128.0.24",
+						},
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "fd20:1234:5678:9abc:0:10::",
+						},
+					},
+				},
+			},
+			wantVethGatewayDsts: []net.IP{
+				net.IPv4(10, 124, 0, 1),
+			},
+			wantNodeInternalIPs: []net.IP{
+				net.IPv4(10, 128, 0, 24),
+			},
+			wantErr: false,
+		},
+		{
+			desc: "dual-stack: PodCIDRs, IPv4 only InternalIP",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+				},
+				Spec: v1.NodeSpec{
+					PodCIDRs: []string{"10.124.0.0/16", "fd20:1234:5678:9abc:0:10:0:0/112"},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.128.0.24",
+						},
+					},
+				},
+			},
+			wantVethGatewayDsts: []net.IP{
+				net.IPv4(10, 124, 0, 1),
+			},
+			wantNodeInternalIPs: []net.IP{
+				net.IPv4(10, 128, 0, 24),
+			},
+			wantErr: false,
+		},
+		{
+			desc: "dual-stack: PodCIDRs, IPv6 only InternalIP",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+				},
+				Spec: v1.NodeSpec{
+					PodCIDRs: []string{"10.124.0.0/16", "fd20:1234:5678:9abc:0:10:0:0/112"},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "fd20:1234:5678:9abc:0:10::",
+						},
+					},
+				},
+			},
+			wantVethGatewayDsts: []net.IP{
+				net.IPv4(10, 124, 0, 1),
+			},
+			wantNodeInternalIPs: []net.IP{},
+			wantErr:             false,
+		},
+		{
+			desc: "dual-stack: IPv4 PodCIDR, dual-stack InternalIPs",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+				},
+				Spec: v1.NodeSpec{
+					PodCIDRs: []string{"10.124.0.0/16"},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.128.0.24",
+						},
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "fd20:1234:5678:9abc:0:10::",
+						},
+					},
+				},
+			},
+			wantVethGatewayDsts: []net.IP{
+				net.IPv4(10, 124, 0, 1),
+			},
+			wantNodeInternalIPs: []net.IP{
+				net.IPv4(10, 128, 0, 24),
+			},
+			wantErr: false,
+		},
 	}
 	originLocalTableRuleConfigs := LocalTableRuleConfigs
 	for _, tc := range testCases {
-		fakeClient := fake.NewSimpleClientset(tc.node)
-		if err := fillLocalRulesFromNode(context.Background(), fakeClient, tc.node.Name); err != nil {
-			if !tc.wantErr {
-				t.Errorf("%q: fillLocalRulesFromNode() error = %v", tc.desc, err)
+		t.Run(tc.desc, func(t *testing.T) {
+			fakeClient := fake.NewSimpleClientset(tc.node)
+			if err := fillLocalRulesFromNode(context.Background(), fakeClient, tc.node.Name); err != nil {
+				if !tc.wantErr {
+					t.Errorf("fillLocalRulesFromNode() error = %v", err)
+				}
+				return
+			} else if tc.wantErr {
+				t.Errorf("fillLocalRulesFromNode() error = nil, wantErr = %v", tc.wantErr)
 			}
-			continue
-		}
 
-		var matchedVethGatewayDsts int
-		for _, vethGatewayDst := range tc.wantVethGatewayDsts {
-			for _, localRule := range LocalTableRuleConfigs {
-				if localRule.(IPRuleConfig).Rule.Dst != nil && vethGatewayDst.Equal(localRule.(IPRuleConfig).Rule.Dst.IP) {
-					matchedVethGatewayDsts++
+			var matchedVethGatewayDsts int
+			for _, vethGatewayDst := range tc.wantVethGatewayDsts {
+				for _, localRule := range LocalTableRuleConfigs {
+					if localRule.(IPRuleConfig).Rule.Dst != nil && vethGatewayDst.Equal(localRule.(IPRuleConfig).Rule.Dst.IP) {
+						matchedVethGatewayDsts++
+					}
 				}
 			}
-		}
-		if matchedVethGatewayDsts != len(tc.wantVethGatewayDsts) {
-			t.Errorf("%q: fillLocalRulesFromNode() matchedVethGatewayDsts = %v, want %v. LocalTableRuleConfigs=%+v", tc.desc,
-				matchedVethGatewayDsts, len(tc.wantVethGatewayDsts), LocalTableRuleConfigs)
-		}
+			if matchedVethGatewayDsts != len(tc.wantVethGatewayDsts) {
+				t.Errorf("fillLocalRulesFromNode() matchedVethGatewayDsts = %v, want %v. LocalTableRuleConfigs=%+v",
+					matchedVethGatewayDsts, len(tc.wantVethGatewayDsts), LocalTableRuleConfigs)
+			}
 
-		var matchedNodeIPs int
-		for _, nodeInternalIP := range tc.wantNodeInternalIPs {
-			for _, localRule := range LocalTableRuleConfigs {
-				if localRule.(IPRuleConfig).Rule.Dst != nil && nodeInternalIP.Equal(localRule.(IPRuleConfig).Rule.Dst.IP) {
-					matchedNodeIPs++
+			var matchedNodeIPs int
+			for _, nodeInternalIP := range tc.wantNodeInternalIPs {
+				for _, localRule := range LocalTableRuleConfigs {
+					if localRule.(IPRuleConfig).Rule.Dst != nil && nodeInternalIP.Equal(localRule.(IPRuleConfig).Rule.Dst.IP) {
+						matchedNodeIPs++
+					}
 				}
 			}
-		}
-		if matchedNodeIPs != len(tc.wantNodeInternalIPs) {
-			t.Errorf("%q: fillLocalRulesFromNode() matchedNodeIPDsts = %v, want %v. LocalTableRuleConfigs=%+v", tc.desc,
-				matchedNodeIPs, len(tc.wantNodeInternalIPs), LocalTableRuleConfigs)
-		}
+			if matchedNodeIPs != len(tc.wantNodeInternalIPs) {
+				t.Errorf("fillLocalRulesFromNode() matchedNodeIPDsts = %v, want %v. LocalTableRuleConfigs=%+v",
+					matchedNodeIPs, len(tc.wantNodeInternalIPs), LocalTableRuleConfigs)
+			}
 
-		// Resetting local configs for testing purpose.
-		LocalTableRuleConfigs = originLocalTableRuleConfigs
+			// Resetting local configs for testing purpose.
+			LocalTableRuleConfigs = originLocalTableRuleConfigs
+		})
 	}
 }
 

@@ -111,7 +111,7 @@ metadata:
   labels:
     addonmanager.kubernetes.io/mode: EnsureExists
 data:
-  metrics_collectors: "conntrack,socket,kernel_metrics"
+  metrics_collectors: "conntrack,socket,kernel_metrics,sysctl_metrics"
   metrics_address: "localhost:10231"
 ---
 

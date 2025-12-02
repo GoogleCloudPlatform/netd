@@ -51,23 +51,23 @@ func NewSysctlCollector() (Collector, error) {
 	}, nil
 }
 
-func parseIPLocalPortRange(content string) (min, max uint64, err error) {
+func parseIPLocalPortRange(content string) (minPort, maxPort uint64, err error) {
 	parts := strings.Fields(strings.TrimSpace(content))
 	if len(parts) != 2 {
 		return 0, 0, fmt.Errorf("invalid ip_local_port_range format: expected 2 values, got %d. Content: %q", len(parts), content)
 	}
 
-	min, err = strconv.ParseUint(parts[0], 10, 64)
+	minPort, err = strconv.ParseUint(parts[0], 10, 64)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to parse min port value: %v", err)
 	}
 
-	max, err = strconv.ParseUint(parts[1], 10, 64)
+	maxPort, err = strconv.ParseUint(parts[1], 10, 64)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to parse max port value: %v", err)
 	}
 
-	return min, max, nil
+	return minPort, maxPort, nil
 }
 
 func (c *sysctlCollector) Update(ch chan<- prometheus.Metric) error {
@@ -76,13 +76,13 @@ func (c *sysctlCollector) Update(ch chan<- prometheus.Metric) error {
 		return fmt.Errorf("failed to read ip_local_port_range from %s: %v", c.ipLocalPortRangeFileLocation, err)
 	}
 
-	min, max, err := parseIPLocalPortRange(string(data))
+	minPort, maxPort, err := parseIPLocalPortRange(string(data))
 	if err != nil {
 		return err
 	}
 
-	ch <- prometheus.MustNewConstMetric(ipLocalPortRangeDesc, prometheus.GaugeValue, float64(min), "min")
-	ch <- prometheus.MustNewConstMetric(ipLocalPortRangeDesc, prometheus.GaugeValue, float64(max), "max")
+	ch <- prometheus.MustNewConstMetric(ipLocalPortRangeDesc, prometheus.GaugeValue, float64(minPort), "min")
+	ch <- prometheus.MustNewConstMetric(ipLocalPortRangeDesc, prometheus.GaugeValue, float64(maxPort), "max")
 
 	return nil
 }

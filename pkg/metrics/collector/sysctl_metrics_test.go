@@ -68,7 +68,7 @@ func TestParseIPLocalPortRange(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			min, max, err := parseIPLocalPortRange(tt.input)
+			minPort, maxPort, err := parseIPLocalPortRange(tt.input)
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("expected error but got none")
@@ -79,11 +79,11 @@ func TestParseIPLocalPortRange(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 				return
 			}
-			if min != tt.expectedMin {
-				t.Errorf("min: got %d, want %d", min, tt.expectedMin)
+			if minPort != tt.expectedMin {
+				t.Errorf("min: got %d, want %d", minPort, tt.expectedMin)
 			}
-			if max != tt.expectedMax {
-				t.Errorf("max: got %d, want %d", max, tt.expectedMax)
+			if maxPort != tt.expectedMax {
+				t.Errorf("max: got %d, want %d", maxPort, tt.expectedMax)
 			}
 		})
 	}

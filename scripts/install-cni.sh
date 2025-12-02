@@ -147,10 +147,10 @@ fetch_node_object 3 20
 log "Node object fetched:"
 log "${node_object}"
 
-if [[ "${MIGRATE_TO_DPV2:-}" == "true" ]]; then
-  DPV2_MIGRATION_READY=$(jq -r '.metadata.labels."cloud.google.com/gke-dpv2-migration-ready"' <<<"${node_object}")
-  log "Migration to DPv2 in progress; node ready: '${DPV2_MIGRATION_READY}'"
-  if [[ "${DPV2_MIGRATION_READY}" != "true" ]]; then
+if [[ "${CHECK_NODE_DATAPATH_PROVIDER:-}" == "true" ]]; then
+  NODE_DPV2_READY=$(jq -r '.metadata.labels."cloud.google.com/gke-dpv2-ready"' <<<"${node_object}")
+  log "Node is Dataplane V2 ready: '${NODE_DPV2_READY}'"
+  if [[ "${NODE_DPV2_READY}" != "true" ]]; then
     ENABLE_CILIUM_PLUGIN=false
   fi
 fi

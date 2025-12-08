@@ -15,7 +15,7 @@
 
 ## The curl, jq and toybox containers build the corresponding binaries.
 
-FROM alpine:3.21 AS curl
+FROM alpine:3.23 AS curl
 
 COPY third_party/curl /curl-src
 
@@ -24,7 +24,7 @@ COPY third_party/static-curl/build.sh /build.sh
 RUN /build.sh
 
 
-FROM alpine:3.21 AS jq
+FROM alpine:3.23 AS jq
 
 COPY third_party/jq /jq-src
 
@@ -33,7 +33,7 @@ COPY build-jq.sh /build-jq.sh
 RUN /build-jq.sh
 
 
-FROM alpine:3.21 AS toybox
+FROM alpine:3.23 AS toybox
 
 COPY third_party/toybox /toybox-src
 
@@ -42,7 +42,7 @@ COPY build-toybox.sh /build-toybox.sh
 RUN /build-toybox.sh
 
 
-FROM alpine:3.21 AS inotify
+FROM alpine:3.23 AS inotify
 
 COPY inotify /inotify
 
@@ -51,7 +51,7 @@ RUN /inotify/build.sh
 
 ## The extras container extracts licenses and package data from Alpine packages.
 
-FROM alpine:3.21 AS extras
+FROM alpine:3.23 AS extras
 
 COPY third_party/license-list-data /license-list-data-src
 

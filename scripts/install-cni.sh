@@ -186,6 +186,10 @@ populate_ip6tables() {
 
 if [[ "${ENABLE_CILIUM_PLUGIN}" == "true" ]]; then
   dpv2_unified_cni=$(jq '.metadata.labels."cloud.google.com/gke-dpv2-unified-cni"' <<<"${node_object}")
+  if [[ -n "${ISTIO_CNI_CONFIG:-}" ]]; then
+    log "Disabling unified CNI because Istio is in use: '${ISTIO_CNI_CONFIG:-}'"
+    dpv2_unified_cni=null
+  fi
   log "Using Cilium plug-in; unified mode: '${dpv2_unified_cni}' (no action needed here if not null)"
   if [[ "${dpv2_unified_cni}" != "null" ]]; then
     populate_ip6tables

@@ -77,6 +77,18 @@ func TestNewNetworkConfigController(t *testing.T) {
 			wantConfigs:   []config.Config{config.ExcludeUDPIPRuleConfig},
 		},
 		{
+			desc:          "6.12 kernel version is impacted",
+			kernelVersion: "6.12.1",
+			wantEnabled:   false,
+			wantConfigs:   []config.Config{config.ExcludeUDPIPRuleConfig},
+		},
+		{
+			desc:          "6.12 fixed version is not impacted",
+			kernelVersion: "6.12.34",
+			wantEnabled:   false,
+			wantConfigs:   []config.Config{},
+		},
+		{
 			desc:                  "all enabled with impacted kernel",
 			enablePolicyRouting:   true,
 			enableSourceValidMark: true,

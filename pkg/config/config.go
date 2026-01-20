@@ -236,10 +236,13 @@ func (r IPTablesRuleConfig) Ensure(enabled bool) error {
 	} else if r.Spec.IsDefaultChain {
 		for _, rs := range r.RuleSpecs {
 			if err := r.IPT.Delete(r.Spec.TableName, r.Spec.ChainName, rs...); err != nil {
-				if eerr, eok := err.(*iptables.Error); !eok || eerr.ExitStatus() != 2 {
-					if !strings.Contains(eerr.Error(), "No chain/target/match") {
+				if eerr, eok := err.(*iptables.Error); eok {
+					if eerr.ExitStatus() != 2 && !strings.Contains(eerr.Error(), "No chain/target/match") {
 						return err
 					}
+				} else {
+					// Non-iptables error, bubble up
+					return err
 				}
 			}
 		}

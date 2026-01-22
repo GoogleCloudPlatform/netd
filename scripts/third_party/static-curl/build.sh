@@ -27,7 +27,18 @@ export CC=clang
 # set up any required curl options here
 #LDFLAGS="-static" PKG_CONFIG="pkg-config --static" ./configure --disable-shared --enable-static --disable-libcurl-option --without-brotli --disable-manual --disable-unix-sockets --disable-dict --disable-file --disable-gopher --disable-imap --disable-smtp --disable-rtsp --disable-telnet --disable-tftp --disable-pop3 --without-zlib --disable-threaded-resolver --disable-ipv6 --disable-smb --disable-ntlm-wb --disable-tls-srp --disable-crypto-auth --without-ngtcp2 --without-nghttp2 --disable-ftp --disable-mqtt --disable-alt-svc --without-ssl
 
-LDFLAGS="-static" PKG_CONFIG="pkg-config --static" ./configure --disable-shared --enable-static --disable-ldap --enable-ipv6 --enable-unix-sockets --with-ssl --without-libssh2 --without-nghttp2 --without-zlib
+LDFLAGS="-static" PKG_CONFIG="pkg-config --static" ./configure --disable-shared --enable-static \
+  --disable-libcurl-option --without-brotli --disable-manual --disable-unix-sockets \
+  --disable-dict --disable-file --disable-gopher --disable-imap --disable-smtp \
+  --disable-rtsp --disable-telnet -disable-tftp --disable-pop3 --without-zlib \
+  --disable-threaded-resolver --enable-ipv6 --disable-smb --disable-ntlm-wb \
+  --disable-tls-srp --disable-crypto-auth --without-ngtcp2 --without-nghttp2 \
+  --disable-ftp --disable-mqtt --disable-alt-svc --with-ssl --without-libssh2 \
+  --disable-ares --disable-cookies --disable-dateparse --disable-dnsshuffle \
+  --disable-doh --disable-get-easy-options --disable-hsts --disable-http-auth \
+  --disable-netrc --disable-progress-meter --disable-proxy --disable-pthreads \
+  --disable-socketpair --disable-versioned-symbols --without-libpsl --without-zstd \
+  --without-libidn2 --without-librtmp
 
 make -j4 V=1 LDFLAGS="-static -all-static"
 

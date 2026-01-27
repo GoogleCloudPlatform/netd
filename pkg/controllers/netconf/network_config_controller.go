@@ -34,6 +34,7 @@ var GetKernelVersion = kernel.GetVersion
 
 const (
 	brokenLocalUDPKernelVersionStart = "6.6.57"
+	brokenLocalUDPKernelVersionEnd   = "6.12.34"
 )
 
 // NetworkConfigController defines the controller
@@ -62,8 +63,11 @@ func NewNetworkConfigController(enablePolicyRouting, enableSourceValidMark, excl
 		glog.Errorf("Could not check kernel version: %v. Skip installing UDP exempt rule.", err)
 	} else {
 		glog.Infof("Kernel version detected: %v.", kernelVersion)
-		if kernelVersion.AtLeast(version.MustParseGeneric(brokenLocalUDPKernelVersionStart)) {
-			glog.Infof("Kernel version is impacted by a known issue (start version: %v). Including an IP rule to exempt UDP traffic.", brokenLocalUDPKernelVersionStart)
+		isBroken := kernelVersion.AtLeast(version.MustParseGeneric(brokenLocalUDPKernelVersionStart)) &&
+			!kernelVersion.AtLeast(version.MustParseGeneric(brokenLocalUDPKernelVersionEnd))
+
+		if isBroken {
+			glog.Infof("Kernel version is impacted by a known issue. Including an IP rule to exempt UDP traffic.")
 			configSet[0].Configs = append(configSet[0].Configs, config.ExcludeUDPIPRuleConfig)
 		}
 	}

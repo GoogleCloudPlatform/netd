@@ -9,7 +9,7 @@ require (
 	github.com/golang/glog v1.2.5
 	github.com/prometheus/client_golang v1.17.0
 	github.com/spf13/pflag v1.0.6
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	github.com/vishvananda/netns v0.0.4
 	golang.org/x/sys v0.38.0

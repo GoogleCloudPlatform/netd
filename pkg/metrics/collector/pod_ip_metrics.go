@@ -228,13 +228,12 @@ func (c *podIPMetricsCollector) listIPAddresses(dir string) error {
 			continue
 		}
 		f, ok := podMap[podID]
-		// TODO: #351 - fix lint errors
-		//nolint:gocritic
-		if !ok {
+		switch {
+		case !ok:
 			podMap[podID] = family
-		} else if (f == ipv4 && family == ipv6) || (f == ipv6 && family == ipv4) {
+		case (f == ipv4 && family == ipv6) || (f == ipv6 && family == ipv4):
 			podMap[podID] = dual
-		} else {
+		default:
 			dupIPCount++
 		}
 	}

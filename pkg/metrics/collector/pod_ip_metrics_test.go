@@ -271,16 +271,15 @@ func TestSetupDirectoryWatcher(t *testing.T) {
 
 	for _, bound := range bucketKeys {
 		v, ok := mc.reuseIPs.buckets[bound]
-		// TODO: #351 - fix lint errors
-		//nolint:gocritic
-		if !ok {
+		switch {
+		case !ok:
 			t.Errorf("reused ip: buckets are initialized with 0 values. want: ok, got %v", ok)
-		} else if bound == 5e3 && v != 0 {
+		case bound == 5e3 && v != 0:
 			t.Errorf("reused ip: bucket with le==5. want: 0, got %d", v)
-		} else if bound == 10e3 && v != 1 {
+		case bound == 10e3 && v != 1:
 			// 10.0.0.3 is reused in 6 seconds
 			t.Errorf("reused ip: bucket with le==10. want: 1, got %d", v)
-		} else if bound >= 15e3 && v != 2 {
+		case bound >= 15e3 && v != 2:
 			// 10.0.0.2 is reused in 11 seconds, so included 10.0.0.3 for buckets: (10, 15] and (15, +Inf), sizes are 2
 			// file "2600:1900::1" and "lock" are not counted in the bucket
 			t.Errorf("reused ip: bucket with le>=15. want: 2, got %d", v)

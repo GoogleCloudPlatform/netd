@@ -137,4 +137,13 @@ type LinuxTCPInfo struct {
 	TotalRto           uint16
 	TotalRtoRecoveries uint16
 	TotalRtoTime       uint32
+
+	ReceivedCE       uint32
+	DeliveredE1Bytes uint32
+	DeliveredE0Bytes uint32
+	DeliveredCEBytes uint32
+	ReceivedE1Bytes  uint32
+	ReceivedE0Bytes  uint32
+	ReceivedCEBytes  uint32
+	_                [4]byte
 }

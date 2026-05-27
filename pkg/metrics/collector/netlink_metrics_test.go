@@ -43,7 +43,7 @@ func TestCreateStatMap(t *testing.T) {
 	statMap := createStatMap(snapshots)
 	want := map[*v1.Pod]netlinkStats{myPod: {retransmits: 8, tcpConnections: 2}}
 	if statMap[myPod] != want[myPod] {
-		t.Fatalf("Fatal, got %+q, wanted %+q", statMap, want)
+		t.Fatalf("Fatal, got %+v, wanted %+v", statMap, want)
 	}
 }
 

@@ -43,7 +43,7 @@ TcpExt: 0 0 0 0 0 440 99 21800 3`
 		t.Errorf("failed parseNetstat, got %q", err)
 	}
 	if !mapContainsAll(got, want) {
-		t.Errorf("parseNetstatVals returns %+q, want %+q", got, want)
+		t.Errorf("parseNetstatVals returns %+v, want %+v", got, want)
 	}
 }
 
@@ -62,7 +62,7 @@ UdpLite: 0 0 0 0 0 0 0 0`
 		t.Errorf("failed parseNetstat, got %q", err)
 	}
 	if !mapContainsAll(got, want) {
-		t.Errorf("parseSnmpVals returns %+q, want %+q", got, want)
+		t.Errorf("parseSnmpVals returns %+v, want %+v", got, want)
 	}
 
 }

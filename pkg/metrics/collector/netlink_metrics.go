@@ -262,6 +262,7 @@ func getNamespaces() ([]netns.NsHandle, error) {
 		}
 		// Check for a new inode.
 		if err := unix.Fstat(int(ns), &s); err != nil {
+			ns.Close()
 			continue
 		}
 		if _, ok := nsSet[s.Ino]; ok {
@@ -285,23 +286,29 @@ func getSnapshots(req *nl.NetlinkRequest) ([]*parser.Snapshot, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		for _, ns := range namespaces {
+			ns.Close()
+		}
+	}()
 	basens, err := netns.Get()
 	if err != nil {
 		return nil, err
 	}
+	defer basens.Close()
 	for _, curNs := range namespaces {
-		defer curNs.Close()
 		s, err := nl.SubscribeAt(curNs, basens, sockType)
 		if err != nil {
 			glog.Infof("Could not subscribe to netlink namespaces %q", curNs)
 			continue
 		}
-		defer s.Close()
-		if err := s.Send(req); err != nil { //nolint:govet
+		if err = s.Send(req); err != nil {
+			s.Close()
 			return nil, err
 		}
 		pid, err := s.GetPid()
 		if err != nil {
+			s.Close()
 			return nil, err
 		}
 		// Adapted this from req.Execute in nl_linux.go
@@ -309,12 +316,14 @@ func getSnapshots(req *nl.NetlinkRequest) ([]*parser.Snapshot, error) {
 		for {
 			msgs, _, err := s.Receive()
 			if err != nil {
+				s.Close()
 				return nil, err
 			}
 			// TODO avoid the copy.
 			for i := range msgs {
 				m, shouldContinue, err := inetdiag.ProcessMessage(&msgs[i], req.Seq, pid)
 				if err != nil {
+					s.Close()
 					return nil, err
 				}
 				if m != nil {
@@ -331,6 +340,7 @@ func getSnapshots(req *nl.NetlinkRequest) ([]*parser.Snapshot, error) {
 			}
 
 		}
+		s.Close()
 	}
 
 	return snps, nil

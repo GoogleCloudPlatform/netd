@@ -190,7 +190,18 @@ func isRuleEqualWithoutPriority(rule1, rule2 netlink.Rule) bool {
 	rule2Copy := rule2
 	rule1Copy.Priority = 0
 	rule2Copy.Priority = 0
+	// RuleList reports the address family of each rule, while the rules we
+	// configure usually leave Family unset, which RuleAdd treats as AF_INET.
+	rule1Copy.Family = normalizeRuleFamily(rule1Copy.Family)
+	rule2Copy.Family = normalizeRuleFamily(rule2Copy.Family)
 	return reflect.DeepEqual(rule1Copy, rule2Copy)
+}
+
+func normalizeRuleFamily(family int) int {
+	if family == 0 {
+		return unix.AF_INET
+	}
+	return family
 }
 
 func (c IPTablesChainSpec) ensure(enabled bool) error {

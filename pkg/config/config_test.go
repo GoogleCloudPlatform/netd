@@ -20,6 +20,8 @@ import (
 	"testing"
 
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
+	"k8s.io/utils/ptr"
 )
 
 func TestSysctlConfigEnsure(t *testing.T) {
@@ -62,9 +64,9 @@ func TestIPRouteConfigEnsure(t *testing.T) {
 
 func TestIPRuleConfigEnsure(t *testing.T) {
 	ruleList := []netlink.Rule{
-		{SuppressIfgroup: -1, SuppressPrefixlen: -1, Mark: -1, Mask: -1, Goto: -1},
-		{SuppressIfgroup: 1, SuppressPrefixlen: 2, Mark: -1, Mask: -1, Goto: -1},
-		{SuppressIfgroup: -1, SuppressPrefixlen: -1, Mark: -1, Mask: -1, Goto: -1},
+		{SuppressIfgroup: -1, SuppressPrefixlen: -1, Goto: -1},
+		{SuppressIfgroup: 1, SuppressPrefixlen: 2, Goto: -1},
+		{SuppressIfgroup: -1, SuppressPrefixlen: -1, Goto: -1},
 	}
 
 	mockRuleDel := func(rule *netlink.Rule) error {
@@ -78,7 +80,7 @@ func TestIPRuleConfigEnsure(t *testing.T) {
 	}
 
 	ipRule := IPRuleConfig{
-		Rule:     netlink.Rule{SuppressIfgroup: -1, SuppressPrefixlen: -1, Mark: -1, Mask: -1, Goto: -1},
+		Rule:     netlink.Rule{SuppressIfgroup: -1, SuppressPrefixlen: -1, Goto: -1},
 		RuleAdd:  func(rule *netlink.Rule) error { ruleList = append(ruleList, *rule); return nil },
 		RuleDel:  mockRuleDel,
 		RuleList: func(_ int) ([]netlink.Rule, error) { return ruleList, nil },
@@ -251,7 +253,7 @@ func TestIsRuleEqualWithoutPriority(t *testing.T) {
 				Dport:    netlink.NewRulePortRange(53, 53),
 				Sport:    netlink.NewRulePortRange(53, 53),
 				Mark:     hairpinMark,
-				Mask:     hairpinMask,
+				Mask:     ptr.To[uint32](hairpinMask),
 				Invert:   true,
 			},
 			rule2: netlink.Rule{
@@ -261,7 +263,7 @@ func TestIsRuleEqualWithoutPriority(t *testing.T) {
 				Dport:    netlink.NewRulePortRange(53, 53),
 				Sport:    netlink.NewRulePortRange(53, 53),
 				Mark:     hairpinMark,
-				Mask:     hairpinMask,
+				Mask:     ptr.To[uint32](hairpinMask),
 				Invert:   true,
 			},
 			want: true,
@@ -275,7 +277,7 @@ func TestIsRuleEqualWithoutPriority(t *testing.T) {
 				Dport:    netlink.NewRulePortRange(53, 53),
 				Sport:    netlink.NewRulePortRange(53, 53),
 				Mark:     hairpinMark,
-				Mask:     hairpinMask,
+				Mask:     ptr.To[uint32](hairpinMask),
 				Invert:   true,
 			},
 			rule2: netlink.Rule{
@@ -285,7 +287,7 @@ func TestIsRuleEqualWithoutPriority(t *testing.T) {
 				Dport:    netlink.NewRulePortRange(443, 443),
 				Sport:    netlink.NewRulePortRange(443, 443),
 				Mark:     hairpinMark,
-				Mask:     hairpinMask,
+				Mask:     ptr.To[uint32](hairpinMask),
 				Invert:   true,
 			},
 			want: false,
@@ -299,7 +301,7 @@ func TestIsRuleEqualWithoutPriority(t *testing.T) {
 				Dport:    netlink.NewRulePortRange(53, 53),
 				Sport:    netlink.NewRulePortRange(53, 53),
 				Mark:     hairpinMark,
-				Mask:     hairpinMask,
+				Mask:     ptr.To[uint32](hairpinMask),
 				Invert:   true,
 			},
 			rule2: netlink.Rule{
@@ -309,10 +311,41 @@ func TestIsRuleEqualWithoutPriority(t *testing.T) {
 				Dport:    netlink.NewRulePortRange(53, 53),
 				Sport:    netlink.NewRulePortRange(53, 53),
 				Mark:     hairpinMark,
-				Mask:     hairpinMask,
+				Mask:     ptr.To[uint32](hairpinMask),
 				Invert:   true,
 			},
 			want: true,
+		},
+		{
+			desc: "unset family equals AF_INET as reported by RuleList",
+			rule1: netlink.Rule{
+				Table:             unix.RT_TABLE_MAIN,
+				Priority:          hairpinRulePriority,
+				Mark:              hairpinMark,
+				Mask:              ptr.To[uint32](hairpinMask),
+				SuppressIfgroup:   -1,
+				SuppressPrefixlen: -1,
+				Goto:              -1,
+				Flow:              -1,
+			},
+			rule2: netlink.Rule{
+				Family:            unix.AF_INET,
+				Table:             unix.RT_TABLE_MAIN,
+				Priority:          hairpinRulePriority,
+				Mark:              hairpinMark,
+				Mask:              ptr.To[uint32](hairpinMask),
+				SuppressIfgroup:   -1,
+				SuppressPrefixlen: -1,
+				Goto:              -1,
+				Flow:              -1,
+			},
+			want: true,
+		},
+		{
+			desc:  "different family not equal",
+			rule1: netlink.Rule{Family: unix.AF_INET, Table: customRouteTable},
+			rule2: netlink.Rule{Family: unix.AF_INET6, Table: customRouteTable},
+			want:  false,
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {

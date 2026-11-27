@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	netutils "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 
 	"github.com/containernetworking/plugins/pkg/ip"
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
@@ -206,7 +207,7 @@ func InitPolicyRouting(ctx context.Context, clientset kubernetes.Interface, node
 		IPRuleConfig{
 			Rule: netlink.Rule{
 				Mark:              hairpinMark,
-				Mask:              hairpinMask,
+				Mask:              ptr.To[uint32](hairpinMask),
 				Table:             unix.RT_TABLE_MAIN,
 				Priority:          hairpinRulePriority,
 				SuppressIfgroup:   -1,
@@ -225,8 +226,6 @@ func InitPolicyRouting(ctx context.Context, clientset kubernetes.Interface, node
 				Priority:          localRulePriority,
 				SuppressIfgroup:   -1,
 				SuppressPrefixlen: -1,
-				Mark:              -1,
-				Mask:              -1,
 				Goto:              -1,
 				Flow:              -1,
 			},
@@ -242,8 +241,6 @@ func InitPolicyRouting(ctx context.Context, clientset kubernetes.Interface, node
 				Priority:          policyRoutingRulePriority,
 				SuppressIfgroup:   -1,
 				SuppressPrefixlen: -1,
-				Mark:              -1,
-				Mask:              -1,
 				Goto:              -1,
 				Flow:              -1,
 			},
@@ -346,8 +343,6 @@ var ExcludeDNSIPRuleConfigs = []Config{
 			Dport:             netlink.NewRulePortRange(53, 53),
 			SuppressIfgroup:   -1,
 			SuppressPrefixlen: -1,
-			Mark:              -1,
-			Mask:              -1,
 			Goto:              -1,
 			Flow:              -1,
 		},
@@ -362,8 +357,6 @@ var ExcludeDNSIPRuleConfigs = []Config{
 			Sport:             netlink.NewRulePortRange(53, 53),
 			SuppressIfgroup:   -1,
 			SuppressPrefixlen: -1,
-			Mark:              -1,
-			Mask:              -1,
 			Goto:              -1,
 			Flow:              -1,
 		},
@@ -380,8 +373,6 @@ var ExcludeUDPIPRuleConfig = IPRuleConfig{
 		IPProto:           unix.IPPROTO_UDP,
 		SuppressIfgroup:   -1,
 		SuppressPrefixlen: -1,
-		Mark:              -1,
-		Mask:              -1,
 		Goto:              -1,
 		Flow:              -1,
 	},
@@ -403,8 +394,6 @@ var LocalTableRuleConfigs = []Config{
 			Dst:               &loopbackDst,
 			SuppressIfgroup:   -1,
 			SuppressPrefixlen: -1,
-			Mark:              -1,
-			Mask:              -1,
 			Goto:              -1,
 			Flow:              -1,
 		},
@@ -419,8 +408,6 @@ var LocalTableRuleConfigs = []Config{
 			Dst:               &linkLocalNet,
 			SuppressIfgroup:   -1,
 			SuppressPrefixlen: -1,
-			Mark:              -1,
-			Mask:              -1,
 			Goto:              -1,
 			Flow:              -1,
 		},
@@ -438,8 +425,6 @@ func newLocalTableRuleConfig(dst net.IPNet) IPRuleConfig {
 			Dst:               &dst,
 			SuppressIfgroup:   -1,
 			SuppressPrefixlen: -1,
-			Mark:              -1,
-			Mask:              -1,
 			Goto:              -1,
 			Flow:              -1,
 		},

@@ -407,8 +407,8 @@ lint:
 	    -w /src                             \
 	    --env HTTP_PROXY="$(HTTP_PROXY)"    \
 	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
-	    python:3-alpine                     \
-	    sh -c 'pip install cpplint==1.6.1 && cpplint --recursive .'
+	    python:3.15-alpine                     \
+	    sh -c 'pip install cpplint==2.0.2 && cpplint --recursive .'
 	echo "Linting install-cni.sh"
 	docker run                              \
 	    -i                                  \
